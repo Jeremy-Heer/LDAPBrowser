@@ -1,0 +1,9 @@
+{
+  "lumoImports": [
+    "@vaadin/vaadin-lumo-styles/color.js",
+    "@vaadin/vaadin-lumo-styles/typography.js",
+    "@vaadin/vaadin-lumo-styles/sizing.js",
+    "@vaadin/vaadin-lumo-styles/spacing.js",
+    "@vaadin/vaadin-lumo-styles/style.js"
+  ]
+}

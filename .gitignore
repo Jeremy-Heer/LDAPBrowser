@@ -1,0 +1,32 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IDE
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vaadin
+node_modules/
+frontend/generated/
+pnpmfile.js
+vite.generated.ts
+webpack.generated.js
+
+# Application specific
+ldap-servers.json
+*.log
+
+# Spring Boot
+*.pid
