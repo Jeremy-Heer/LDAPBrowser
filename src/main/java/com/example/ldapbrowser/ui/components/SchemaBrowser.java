@@ -2,6 +2,8 @@ package com.example.ldapbrowser.ui.components;
 
 import com.example.ldapbrowser.model.LdapServerConfig;
 import com.example.ldapbrowser.service.LdapService;
+import com.example.ldapbrowser.service.ConfigurationService;
+import com.example.ldapbrowser.service.InMemoryLdapService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.grid.Grid;
@@ -32,6 +34,11 @@ import java.util.stream.Collectors;
 public class SchemaBrowser extends VerticalLayout {
     
     private final LdapService ldapService;
+    private final ConfigurationService configurationService;
+    private final InMemoryLdapService inMemoryLdapService;
+    
+    // Environment selection
+    private EnvironmentDropdown environmentDropdown;
     
     // Server configuration
     private LdapServerConfig serverConfig;
@@ -53,18 +60,26 @@ public class SchemaBrowser extends VerticalLayout {
     
     // Details panels
     private VerticalLayout detailsPanel;
+    private VerticalLayout gridContainer;
     
     // Current view state
     private String currentView = "objectClasses";
     private String currentFilter = "";
     
-    public SchemaBrowser(LdapService ldapService) {
+    public SchemaBrowser(LdapService ldapService, ConfigurationService configurationService,
+                        InMemoryLdapService inMemoryLdapService) {
         this.ldapService = ldapService;
+        this.configurationService = configurationService;
+        this.inMemoryLdapService = inMemoryLdapService;
         initializeComponents();
         setupLayout();
     }
     
     private void initializeComponents() {
+        // Environment dropdown for single-select
+        environmentDropdown = new EnvironmentDropdown(ldapService, configurationService, inMemoryLdapService, false);
+        environmentDropdown.addSingleSelectionListener(this::onEnvironmentSelected);
+        
         // Search controls
         searchField = new TextField();
         searchField.setPlaceholder("Search schema elements...");
@@ -292,6 +307,12 @@ public class SchemaBrowser extends VerticalLayout {
         setPadding(false);
         setSpacing(false);
         
+        // Environment dropdown
+        HorizontalLayout environmentLayout = new HorizontalLayout();
+        environmentLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.END);
+        environmentLayout.setPadding(true);
+        environmentLayout.add(environmentDropdown.getSingleSelectComponent());
+        
         // Top controls
         HorizontalLayout controlsLayout = new HorizontalLayout();
         controlsLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
@@ -325,7 +346,7 @@ public class SchemaBrowser extends VerticalLayout {
         splitLayout.setSplitterPosition(70); // 70% for grid, 30% for details
         
         // Grid container
-        VerticalLayout gridContainer = new VerticalLayout();
+        gridContainer = new VerticalLayout();
         gridContainer.setSizeFull();
         gridContainer.setPadding(false);
         gridContainer.setSpacing(false);
@@ -362,8 +383,17 @@ public class SchemaBrowser extends VerticalLayout {
         contentLayout.add(splitLayout);
         contentLayout.setFlexGrow(1, splitLayout);
         
-        add(controlsLayout, contentLayout);
+        add(environmentLayout, controlsLayout, contentLayout);
         setFlexGrow(1, contentLayout);
+    }
+    
+    private void onEnvironmentSelected(LdapServerConfig environment) {
+        this.serverConfig = environment;
+        if (environment != null) {
+            loadSchema();
+        } else {
+            clear();
+        }
     }
     
     public void setServerConfig(LdapServerConfig serverConfig) {
@@ -375,6 +405,19 @@ public class SchemaBrowser extends VerticalLayout {
         if (serverConfig == null) {
             showError("No server selected");
             return;
+        }
+        
+        // Check if connected to the server
+        if (!ldapService.isConnected(serverConfig.getId())) {
+            // Try to connect first
+            try {
+                ldapService.connect(serverConfig);
+                showSuccess("Connected to " + serverConfig.getName());
+            } catch (Exception e) {
+                showError("Failed to connect to server " + serverConfig.getName() + ": " + e.getMessage());
+                schema = null;
+                return;
+            }
         }
         
         try {
@@ -447,8 +490,7 @@ public class SchemaBrowser extends VerticalLayout {
     }
     
     private VerticalLayout getGridContainer() {
-        SplitLayout splitLayout = (SplitLayout) ((VerticalLayout) getComponentAt(1)).getComponentAt(1);
-        return (VerticalLayout) splitLayout.getPrimaryComponent();
+        return gridContainer;
     }
     
     private void clearGridContainer() {
@@ -762,5 +804,11 @@ public class SchemaBrowser extends VerticalLayout {
     private void showError(String message) {
         Notification notification = Notification.show(message, 5000, Notification.Position.TOP_END);
         notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+    }
+    
+    public void refreshEnvironments() {
+        if (environmentDropdown != null) {
+            environmentDropdown.refreshEnvironments();
+        }
     }
 }

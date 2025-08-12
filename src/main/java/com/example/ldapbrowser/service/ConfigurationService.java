@@ -81,7 +81,6 @@ public class ConfigurationService {
                     configurations.put(config.getId(), config);
                 }
             } catch (IOException e) {
-                System.err.println("Failed to load configurations: " + e.getMessage());
                 // Initialize with default configurations if loading fails
                 initializeDefaultConfigurations();
             }
@@ -99,7 +98,7 @@ public class ConfigurationService {
             objectMapper.writerWithDefaultPrettyPrinter()
                 .writeValue(new File(CONFIG_FILE), new ArrayList<>(configurations.values()));
         } catch (IOException e) {
-            System.err.println("Failed to save configurations: " + e.getMessage());
+            // Log error if needed for debugging
         }
     }
     

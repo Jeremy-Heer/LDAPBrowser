@@ -3,6 +3,7 @@ package com.example.ldapbrowser.ui.components;
 import com.example.ldapbrowser.model.LdapServerConfig;
 import com.example.ldapbrowser.service.ConfigurationService;
 import com.example.ldapbrowser.service.LdapService;
+import com.example.ldapbrowser.service.InMemoryLdapService;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.TabSheet;
@@ -16,6 +17,7 @@ public class ServersTab extends VerticalLayout {
     
     private final LdapService ldapService;
     private final ConfigurationService configurationService;
+    private final InMemoryLdapService inMemoryLdapService;
     
     // Sub-tabs
     private TabSheet tabSheet;
@@ -30,15 +32,18 @@ public class ServersTab extends VerticalLayout {
     private Consumer<LdapServerConfig> connectionListener;
     private Runnable disconnectionListener;
     
-    public ServersTab(LdapService ldapService, ConfigurationService configurationService) {
+    public ServersTab(LdapService ldapService, ConfigurationService configurationService, 
+                      EnvironmentRefreshListener environmentRefreshListener,
+                      InMemoryLdapService inMemoryLdapService) {
         this.ldapService = ldapService;
         this.configurationService = configurationService;
+        this.inMemoryLdapService = inMemoryLdapService;
         
-        initializeComponents();
+        initializeComponents(environmentRefreshListener);
         setupLayout();
     }
     
-    private void initializeComponents() {
+    private void initializeComponents(EnvironmentRefreshListener environmentRefreshListener) {
         // Create sub-tabs
         tabSheet = new TabSheet();
         tabSheet.setSizeFull();
@@ -50,7 +55,7 @@ public class ServersTab extends VerticalLayout {
         
         // Internal servers tab (UnboundID in-memory servers)
         internalTab = new Tab("Internal");
-        internalServersTab = new InternalServersTab(ldapService, configurationService);
+        internalServersTab = new InternalServersTab(ldapService, configurationService, environmentRefreshListener, inMemoryLdapService);
         tabSheet.add(internalTab, internalServersTab);
         
         // Set External as the default selected tab

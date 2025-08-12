@@ -41,71 +41,45 @@ public class InMemoryLdapService {
     
     @PostConstruct
     private void loadConfigurations() {
-        System.out.println("InMemoryLdapService: @PostConstruct loadConfigurations() called");
         try {
             File configFile = new File(CONFIG_FILE_PATH);
-            System.out.println("InMemoryLdapService: Checking for config file: " + configFile.getAbsolutePath());
             if (configFile.exists()) {
-                System.out.println("InMemoryLdapService: Config file exists, loading configurations...");
                 TypeReference<Map<String, LdapServerConfig>> typeRef = new TypeReference<Map<String, LdapServerConfig>>() {};
                 Map<String, LdapServerConfig> loadedConfigs = objectMapper.readValue(configFile, typeRef);
-                System.out.println("InMemoryLdapService: Raw loaded configs: " + loadedConfigs.keySet());
-                for (String key : loadedConfigs.keySet()) {
-                    LdapServerConfig config = loadedConfigs.get(key);
-                    System.out.println("InMemoryLdapService: Loaded server - ID: " + config.getId() + ", Name: " + config.getName());
-                }
                 serverConfigurations.putAll(loadedConfigs);
-                System.out.println("InMemoryLdapService: Loaded " + loadedConfigs.size() + " in-memory server configurations from disk");
-                System.out.println("InMemoryLdapService: Total servers in memory after load: " + serverConfigurations.size());
-            } else {
-                System.out.println("InMemoryLdapService: No config file found at " + configFile.getAbsolutePath());
             }
         } catch (IOException e) {
-            System.err.println("InMemoryLdapService: Failed to load in-memory server configurations: " + e.getMessage());
-            e.printStackTrace();
+            // Initialize with empty configurations if loading fails
         }
     }
     
     @PreDestroy
     private void cleanup() {
-        System.out.println("=== SHUTDOWN DEBUG ===");
-        System.out.println("InMemoryLdapService: @PreDestroy cleanup() called on bean: " + this.hashCode());
-        System.out.println("InMemoryLdapService: Servers in memory before save: " + serverConfigurations.size());
-        
         // Safety check - don't overwrite file if it has more servers than memory
         File configFile = new File(CONFIG_FILE_PATH);
         if (configFile.exists()) {
             try {
                 String fileContent = Files.readString(configFile.toPath());
-                System.out.println("InMemoryLdapService: File content before save: " + fileContent);
                 
                 TypeReference<Map<String, LdapServerConfig>> typeRef = new TypeReference<Map<String, LdapServerConfig>>() {};
                 Map<String, LdapServerConfig> fileConfigs = objectMapper.readValue(fileContent, typeRef);
                 
-                System.out.println("InMemoryLdapService: File has " + fileConfigs.size() + " servers");
-                System.out.println("InMemoryLdapService: Memory has " + serverConfigurations.size() + " servers");
-                
                 if (fileConfigs.size() > serverConfigurations.size()) {
-                    System.out.println("InMemoryLdapService: WARNING - File has more servers than memory!");
-                    System.out.println("InMemoryLdapService: Skipping save to prevent data loss");
-                    System.out.println("=== END SHUTDOWN DEBUG ===");
                     return; // Don't save - prevent data loss
                 }
             } catch (Exception e) {
-                System.out.println("InMemoryLdapService: Could not read file for safety check: " + e.getMessage());
+                // Continue with save if safety check fails
             }
         }
         
         saveConfigurationsToDisk();
-        System.out.println("=== END SHUTDOWN DEBUG ===");
     }
     
     private void saveConfigurationsToDisk() {
         try {
             objectMapper.writeValue(new File(CONFIG_FILE_PATH), new HashMap<>(serverConfigurations));
-            System.out.println("Saved " + serverConfigurations.size() + " in-memory server configurations to disk");
         } catch (IOException e) {
-            System.err.println("Failed to save in-memory server configurations: " + e.getMessage());
+            // Log error if needed for debugging
         }
     }
     
@@ -185,25 +159,13 @@ public class InMemoryLdapService {
      * Get all in-memory server configurations
      */
     public List<LdapServerConfig> getAllInMemoryServers() {
-        System.out.println("=== GET SERVERS DEBUG ===");
-        System.out.println("InMemoryLdapService: getAllInMemoryServers() called - Bean instance: " + this.hashCode());
-        System.out.println("InMemoryLdapService: Servers in memory: " + serverConfigurations.size());
-        
         // If the in-memory map is empty but the file exists, reload from disk
         // This handles cases where DevTools recreated the Bean but lost the in-memory state
         File configFile = new File(CONFIG_FILE_PATH);
         if (serverConfigurations.isEmpty() && configFile.exists()) {
-            System.out.println("InMemoryLdapService: In-memory servers empty but config file exists - auto-reloading...");
             loadConfigurations();
-            System.out.println("InMemoryLdapService: After auto-reload, servers in memory: " + serverConfigurations.size());
         }
         
-        System.out.println("InMemoryLdapService: Returning " + serverConfigurations.size() + " servers");
-        for (String key : serverConfigurations.keySet()) {
-            LdapServerConfig config = serverConfigurations.get(key);
-            System.out.println("InMemoryLdapService: Available server - ID: " + config.getId() + ", Name: " + config.getName());
-        }
-        System.out.println("=== END GET SERVERS DEBUG ===");
         return new ArrayList<>(serverConfigurations.values());
     }
     
@@ -211,22 +173,10 @@ public class InMemoryLdapService {
      * Save an in-memory server configuration
      */
     public void saveInMemoryServer(LdapServerConfig config) {
-        System.out.println("=== SAVE SERVER DEBUG ===");
-        System.out.println("InMemoryLdapService: Saving server - ID: " + config.getId() + ", Name: " + config.getName());
-        System.out.println("InMemoryLdapService: Bean instance: " + this.hashCode());
-        System.out.println("InMemoryLdapService: Servers in memory before add: " + serverConfigurations.size());
-        
         serverConfigurations.put(config.getId(), config);
-        
-        System.out.println("InMemoryLdapService: Servers in memory after add: " + serverConfigurations.size());
-        System.out.println("InMemoryLdapService: All servers in memory:");
-        for (String key : serverConfigurations.keySet()) {
-            System.out.println("  - " + key + ": " + serverConfigurations.get(key).getName());
-        }
         
         // Persist to disk immediately
         saveConfigurationsToDisk();
-        System.out.println("=== END SAVE SERVER DEBUG ===");
     }
     
     /**

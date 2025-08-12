@@ -5,9 +5,12 @@ import com.example.ldapbrowser.model.LdapServerConfig;
 import com.example.ldapbrowser.service.LdapService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
+import com.vaadin.flow.component.contextmenu.ContextMenu;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -17,6 +20,7 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.Modification;
@@ -32,11 +36,15 @@ public class AttributeEditor extends VerticalLayout {
     private final LdapService ldapService;
     private LdapServerConfig serverConfig;
     private LdapEntry currentEntry;
+    private LdapEntry fullEntry; // Cache of full entry with all attributes
     
     // Removed redundant titleLabel field
     private Span dnLabel;
+    private Button copyDnButton;
     private HorizontalLayout entryTypeDisplay;
+    private Checkbox showOperationalAttributesCheckbox;
     private Grid<AttributeRow> attributeGrid;
+    private Grid.Column<AttributeRow> attributeColumn;
     private Button addAttributeButton;
     private Button saveButton;
     private Button refreshButton;
@@ -55,6 +63,13 @@ public class AttributeEditor extends VerticalLayout {
         dnLabel.getStyle().set("font-family", "monospace");
         dnLabel.getStyle().set("word-break", "break-all");
         
+        // Copy DN button
+        copyDnButton = new Button(new Icon(VaadinIcon.COPY));
+        copyDnButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+        copyDnButton.getElement().setAttribute("title", "Copy DN to clipboard");
+        copyDnButton.addClickListener(e -> copyDnToClipboard());
+        copyDnButton.setEnabled(false); // Initially disabled
+        
         // Initialize entry type display
         entryTypeDisplay = new HorizontalLayout();
         entryTypeDisplay.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
@@ -62,11 +77,16 @@ public class AttributeEditor extends VerticalLayout {
         entryTypeDisplay.setSpacing(true);
         entryTypeDisplay.getStyle().set("margin-bottom", "8px");
         
+        // Operational attributes checkbox
+        showOperationalAttributesCheckbox = new Checkbox("Show operational attributes");
+        showOperationalAttributesCheckbox.setValue(false);
+        showOperationalAttributesCheckbox.addValueChangeListener(e -> refreshAttributeDisplay());
+        
         attributeGrid = new Grid<>(AttributeRow.class, false);
         attributeGrid.setSizeFull();
         
         // Configure attribute grid columns
-        attributeGrid.addColumn(AttributeRow::getName)
+        attributeColumn = attributeGrid.addColumn(AttributeRow::getName)
             .setHeader("Attribute")
             .setFlexGrow(1)
             .setSortable(true);
@@ -103,17 +123,32 @@ public class AttributeEditor extends VerticalLayout {
         setPadding(false);
         setSpacing(true);
         
-        // Header with DN (removed redundant title)
+        // Header with DN and copy button (removed redundant title)
         VerticalLayout header = new VerticalLayout();
         header.setPadding(false);
         header.setSpacing(false);
-        header.add(entryTypeDisplay, dnLabel);
+        
+        // DN row with copy button
+        HorizontalLayout dnRow = new HorizontalLayout();
+        dnRow.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+        dnRow.setPadding(false);
+        dnRow.setSpacing(true);
+        dnRow.add(dnLabel, copyDnButton);
+        dnRow.setFlexGrow(1, dnLabel);
+        
+        header.add(entryTypeDisplay, dnRow);
+        
+        // Controls layout (operational attributes checkbox)
+        HorizontalLayout controlsLayout = new HorizontalLayout();
+        controlsLayout.setPadding(false);
+        controlsLayout.setSpacing(true);
+        controlsLayout.add(showOperationalAttributesCheckbox);
         
         // Action buttons
         HorizontalLayout buttonLayout = new HorizontalLayout();
         buttonLayout.add(addAttributeButton, saveButton, refreshButton, deleteEntryButton);
         
-        add(header, buttonLayout, attributeGrid);
+        add(header, controlsLayout, buttonLayout, attributeGrid);
         setFlexGrow(1, attributeGrid);
     }
     
@@ -123,6 +158,7 @@ public class AttributeEditor extends VerticalLayout {
     
     public void editEntry(LdapEntry entry) {
         this.currentEntry = entry;
+        this.fullEntry = entry; // Store the full entry
         
         if (entry != null) {
             // Removed redundant titleLabel.setText() call
@@ -131,16 +167,63 @@ public class AttributeEditor extends VerticalLayout {
             // Update entry type display
             updateEntryTypeDisplay(entry);
             
-            List<AttributeRow> rows = new ArrayList<>();
-            for (Map.Entry<String, List<String>> attr : entry.getAttributes().entrySet()) {
-                rows.add(new AttributeRow(attr.getKey(), attr.getValue()));
-            }
+            // Refresh attribute display based on operational attributes setting
+            refreshAttributeDisplay();
             
-            attributeGrid.setItems(rows);
             setButtonsEnabled(true);
+            copyDnButton.setEnabled(true);
+            showOperationalAttributesCheckbox.setEnabled(true);
         } else {
             clear();
         }
+    }
+    
+    /**
+     * Refresh the attribute display based on current settings
+     */
+    private void refreshAttributeDisplay() {
+        if (fullEntry == null) {
+            return;
+        }
+        
+        List<AttributeRow> rows = new ArrayList<>();
+        boolean showOperational = showOperationalAttributesCheckbox.getValue();
+        
+        for (Map.Entry<String, List<String>> attr : fullEntry.getAttributes().entrySet()) {
+            String attrName = attr.getKey();
+            
+            // Filter operational attributes if checkbox is unchecked
+            if (!showOperational && isOperationalAttribute(attrName)) {
+                continue;
+            }
+            
+            rows.add(new AttributeRow(attrName, attr.getValue()));
+        }
+        
+        attributeGrid.setItems(rows);
+        // Sort by attribute name by default
+        attributeGrid.sort(List.of(new GridSortOrder<>(attributeColumn, SortDirection.ASCENDING)));
+    }
+    
+    /**
+     * Check if an attribute is operational (system-generated)
+     */
+    private boolean isOperationalAttribute(String attributeName) {
+        String lowerName = attributeName.toLowerCase();
+        return lowerName.startsWith("create") || 
+               lowerName.startsWith("modify") || 
+               lowerName.equals("entryuuid") ||
+               lowerName.equals("entrydd") ||
+               lowerName.equals("entrycsn") ||
+               lowerName.equals("hassubordinates") ||
+               lowerName.equals("subschemasubentry") ||
+               lowerName.equals("pwdchangedtime") ||
+               lowerName.equals("pwdaccountlockedtime") ||
+               lowerName.equals("pwdfailuretime") ||
+               lowerName.equals("structuralobjectclass") ||
+               lowerName.startsWith("ds-") ||
+               lowerName.startsWith("nsds-") ||
+               lowerName.contains("timestamp");
     }
     
     /**
@@ -283,11 +366,15 @@ public class AttributeEditor extends VerticalLayout {
     
     public void clear() {
         currentEntry = null;
+        fullEntry = null;
         // Removed redundant titleLabel.setText() call
         dnLabel.setText("No entry selected");
         entryTypeDisplay.removeAll();
         attributeGrid.setItems(Collections.emptyList());
         setButtonsEnabled(false);
+        copyDnButton.setEnabled(false);
+        showOperationalAttributesCheckbox.setEnabled(false);
+        showOperationalAttributesCheckbox.setValue(false);
     }
     
     private void setButtonsEnabled(boolean enabled) {
@@ -321,17 +408,26 @@ public class AttributeEditor extends VerticalLayout {
         editButton.addClickListener(e -> openEditAttributeDialog(row));
         editButton.getElement().setAttribute("title", "Edit attribute");
         
-        Button copyFilterButton = new Button(new Icon(VaadinIcon.COPY));
-        copyFilterButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
-        copyFilterButton.addClickListener(e -> copySearchFilter(row));
-        copyFilterButton.getElement().setAttribute("title", "Copy search filter to clipboard");
+        Button copyButton = new Button(new Icon(VaadinIcon.COPY));
+        copyButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+        copyButton.getElement().setAttribute("title", "Copy options");
+        
+        // Create context menu for copy options
+        ContextMenu copyMenu = new ContextMenu(copyButton);
+        copyMenu.setOpenOnClick(true);
+        copyMenu.addItem("Copy search filter", e -> copySearchFilter(row))
+                .addComponentAsFirst(new Icon(VaadinIcon.SEARCH));
+        copyMenu.addItem("Copy value(s)", e -> copyValues(row))
+                .addComponentAsFirst(new Icon(VaadinIcon.CLIPBOARD_TEXT));
+        copyMenu.addItem("Copy as LDIF", e -> copyAsLdif(row))
+                .addComponentAsFirst(new Icon(VaadinIcon.FILE_TEXT));
         
         Button deleteButton = new Button(new Icon(VaadinIcon.TRASH));
         deleteButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
         deleteButton.addClickListener(e -> deleteAttribute(row));
         deleteButton.getElement().setAttribute("title", "Delete attribute");
         
-        HorizontalLayout layout = new HorizontalLayout(editButton, copyFilterButton, deleteButton);
+        HorizontalLayout layout = new HorizontalLayout(editButton, copyButton, deleteButton);
         layout.setSpacing(false);
         layout.setPadding(false);
         
@@ -488,6 +584,52 @@ public class AttributeEditor extends VerticalLayout {
     }
     
     /**
+     * Copy attribute values to clipboard
+     */
+    private void copyValues(AttributeRow row) {
+        List<String> values = row.getValues();
+        String valueText;
+        
+        if (values.size() == 1) {
+            valueText = values.get(0);
+        } else {
+            valueText = String.join("\n", values);
+        }
+        
+        // Copy to clipboard using JavaScript
+        getUI().ifPresent(ui -> 
+            ui.getPage().executeJs("navigator.clipboard.writeText($0)", valueText)
+        );
+        
+        // Show notification
+        String message = values.size() == 1 ? 
+            "Attribute value copied to clipboard" : 
+            "Attribute values copied to clipboard (" + values.size() + " values)";
+        showSuccess(message);
+    }
+    
+    /**
+     * Copy attribute as LDIF format to clipboard
+     */
+    private void copyAsLdif(AttributeRow row) {
+        StringBuilder ldif = new StringBuilder();
+        String attrName = row.getName();
+        
+        for (String value : row.getValues()) {
+            ldif.append(attrName).append(": ").append(value).append("\n");
+        }
+        
+        // Copy to clipboard using JavaScript
+        getUI().ifPresent(ui -> 
+            ui.getPage().executeJs("navigator.clipboard.writeText($0)", ldif.toString())
+        );
+        
+        // Show notification
+        String message = "Attribute copied as LDIF to clipboard";
+        showSuccess(message);
+    }
+    
+    /**
      * Escape special characters in LDAP filter values according to RFC 4515
      */
     private String escapeFilterValue(String value) {
@@ -501,6 +643,27 @@ public class AttributeEditor extends VerticalLayout {
             .replace("(", "\\28")   // Left parenthesis
             .replace(")", "\\29")   // Right parenthesis
             .replace("\0", "\\00"); // Null character
+    }
+    
+    /**
+     * Copy DN to clipboard
+     */
+    private void copyDnToClipboard() {
+        if (currentEntry == null || currentEntry.getDn() == null) {
+            showInfo("No DN to copy.");
+            return;
+        }
+        
+        String dn = currentEntry.getDn();
+        
+        // Copy to clipboard using JavaScript
+        getUI().ifPresent(ui -> 
+            ui.getPage().executeJs("navigator.clipboard.writeText($0)", dn)
+        );
+        
+        // Show notification
+        String message = "DN copied to clipboard: " + dn;
+        showSuccess(message);
     }
     
     private void saveChanges() {

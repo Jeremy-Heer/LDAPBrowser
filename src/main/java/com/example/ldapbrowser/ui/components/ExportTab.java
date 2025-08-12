@@ -3,6 +3,9 @@ package com.example.ldapbrowser.ui.components;
 import com.example.ldapbrowser.model.LdapEntry;
 import com.example.ldapbrowser.model.LdapServerConfig;
 import com.example.ldapbrowser.service.LdapService;
+import com.example.ldapbrowser.service.LoggingService;
+import com.example.ldapbrowser.service.ConfigurationService;
+import com.example.ldapbrowser.service.InMemoryLdapService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
@@ -46,6 +49,12 @@ import java.util.stream.Collectors;
 public class ExportTab extends VerticalLayout {
     
     private final LdapService ldapService;
+    private final LoggingService loggingService;
+    private final ConfigurationService configurationService;
+    private final InMemoryLdapService inMemoryLdapService;
+    
+    // Environment selection
+    private EnvironmentDropdown environmentDropdown;
     
     // Server configuration
     private LdapServerConfig serverConfig;
@@ -77,6 +86,7 @@ public class ExportTab extends VerticalLayout {
     // CSV data and settings
     private List<Map<String, String>> csvData;
     private String rawCsvContent; // Store the raw CSV content for reprocessing
+    private List<String> csvColumnOrder; // Maintain original CSV column order
     private Button csvExportButton;
     
     // Progress and download
@@ -84,9 +94,19 @@ public class ExportTab extends VerticalLayout {
     private VerticalLayout progressContainer;
     private Anchor downloadLink;
     
-    public ExportTab(LdapService ldapService) {
+    public ExportTab(LdapService ldapService, LoggingService loggingService, 
+                     ConfigurationService configurationService, InMemoryLdapService inMemoryLdapService) {
         this.ldapService = ldapService;
+        this.loggingService = loggingService;
+        this.configurationService = configurationService;
+        this.inMemoryLdapService = inMemoryLdapService;
         this.csvData = new ArrayList<>();
+        this.csvColumnOrder = new ArrayList<>();
+        
+        // Initialize environment dropdown
+        environmentDropdown = new EnvironmentDropdown(ldapService, configurationService, inMemoryLdapService, false);
+        environmentDropdown.addSingleSelectionListener(this::setServerConfig);
+        
         initializeComponents();
         setupLayout();
     }
@@ -140,7 +160,7 @@ public class ExportTab extends VerticalLayout {
         returnAttributesField.setPlaceholder("cn,mail,telephoneNumber (comma-separated, leave empty for all)");
         
         outputFormatCombo = new ComboBox<>("Output Format");
-        outputFormatCombo.setItems("CSV", "JSON", "LDIF");
+        outputFormatCombo.setItems("CSV", "JSON", "LDIF", "DN List");
         outputFormatCombo.setValue("CSV");
         
         exportButton = new Button("Export", new Icon(VaadinIcon.DOWNLOAD));
@@ -198,7 +218,7 @@ public class ExportTab extends VerticalLayout {
         csvReturnAttributesField.setPlaceholder("cn,mail,telephoneNumber (comma-separated, leave empty for all)");
         
         csvOutputFormatCombo = new ComboBox<>("Output Format");
-        csvOutputFormatCombo.setItems("CSV", "JSON", "LDIF");
+        csvOutputFormatCombo.setItems("CSV", "JSON", "LDIF", "DN List");
         csvOutputFormatCombo.setValue("CSV");
         
         excludeHeaderCheckbox = new Checkbox("Exclude first row (header row)");
@@ -272,6 +292,13 @@ public class ExportTab extends VerticalLayout {
         setSpacing(true);
         addClassName("export-container");
         
+        // Environment selection at the top
+        HorizontalLayout environmentSection = new HorizontalLayout();
+        environmentSection.setSpacing(true);
+        environmentSection.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+        environmentSection.add(new com.vaadin.flow.component.html.Span("Environment:"), environmentDropdown.getSingleSelectComponent());
+        add(environmentSection);
+        
         // Title with icon
         HorizontalLayout titleLayout = new HorizontalLayout();
         titleLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
@@ -326,6 +353,7 @@ public class ExportTab extends VerticalLayout {
         String[] lines = content.split("\n");
         
         csvData.clear();
+        csvColumnOrder.clear();
         csvPreviewGrid.removeAllColumns();
         
         if (lines.length == 0) {
@@ -338,12 +366,22 @@ public class ExportTab extends VerticalLayout {
         boolean removeQuotes = quotedValuesCheckbox.getValue();
         
         // Parse CSV data
+        boolean isFirstRow = true;
         for (int i = startIndex; i < lines.length; i++) {
             String line = lines[i].trim();
             if (line.isEmpty()) continue;
             
             List<String> values = parseCSVLine(line, removeQuotes);
-            Map<String, String> row = new HashMap<>();
+            Map<String, String> row = new LinkedHashMap<>();
+            
+            // On the first row, establish the column order
+            if (isFirstRow) {
+                for (int j = 0; j < values.size(); j++) {
+                    String columnName = "C" + (j + 1);
+                    csvColumnOrder.add(columnName);
+                }
+                isFirstRow = false;
+            }
             
             for (int j = 0; j < values.size(); j++) {
                 String columnName = "C" + (j + 1);
@@ -358,9 +396,8 @@ public class ExportTab extends VerticalLayout {
             return;
         }
         
-        // Set up preview grid columns
-        Map<String, String> firstRow = csvData.get(0);
-        for (String columnName : firstRow.keySet()) {
+        // Set up preview grid columns using the stored column order
+        for (String columnName : csvColumnOrder) {
             csvPreviewGrid.addColumn(row -> row.get(columnName))
                 .setHeader(columnName)
                 .setFlexGrow(1)
@@ -405,41 +442,67 @@ public class ExportTab extends VerticalLayout {
             return;
         }
         
+        loggingService.logInfo("EXPORT", "Starting search export - Server: " + serverConfig.getName() + ", Base: " + searchBase + ", Filter: " + searchFilter + ", Format: " + format);
+        
         showProgress();
         
         try {
-            List<LdapEntry> ldapEntries;
-            if (returnAttrs != null && !returnAttrs.trim().isEmpty()) {
-                String[] attrs = returnAttrs.split(",");
-                for (int i = 0; i < attrs.length; i++) {
-                    attrs[i] = attrs[i].trim();
-                }
-                ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter.trim(), SearchScope.SUB, attrs);
+            List<LdapEntry> ldapEntries = null;
+            List<String> dnList = null;
+            
+            // Use optimized DN-only search for DN List format
+            if ("DN List".equals(format)) {
+                dnList = ldapService.getDNsOnly(serverConfig.getId(), searchBase.trim(), searchFilter.trim(), SearchScope.SUB);
             } else {
-                ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter.trim(), SearchScope.SUB);
-            }
-            
-            // Convert LdapEntry to SearchResultEntry for export generation
-            List<SearchResultEntry> entries = new ArrayList<>();
-            for (LdapEntry ldapEntry : ldapEntries) {
-                // Create a SearchResultEntry from LdapEntry
-                Collection<Attribute> attributes = new ArrayList<>();
-                for (Map.Entry<String, List<String>> attr : ldapEntry.getAttributes().entrySet()) {
-                    attributes.add(new Attribute(attr.getKey(), attr.getValue()));
+                // Use regular search for other formats
+                if (returnAttrs != null && !returnAttrs.trim().isEmpty()) {
+                    String[] attrs = returnAttrs.split(",");
+                    for (int i = 0; i < attrs.length; i++) {
+                        attrs[i] = attrs[i].trim();
+                    }
+                    ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter.trim(), SearchScope.SUB, attrs);
+                } else {
+                    ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter.trim(), SearchScope.SUB);
                 }
-                SearchResultEntry entry = new SearchResultEntry(ldapEntry.getDn(), attributes);
-                entries.add(entry);
             }
             
-            String exportData = generateExportData(entries, format, getReturnAttributesList(returnAttrs));
-            String fileName = generateFileName(format);
+            String exportData;
+            String fileName;
+            int entryCount;
+            
+            if ("DN List".equals(format)) {
+                // Generate DN list export
+                exportData = generateDNListExport(dnList);
+                fileName = generateFileName(format);
+                entryCount = dnList != null ? dnList.size() : 0;
+            } else {
+                // Convert LdapEntry to SearchResultEntry for export generation
+                List<SearchResultEntry> entries = new ArrayList<>();
+                if (ldapEntries != null) {
+                    for (LdapEntry ldapEntry : ldapEntries) {
+                        // Create a SearchResultEntry from LdapEntry
+                        Collection<Attribute> attributes = new ArrayList<>();
+                        for (Map.Entry<String, List<String>> attr : ldapEntry.getAttributes().entrySet()) {
+                            attributes.add(new Attribute(attr.getKey(), attr.getValue()));
+                        }
+                        SearchResultEntry entry = new SearchResultEntry(ldapEntry.getDn(), attributes);
+                        entries.add(entry);
+                    }
+                }
+                
+                exportData = generateExportData(entries, format, getReturnAttributesList(returnAttrs));
+                fileName = generateFileName(format);
+                entryCount = entries.size();
+            }
             
             createDownloadLink(exportData, fileName, format);
             hideProgress();
-            showSuccess("Export completed successfully. " + entries.size() + " entries exported.");
+            loggingService.logExport(serverConfig.getName(), fileName, entryCount);
+            showSuccess("Export completed successfully. " + entryCount + " entries exported.");
             
         } catch (LDAPException e) {
             hideProgress();
+            loggingService.logError("EXPORT", "Search export failed - Server: " + serverConfig.getName(), e.getMessage());
             showError("Search failed: " + e.getMessage());
         }
     }
@@ -469,6 +532,8 @@ public class ExportTab extends VerticalLayout {
             showError("Search Filter is required");
             return;
         }
+        
+        loggingService.logInfo("EXPORT", "Starting CSV export - Server: " + serverConfig.getName() + ", CSV rows: " + csvData.size() + ", Format: " + format);
         
         showProgress();
         
@@ -506,10 +571,12 @@ public class ExportTab extends VerticalLayout {
             
             createDownloadLink(exportData, fileName, format);
             hideProgress();
+            loggingService.logExport(serverConfig.getName(), fileName, allEntries.size());
             showSuccess("Export completed successfully. " + allEntries.size() + " entries exported from " + csvData.size() + " searches.");
             
         } catch (LDAPException e) {
             hideProgress();
+            loggingService.logError("EXPORT", "CSV export failed - Server: " + serverConfig.getName(), e.getMessage());
             showError("Search failed: " + e.getMessage());
         }
     }
@@ -590,6 +657,17 @@ public class ExportTab extends VerticalLayout {
             default:
                 return generateCsvData(entries, requestedAttrs);
         }
+    }
+    
+    /**
+     * Generate DN-only export - optimized for bulk operations
+     */
+    private String generateDNListExport(List<String> dnList) {
+        StringBuilder sb = new StringBuilder();
+        for (String dn : dnList) {
+            sb.append(dn).append("\n");
+        }
+        return sb.toString();
     }
     
     private String generateCsvData(List<SearchResultEntry> entries, List<String> requestedAttrs) {
@@ -733,6 +811,8 @@ public class ExportTab extends VerticalLayout {
             extension = "ldif";
         } else if ("json".equals(extension)) {
             extension = "json";
+        } else if ("dn list".equals(extension)) {
+            extension = "txt";
         } else {
             extension = "csv";
         }
@@ -746,6 +826,9 @@ public class ExportTab extends VerticalLayout {
                 mimeType = "application/json";
                 break;
             case "LDIF":
+                mimeType = "text/plain";
+                break;
+            case "DN LIST":
                 mimeType = "text/plain";
                 break;
             default:
@@ -789,6 +872,7 @@ public class ExportTab extends VerticalLayout {
         csvSearchFilterField.clear();
         csvReturnAttributesField.clear();
         csvData.clear();
+        csvColumnOrder.clear();
         rawCsvContent = null;
         excludeHeaderCheckbox.setValue(false);
         quotedValuesCheckbox.setValue(true);
@@ -806,5 +890,14 @@ public class ExportTab extends VerticalLayout {
     private void showError(String message) {
         Notification notification = Notification.show(message, 5000, Notification.Position.TOP_END);
         notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+    }
+    
+    /**
+     * Refresh the environment dropdown when environments change
+     */
+    public void refreshEnvironments() {
+        if (environmentDropdown != null) {
+            environmentDropdown.refreshEnvironments();
+        }
     }
 }

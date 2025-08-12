@@ -290,13 +290,17 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
     }
     
     public void loadRootDSEWithNamingContexts() throws LDAPException {
+        loadRootDSEWithNamingContexts(false);
+    }
+    
+    public void loadRootDSEWithNamingContexts(boolean includePrivateNamingContexts) throws LDAPException {
         if (serverConfig == null) {
             throw new IllegalStateException("Server config not set");
         }
         
         clear();
         
-        List<LdapEntry> rootEntries = ldapService.loadRootDSEWithNamingContexts(serverConfig.getId());
+        List<LdapEntry> rootEntries = ldapService.loadRootDSEWithNamingContexts(serverConfig.getId(), includePrivateNamingContexts);
         
         for (LdapEntry entry : rootEntries) {
             // Ensure all entries get a chance to show expanders by checking their object classes
@@ -325,7 +329,11 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
         if (rootEntries.isEmpty()) {
             showNotification("No Root DSE or naming contexts found", NotificationVariant.LUMO_PRIMARY);
         } else {
-            showNotification("Loaded Root DSE and " + (rootEntries.size() - 1) + " naming contexts", NotificationVariant.LUMO_SUCCESS);
+            String message = "Loaded Root DSE and " + (rootEntries.size() - 1) + " naming contexts";
+            if (includePrivateNamingContexts) {
+                message += " (including private naming contexts)";
+            }
+            showNotification(message, NotificationVariant.LUMO_SUCCESS);
         }
     }
     

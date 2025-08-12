@@ -30,6 +30,7 @@ public class InternalServersTab extends VerticalLayout {
     private final LdapService ldapService;
     private final ConfigurationService configurationService;
     private final InMemoryLdapService inMemoryLdapService;
+    private final EnvironmentRefreshListener environmentRefreshListener;
     
     // Server management controls
     private Grid<LdapServerConfig> serverGrid;
@@ -42,10 +43,13 @@ public class InternalServersTab extends VerticalLayout {
     private Consumer<LdapServerConfig> connectionListener;
     private Runnable disconnectionListener;
     
-    public InternalServersTab(LdapService ldapService, ConfigurationService configurationService) {
+    public InternalServersTab(LdapService ldapService, ConfigurationService configurationService, 
+                              EnvironmentRefreshListener environmentRefreshListener,
+                              InMemoryLdapService inMemoryLdapService) {
         this.ldapService = ldapService;
         this.configurationService = configurationService;
-        this.inMemoryLdapService = new InMemoryLdapService();
+        this.inMemoryLdapService = inMemoryLdapService;
+        this.environmentRefreshListener = environmentRefreshListener;
         
         initializeComponents();
         setupLayout();
@@ -277,6 +281,12 @@ public class InternalServersTab extends VerticalLayout {
         try {
             inMemoryLdapService.startServer(config);
             refreshServerList();
+            
+            // Notify environment dropdowns about the change
+            if (environmentRefreshListener != null) {
+                environmentRefreshListener.onEnvironmentChange();
+            }
+            
             showSuccess("In-Memory server '" + config.getName() + "' started successfully.");
         } catch (Exception e) {
             showError("Failed to start server '" + config.getName() + "': " + e.getMessage());
@@ -292,6 +302,12 @@ public class InternalServersTab extends VerticalLayout {
             
             inMemoryLdapService.stopServer(config.getId());
             refreshServerList();
+            
+            // Notify environment dropdowns about the change
+            if (environmentRefreshListener != null) {
+                environmentRefreshListener.onEnvironmentChange();
+            }
+            
             showSuccess("In-Memory server '" + config.getName() + "' stopped.");
         } catch (Exception e) {
             showError("Failed to stop server '" + config.getName() + "': " + e.getMessage());

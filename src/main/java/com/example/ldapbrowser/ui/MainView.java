@@ -3,12 +3,17 @@ package com.example.ldapbrowser.ui;
 import com.example.ldapbrowser.model.LdapServerConfig;
 import com.example.ldapbrowser.service.ConfigurationService;
 import com.example.ldapbrowser.service.LdapService;
+import com.example.ldapbrowser.service.InMemoryLdapService;
 import com.example.ldapbrowser.ui.components.ServersTab;
 import com.example.ldapbrowser.ui.components.DashboardTab;
 import com.example.ldapbrowser.ui.components.SchemaBrowser;
 import com.example.ldapbrowser.ui.components.ExportTab;
+import com.example.ldapbrowser.ui.components.BulkOperationsTab;
+import com.example.ldapbrowser.ui.components.LogsTab;
+import com.example.ldapbrowser.ui.components.DirectorySearchTab;
+import com.example.ldapbrowser.ui.components.EnvironmentRefreshListener;
+import com.example.ldapbrowser.service.LoggingService;
 import com.vaadin.flow.component.applayout.AppLayout;
-import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -24,26 +29,30 @@ import com.unboundid.ldap.sdk.LDAPException;
  */
 @Route("")
 @PageTitle("LDAP Browser")
-public class MainView extends AppLayout {
+public class MainView extends AppLayout implements EnvironmentRefreshListener {
     
     private final LdapService ldapService;
     private final ConfigurationService configurationService;
+    private final InMemoryLdapService inMemoryLdapService;
+    private final LoggingService loggingService;
     
     // Main content components
     private Tabs mainTabs;
     private ServersTab serversTab;
     private DashboardTab dashboardTab;
     private SchemaBrowser schemaBrowser;
-    private ExportTab exportTab;
+    private ExportTab reportsTab;
+    private BulkOperationsTab bulkOperationsTab;
+    private LogsTab logsTab;
+    private DirectorySearchTab directorySearchTab;
     private VerticalLayout contentContainer;
     
-    // Global status display
-    private Span connectionStatus;
-    private HorizontalLayout statusContainer;
-    
-    public MainView(LdapService ldapService, ConfigurationService configurationService) {
+    public MainView(LdapService ldapService, ConfigurationService configurationService, 
+                   InMemoryLdapService inMemoryLdapService, LoggingService loggingService) {
         this.ldapService = ldapService;
         this.configurationService = configurationService;
+        this.inMemoryLdapService = inMemoryLdapService;
+        this.loggingService = loggingService;
         
         initializeComponents();
         setupLayout();
@@ -51,55 +60,47 @@ public class MainView extends AppLayout {
     }
     
     private void initializeComponents() {
-        // Global connection status display
-        connectionStatus = new Span("Disconnected");
-        connectionStatus.getStyle()
-            .set("background-color", "#f44336")  // Red background for disconnected
-            .set("color", "white")
-            .set("padding", "4px 12px")
-            .set("border-radius", "12px")
-            .set("font-weight", "bold")
-            .set("font-size", "0.9em");
-        
-        statusContainer = new HorizontalLayout();
-        statusContainer.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
-        statusContainer.setSpacing(true);
-        statusContainer.add(new Span("Status:"), connectionStatus);
-        statusContainer.getStyle()
-            .set("position", "fixed")
-            .set("top", "10px")
-            .set("right", "20px")
-            .set("z-index", "1000");
-        
-        // Main tabs - Servers tab first
+        // Main tabs - Directory Search tab first, Servers renamed to Settings and moved to far right
         mainTabs = new Tabs();
-        Tab serversTabComponent = new Tab("Servers");
-        Tab dashboardTabComponent = new Tab("Dashboard");
+        Tab directorySearchTabComponent = new Tab("Directory Search");
+        Tab dashboardTabComponent = new Tab("LDAP Browser");
         Tab schemaTabComponent = new Tab("Schema");
-        Tab exportTabComponent = new Tab("Export");
-        mainTabs.add(serversTabComponent, dashboardTabComponent, schemaTabComponent, exportTabComponent);
+        Tab reportsTabComponent = new Tab("Reports");
+        Tab bulkOperationsTabComponent = new Tab("Bulk Operations");
+        Tab logsTabComponent = new Tab("Logs");
+        Tab serversTabComponent = new Tab("Settings");
+        mainTabs.add(directorySearchTabComponent, dashboardTabComponent, schemaTabComponent, reportsTabComponent, bulkOperationsTabComponent, logsTabComponent, serversTabComponent);
         
         mainTabs.addSelectedChangeListener(e -> {
             Tab selectedTab = e.getSelectedTab();
-            if (selectedTab == serversTabComponent) {
-                showServers();
+            if (selectedTab == directorySearchTabComponent) {
+                showDirectorySearch();
             } else if (selectedTab == dashboardTabComponent) {
                 showDashboard();
             } else if (selectedTab == schemaTabComponent) {
                 showSchema();
-            } else if (selectedTab == exportTabComponent) {
-                showExport();
+            } else if (selectedTab == reportsTabComponent) {
+                showReports();
+            } else if (selectedTab == bulkOperationsTabComponent) {
+                showBulkOperations();
+            } else if (selectedTab == logsTabComponent) {
+                showLogs();
+            } else if (selectedTab == serversTabComponent) {
+                showServers();
             }
         });
         
         // Tab content components
-        serversTab = new ServersTab(ldapService, configurationService);
+        serversTab = new ServersTab(ldapService, configurationService, this, inMemoryLdapService);
         serversTab.setConnectionListener(this::connectToServer);
         serversTab.setDisconnectionListener(this::disconnectFromServer);
         
-        dashboardTab = new DashboardTab(ldapService);
-        schemaBrowser = new SchemaBrowser(ldapService);
-        exportTab = new ExportTab(ldapService);
+        dashboardTab = new DashboardTab(ldapService, configurationService, inMemoryLdapService);
+        directorySearchTab = new DirectorySearchTab(ldapService, configurationService, inMemoryLdapService);
+        schemaBrowser = new SchemaBrowser(ldapService, configurationService, inMemoryLdapService);
+        reportsTab = new ExportTab(ldapService, loggingService, configurationService, inMemoryLdapService);
+        bulkOperationsTab = new BulkOperationsTab(ldapService, loggingService, configurationService, inMemoryLdapService);
+        logsTab = new LogsTab(loggingService);
         
         // Content container
         contentContainer = new VerticalLayout();
@@ -107,18 +108,18 @@ public class MainView extends AppLayout {
         contentContainer.setPadding(false);
         contentContainer.setSpacing(false);
         
-        // Initially show servers tab
-        contentContainer.add(serversTab);
+        // Initially show directory search tab
+        contentContainer.add(directorySearchTab);
     }
     
     private void setupLayout() {
-        // Create main content layout with tabs and connection status
+        // Create main content layout with tabs
         VerticalLayout mainContent = new VerticalLayout();
         mainContent.setSizeFull();
         mainContent.setPadding(false);
         mainContent.setSpacing(false);
         
-        // Tabs header without connection status
+        // Tabs header
         HorizontalLayout tabsHeader = new HorizontalLayout();
         tabsHeader.setWidthFull();
         tabsHeader.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
@@ -132,9 +133,6 @@ public class MainView extends AppLayout {
         
         // Set up the AppLayout with no navbar - just content
         setContent(mainContent);
-        
-        // Add global status container to the UI (positioned fixed)
-        getElement().appendChild(statusContainer.getElement());
     }
     
     private void showServers() {
@@ -147,14 +145,53 @@ public class MainView extends AppLayout {
         contentContainer.add(dashboardTab);
     }
     
+    private void showDirectorySearch() {
+        contentContainer.removeAll();
+        contentContainer.add(directorySearchTab);
+    }
+    
     private void showSchema() {
         contentContainer.removeAll();
         contentContainer.add(schemaBrowser);
     }
     
-    private void showExport() {
+    private void showReports() {
         contentContainer.removeAll();
-        contentContainer.add(exportTab);
+        contentContainer.add(reportsTab);
+    }
+
+    private void showBulkOperations() {
+        contentContainer.removeAll();
+        contentContainer.add(bulkOperationsTab);
+    }
+
+    private void showLogs() {
+        contentContainer.removeAll();
+        contentContainer.add(logsTab);
+    }
+    
+    @Override
+    public void onEnvironmentChange() {
+        refreshEnvironmentDropdowns();
+    }
+    
+    public void refreshEnvironmentDropdowns() {
+        // Refresh environment dropdowns in all tabs that have them
+        if (dashboardTab != null) {
+            dashboardTab.refreshEnvironments();
+        }
+        if (directorySearchTab != null) {
+            directorySearchTab.refreshEnvironments();
+        }
+        if (schemaBrowser != null) {
+            schemaBrowser.refreshEnvironments();
+        }
+        if (reportsTab != null) {
+            reportsTab.refreshEnvironments();
+        }
+        if (bulkOperationsTab != null) {
+            bulkOperationsTab.refreshEnvironments();
+        }
     }
     
     private void refreshServerList() {
@@ -163,27 +200,7 @@ public class MainView extends AppLayout {
     }
     
     private void updateConnectionButtons() {
-        LdapServerConfig selected = serversTab.getSelectedServer();
-        boolean connected = selected != null && ldapService.isConnected(selected.getId());
-        
         serversTab.updateConnectionButtons();
-        
-        // Update the global status display
-        updateGlobalConnectionStatus(selected, connected);
-    }
-    
-    private void updateGlobalConnectionStatus(LdapServerConfig selected, boolean connected) {
-        if (connected && selected != null) {
-            connectionStatus.setText("Connected to " + selected.getName());
-            connectionStatus.getStyle()
-                .set("background-color", "#4caf50")  // Green background for connected
-                .set("color", "white");
-        } else {
-            connectionStatus.setText("Disconnected");
-            connectionStatus.getStyle()
-                .set("background-color", "#f44336")  // Red background for disconnected
-                .set("color", "white");
-        }
     }
     
     private void connectToServer(LdapServerConfig config) {
@@ -196,10 +213,9 @@ public class MainView extends AppLayout {
             ldapService.connect(config);
             updateConnectionButtons();
             
-            // Update both dashboard and schema tabs with server config
-            dashboardTab.setServerConfig(config);
-            schemaBrowser.setServerConfig(config);
-            exportTab.setServerConfig(config);
+            // Update reports and bulk operations tabs with server config
+            reportsTab.setServerConfig(config);
+            bulkOperationsTab.setServerConfig(config);
             
             // Automatically load Root DSE and naming contexts for dashboard
             dashboardTab.loadRootDSEWithNamingContexts();
@@ -216,9 +232,9 @@ public class MainView extends AppLayout {
             ldapService.disconnect(config.getId());
             updateConnectionButtons();
             
-            dashboardTab.clear();
-            schemaBrowser.clear();
-            exportTab.clear();
+            directorySearchTab.clear();
+            reportsTab.clear();
+            bulkOperationsTab.clear();
             
             showInfo("Disconnected from " + config.getName());
         }

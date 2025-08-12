@@ -3,7 +3,12 @@ package com.example.ldapbrowser.ui.components;
 import com.example.ldapbrowser.model.LdapEntry;
 import com.example.ldapbrowser.model.LdapServerConfig;
 import com.example.ldapbrowser.service.LdapService;
+import com.example.ldapbrowser.service.ConfigurationService;
+import com.example.ldapbrowser.service.InMemoryLdapService;
 import com.example.ldapbrowser.ui.components.SearchPanel.SearchResult;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
@@ -23,6 +28,12 @@ import java.util.List;
 public class DashboardTab extends VerticalLayout {
     
     private final LdapService ldapService;
+    private final ConfigurationService configurationService;
+    private final InMemoryLdapService inMemoryLdapService;
+    private LdapServerConfig serverConfig;
+    
+    // Environment selection
+    private EnvironmentDropdown environmentDropdown;
     
     // Main content components
     private LdapTreeGrid treeGrid;
@@ -34,15 +45,23 @@ public class DashboardTab extends VerticalLayout {
     private TabSheet tabSheet;
     private Tab entryDetailsTab;
     
-    // Server configuration (removed unused field)
+    // Private naming contexts option
+    private Checkbox includePrivateNamingContextsCheckbox;
     
-    public DashboardTab(LdapService ldapService) {
+    public DashboardTab(LdapService ldapService, ConfigurationService configurationService, 
+                       InMemoryLdapService inMemoryLdapService) {
         this.ldapService = ldapService;
+        this.configurationService = configurationService;
+        this.inMemoryLdapService = inMemoryLdapService;
         initializeComponents();
         setupLayout();
     }
     
     private void initializeComponents() {
+        // Environment dropdown for single-select
+        environmentDropdown = new EnvironmentDropdown(ldapService, configurationService, inMemoryLdapService, false);
+        environmentDropdown.addSingleSelectionListener(this::onEnvironmentSelected);
+        
         // Main content components
         treeGrid = new LdapTreeGrid(ldapService);
         treeGrid.asSingleSelect().addValueChangeListener(event -> {
@@ -58,12 +77,32 @@ public class DashboardTab extends VerticalLayout {
         searchResultsPanel = new VerticalLayout();
         searchResultsPanel.setPadding(false);
         searchResultsPanel.setSpacing(false);
+        
+        // Initialize private naming contexts checkbox
+        includePrivateNamingContextsCheckbox = new Checkbox("Include private naming contexts");
+        includePrivateNamingContextsCheckbox.getStyle().set("font-size", "0.85em");
+        includePrivateNamingContextsCheckbox.addValueChangeListener(event -> {
+            // Reload the tree when the checkbox state changes
+            if (treeGrid != null) {
+                try {
+                    treeGrid.loadRootDSEWithNamingContexts(event.getValue());
+                } catch (Exception e) {
+                    // Error will be handled by the tree grid component
+                }
+            }
+        });
     }
     
     private void setupLayout() {
         setSizeFull();
         setPadding(false);
         setSpacing(false);
+        
+        // Environment dropdown at the top
+        HorizontalLayout environmentLayout = new HorizontalLayout();
+        environmentLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.END);
+        environmentLayout.setPadding(true);
+        environmentLayout.add(environmentDropdown.getSingleSelectComponent());
         
         // Create left sidebar with LDAP browser
         VerticalLayout leftSidebar = new VerticalLayout();
@@ -87,7 +126,14 @@ public class DashboardTab extends VerticalLayout {
         browserTitle.addClassNames(LumoUtility.Margin.NONE);
         browserTitle.getStyle().set("font-size", "0.9em").set("font-weight", "600").set("color", "#333");
         
-        browserHeader.add(treeIcon, browserTitle);
+        // Add refresh button
+        Button refreshButton = new Button(new Icon(VaadinIcon.REFRESH));
+        refreshButton.addThemeVariants(ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
+        refreshButton.setTooltipText("Refresh LDAP Browser");
+        refreshButton.addClickListener(e -> refreshLdapBrowser());
+        refreshButton.getStyle().set("color", "#4a90e2");
+        
+        browserHeader.add(treeIcon, browserTitle, refreshButton);
         browserHeader.setFlexGrow(1, browserTitle);
         
         // Apply tree styling and completely remove all spacing
@@ -96,7 +142,7 @@ public class DashboardTab extends VerticalLayout {
         treeGrid.getStyle().set("padding", "0px");
         treeGrid.getStyle().set("border-top", "none");
         
-        leftSidebar.add(browserHeader, treeGrid);
+        leftSidebar.add(browserHeader, includePrivateNamingContextsCheckbox, treeGrid);
         leftSidebar.setFlexGrow(1, treeGrid);
         leftSidebar.getStyle().set("gap", "0px"); // Remove any gap between components
         
@@ -124,8 +170,24 @@ public class DashboardTab extends VerticalLayout {
         mainHorizontalSplit.addToPrimary(leftSidebar);
         mainHorizontalSplit.addToSecondary(tabSheet);
         
-        add(mainHorizontalSplit);
+        add(environmentLayout, mainHorizontalSplit);
         setFlexGrow(1, mainHorizontalSplit);
+    }
+    
+    private void onEnvironmentSelected(LdapServerConfig environment) {
+        this.serverConfig = environment;
+        
+        // Update components with new environment
+        if (environment != null) {
+            treeGrid.setServerConfig(environment);
+            attributeEditor.setServerConfig(environment);
+            searchPanel.setServerConfig(environment);
+            
+            // Load the tree for the new environment
+            loadRootDSEWithNamingContexts();
+        } else {
+            clear();
+        }
     }
     
     /**
@@ -224,7 +286,18 @@ public class DashboardTab extends VerticalLayout {
     private void onEntrySelected(LdapEntry entry) {
         // Don't display placeholder entries in the attribute editor
         if (entry != null && !entry.getDn().startsWith("_placeholder_")) {
-            attributeEditor.editEntry(entry);
+            // Fetch the complete entry with all attributes from LDAP
+            try {
+                LdapEntry fullEntry = ldapService.getEntry(serverConfig.getId(), entry.getDn());
+                if (fullEntry != null) {
+                    attributeEditor.editEntry(fullEntry);
+                } else {
+                    attributeEditor.editEntry(entry); // Fallback to tree entry if fetch fails
+                }
+            } catch (Exception e) {
+                // Fallback to the entry from tree if full fetch fails
+                attributeEditor.editEntry(entry);
+            }
             // Automatically switch to Entry Details tab when an entry is selected
             tabSheet.setSelectedTab(entryDetailsTab);
         } else {
@@ -347,6 +420,7 @@ public class DashboardTab extends VerticalLayout {
     }
     
     public void setServerConfig(LdapServerConfig serverConfig) {
+        this.serverConfig = serverConfig;
         treeGrid.setServerConfig(serverConfig);
         attributeEditor.setServerConfig(serverConfig);
         searchPanel.setServerConfig(serverConfig);
@@ -354,7 +428,7 @@ public class DashboardTab extends VerticalLayout {
     
     public void loadRootDSEWithNamingContexts() {
         try {
-            treeGrid.loadRootDSEWithNamingContexts();
+            treeGrid.loadRootDSEWithNamingContexts(includePrivateNamingContextsCheckbox.getValue());
         } catch (Exception e) {
             // Error will be handled by the tree grid component
         }
@@ -365,5 +439,24 @@ public class DashboardTab extends VerticalLayout {
         attributeEditor.clear();
         searchResultsPanel.removeAll();
         searchResultsPanel.add(new Span("No search results"));
+    }
+    
+    public void refreshEnvironments() {
+        if (environmentDropdown != null) {
+            environmentDropdown.refreshEnvironments();
+        }
+    }
+    
+    /**
+     * Refresh the LDAP browser tree
+     */
+    private void refreshLdapBrowser() {
+        if (serverConfig != null && treeGrid != null) {
+            try {
+                treeGrid.loadRootDSEWithNamingContexts(includePrivateNamingContextsCheckbox.getValue());
+            } catch (Exception e) {
+                // Error will be handled by the tree grid component
+            }
+        }
     }
 }
