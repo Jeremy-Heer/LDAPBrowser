@@ -50,7 +50,7 @@ public class ServersTab extends VerticalLayout {
         
         // External servers tab (existing connections functionality)
         externalTab = new Tab("External");
-        externalServersTab = new ExternalServersTab(ldapService, configurationService);
+        externalServersTab = new ExternalServersTab(ldapService, configurationService, environmentRefreshListener);
         tabSheet.add(externalTab, externalServersTab);
         
         // Internal servers tab (UnboundID in-memory servers)

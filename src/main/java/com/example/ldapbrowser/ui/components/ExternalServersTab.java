@@ -28,11 +28,13 @@ public class ExternalServersTab extends VerticalLayout {
     
     private final LdapService ldapService;
     private final ConfigurationService configurationService;
+    private final EnvironmentRefreshListener environmentRefreshListener;
     
     // Server management controls
     private Grid<LdapServerConfig> serverGrid;
     private Button addServerButton;
     private Button editServerButton;
+    private Button copyServerButton;
     private Button deleteServerButton;
     private Button testConnectionButton;
     
@@ -40,9 +42,11 @@ public class ExternalServersTab extends VerticalLayout {
     private Consumer<LdapServerConfig> connectionListener;
     private Runnable disconnectionListener;
     
-    public ExternalServersTab(LdapService ldapService, ConfigurationService configurationService) {
+    public ExternalServersTab(LdapService ldapService, ConfigurationService configurationService, 
+                              EnvironmentRefreshListener environmentRefreshListener) {
         this.ldapService = ldapService;
         this.configurationService = configurationService;
+        this.environmentRefreshListener = environmentRefreshListener;
         
         initializeComponents();
         setupLayout();
@@ -96,6 +100,14 @@ public class ExternalServersTab extends VerticalLayout {
         });
         editServerButton.setEnabled(false);
         
+        copyServerButton = new Button("Copy", new Icon(VaadinIcon.COPY));
+        copyServerButton.addClickListener(e -> {
+            serverGrid.getSelectedItems().stream()
+                .findFirst()
+                .ifPresent(this::copyServerConfiguration);
+        });
+        copyServerButton.setEnabled(false);
+        
         deleteServerButton = new Button("Delete", new Icon(VaadinIcon.TRASH));
         deleteServerButton.addThemeVariants(ButtonVariant.LUMO_ERROR);
         deleteServerButton.addClickListener(e -> {
@@ -148,7 +160,7 @@ public class ExternalServersTab extends VerticalLayout {
         // Server management buttons layout
         HorizontalLayout managementButtonLayout = new HorizontalLayout();
         managementButtonLayout.setSpacing(true);
-        managementButtonLayout.add(addServerButton, editServerButton, deleteServerButton, testConnectionButton);
+        managementButtonLayout.add(addServerButton, editServerButton, copyServerButton, deleteServerButton, testConnectionButton);
         
         serverManagementSection.add(
             managementTitle,
@@ -173,6 +185,7 @@ public class ExternalServersTab extends VerticalLayout {
     private void updateServerManagementButtons() {
         boolean hasSelection = !serverGrid.getSelectedItems().isEmpty();
         editServerButton.setEnabled(hasSelection);
+        copyServerButton.setEnabled(hasSelection);
         deleteServerButton.setEnabled(hasSelection);
         testConnectionButton.setEnabled(hasSelection);
     }
@@ -226,6 +239,12 @@ public class ExternalServersTab extends VerticalLayout {
         dialog.addSaveListener(savedConfig -> {
             configurationService.saveConfiguration(savedConfig);
             refreshServerList();
+            
+            // Notify environment dropdowns about the change
+            if (environmentRefreshListener != null) {
+                environmentRefreshListener.onEnvironmentChange();
+            }
+            
             showSuccess(config == null ? "Server configuration added." : "Server configuration updated.");
             dialog.close();
         });
@@ -241,6 +260,12 @@ public class ExternalServersTab extends VerticalLayout {
         dialog.addConfirmListener(e -> {
             configurationService.deleteConfiguration(config.getId());
             refreshServerList();
+            
+            // Notify environment dropdowns about the change
+            if (environmentRefreshListener != null) {
+                environmentRefreshListener.onEnvironmentChange();
+            }
+            
             showSuccess("Server configuration deleted.");
         });
         dialog.open();
@@ -255,6 +280,22 @@ public class ExternalServersTab extends VerticalLayout {
         } catch (Exception e) {
             showError("Connection test failed for " + config.getName() + ": " + e.getMessage());
         }
+    }
+    
+    private void copyServerConfiguration(LdapServerConfig originalConfig) {
+        // Create a copy of the configuration for use as a template
+        LdapServerConfig copyConfig = new LdapServerConfig();
+        copyConfig.setName(originalConfig.getName() + " (Copy)");
+        copyConfig.setHost(originalConfig.getHost());
+        copyConfig.setPort(originalConfig.getPort());
+        copyConfig.setBindDn(originalConfig.getBindDn());
+        copyConfig.setPassword(originalConfig.getPassword());
+        copyConfig.setUseSSL(originalConfig.isUseSSL());
+        copyConfig.setUseStartTLS(originalConfig.isUseStartTLS());
+        copyConfig.setBaseDn(originalConfig.getBaseDn());
+        
+        // Open the dialog with the copied configuration
+        openServerDialog(copyConfig);
     }
     
     private void connectToServer(LdapServerConfig config) {

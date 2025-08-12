@@ -78,28 +78,8 @@ public class EnvironmentDropdown {
     }
     
     private String formatServerName(LdapServerConfig config) {
-        // Check if it's connected
-        boolean connected = ldapService.isConnected(config.getId());
-        
-        // Check if it's an internal server that's running
-        boolean isInternalRunning = inMemoryLdapService.getAllInMemoryServers().stream()
-            .anyMatch(server -> server.getId().equals(config.getId()) && 
-                     inMemoryLdapService.isServerRunning(config.getId()));
-        
-        String status = "";
-        if (connected) {
-            status = " ✓ Connected";
-        } else if (isInternalRunning) {
-            status = " ● Running";
-        }
-        
-        // Determine if it's external or internal
-        boolean isInternal = inMemoryLdapService.getAllInMemoryServers().stream()
-            .anyMatch(server -> server.getId().equals(config.getId()));
-        
-        String type = isInternal ? "[Internal] " : "[External] ";
-        
-        return type + config.getName() + " (" + config.getHost() + ":" + config.getPort() + ")" + status;
+        // Use just the Name field as requested
+        return config.getName() != null ? config.getName() : config.getHost() + ":" + config.getPort();
     }
     
     public void refreshEnvironments() {
