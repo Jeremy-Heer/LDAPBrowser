@@ -296,7 +296,7 @@ public class ExportTab extends VerticalLayout {
         HorizontalLayout environmentSection = new HorizontalLayout();
         environmentSection.setSpacing(true);
         environmentSection.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-        environmentSection.add(new com.vaadin.flow.component.html.Span("Environment:"), environmentDropdown.getSingleSelectComponent());
+        environmentSection.add(environmentDropdown.getSingleSelectComponent());
         add(environmentSection);
         
         // Title with icon

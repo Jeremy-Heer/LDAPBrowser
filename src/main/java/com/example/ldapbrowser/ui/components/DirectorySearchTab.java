@@ -217,15 +217,7 @@ public class DirectorySearchTab extends VerticalLayout {
         // Environment dropdown
         HorizontalLayout environmentLayout = new HorizontalLayout();
         environmentLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.END);
-        environmentLayout.setSpacing(true);
-        
-        // Add server icon to environment section
-        Icon serverIcon = new Icon(VaadinIcon.SERVER);
-        serverIcon.setSize("16px");
-        serverIcon.getStyle().set("color", "#666");
-        serverIcon.getStyle().set("margin-top", "26px"); // Align with combo box
-        
-        environmentLayout.add(serverIcon, environmentDropdown.getMultiSelectComponent());
+        environmentLayout.add(environmentDropdown.getMultiSelectComponentWithIcon());
         
         // Search form
         HorizontalLayout searchForm = new HorizontalLayout();

@@ -4,8 +4,10 @@ import com.example.ldapbrowser.model.LdapServerConfig;
 import com.example.ldapbrowser.service.ConfigurationService;
 import com.example.ldapbrowser.service.InMemoryLdapService;
 import com.example.ldapbrowser.service.LdapService;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.combobox.MultiSelectComboBox;
 import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
@@ -147,6 +149,39 @@ public class EnvironmentDropdown {
     // Multi select methods
     public MultiSelectComboBox<LdapServerConfig> getMultiSelectComponent() {
         return multiSelectCombo;
+    }
+    
+    /**
+     * Get the multi-select component wrapped with an icon for consistency with single-select
+     */
+    public Component getMultiSelectComponentWithIcon() {
+        if (!multiSelect || multiSelectCombo == null) {
+            return multiSelectCombo;
+        }
+        
+        // Create a wrapper div that mimics the structure of a ComboBox with prefix
+        Div wrapper = new Div();
+        wrapper.getStyle()
+            .set("position", "relative")
+            .set("width", "100%");
+        
+        // Create icon positioned like a prefix component
+        Icon serverIcon = new Icon(VaadinIcon.SERVER);
+        serverIcon.setSize("var(--lumo-icon-size-m)");
+        serverIcon.getStyle()
+            .set("position", "absolute")
+            .set("left", "var(--lumo-space-s)")
+            .set("top", "calc(var(--lumo-text-field-size) - var(--lumo-icon-size-m))")
+            .set("z-index", "10")
+            .set("color", "var(--lumo-contrast-60pct)")
+            .set("pointer-events", "none");
+        
+        // Add left padding to the multiselect combo to make space for the icon
+        multiSelectCombo.getStyle().set("padding-left", "calc(var(--lumo-space-s) + var(--lumo-icon-size-m) + var(--lumo-space-xs))");
+        
+        wrapper.add(serverIcon, multiSelectCombo);
+        
+        return wrapper;
     }
     
     public Set<LdapServerConfig> getSelectedEnvironments() {

@@ -44,6 +44,7 @@ public class DashboardTab extends VerticalLayout {
     // Tabbed interface components
     private TabSheet tabSheet;
     private Tab entryDetailsTab;
+    private NewEntryTab newEntryTab;
     
     // Private naming contexts option
     private Checkbox includePrivateNamingContextsCheckbox;
@@ -70,6 +71,8 @@ public class DashboardTab extends VerticalLayout {
         });
         
         attributeEditor = new AttributeEditor(ldapService);
+        
+        newEntryTab = new NewEntryTab(ldapService);
         
         searchPanel = new SearchPanel(ldapService);
         searchPanel.addSearchListener(this::onSearchResults);
@@ -155,6 +158,10 @@ public class DashboardTab extends VerticalLayout {
         VerticalLayout entryDetailsPanel = createEntryDetailsPanel();
         tabSheet.add(entryDetailsTab, entryDetailsPanel);
         
+        // New Entry Tab
+        Tab newEntryTabComponent = new Tab("New Entry");
+        tabSheet.add(newEntryTabComponent, newEntryTab);
+        
         // Search Tab
         Tab searchTab = new Tab("Search");
         VerticalLayout searchTabPanel = createSearchTabPanel();
@@ -181,6 +188,7 @@ public class DashboardTab extends VerticalLayout {
         if (environment != null) {
             treeGrid.setServerConfig(environment);
             attributeEditor.setServerConfig(environment);
+            newEntryTab.setServerConfig(environment);
             searchPanel.setServerConfig(environment);
             
             // Load the tree for the new environment
@@ -423,6 +431,7 @@ public class DashboardTab extends VerticalLayout {
         this.serverConfig = serverConfig;
         treeGrid.setServerConfig(serverConfig);
         attributeEditor.setServerConfig(serverConfig);
+        newEntryTab.setServerConfig(serverConfig);
         searchPanel.setServerConfig(serverConfig);
     }
     
@@ -437,6 +446,7 @@ public class DashboardTab extends VerticalLayout {
     public void clear() {
         treeGrid.clear();
         attributeEditor.clear();
+        newEntryTab.clear();
         searchResultsPanel.removeAll();
         searchResultsPanel.add(new Span("No search results"));
     }

@@ -15,7 +15,7 @@ import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 
 /**
- * Bulk Operations tab containing Import and Search sub-tabs
+ * Bulk Operations tab containing Import, Search, and Generate sub-tabs
  */
 public class BulkOperationsTab extends VerticalLayout {
     
@@ -31,10 +31,12 @@ public class BulkOperationsTab extends VerticalLayout {
     private TabSheet tabSheet;
     private Tab importTab;
     private Tab searchTab;
+    private Tab generateTab;
     
     // Components
     private ImportTab importTabContent;
     private BulkSearchTab searchTabContent;
+    private BulkGenerateTab generateTabContent;
     
     public BulkOperationsTab(LdapService ldapService, LoggingService loggingService,
                             ConfigurationService configurationService, InMemoryLdapService inMemoryLdapService) {
@@ -65,6 +67,11 @@ public class BulkOperationsTab extends VerticalLayout {
         searchTab = new Tab("Search");
         searchTabContent = new BulkSearchTab(ldapService, loggingService);
         tabSheet.add(searchTab, searchTabContent);
+        
+        // Generate tab (new bulk generate operations)
+        generateTab = new Tab("Generate");
+        generateTabContent = new BulkGenerateTab(ldapService, loggingService);
+        tabSheet.add(generateTab, generateTabContent);
         
         // Set Import as the default selected tab
         tabSheet.setSelectedTab(importTab);
@@ -104,6 +111,7 @@ public class BulkOperationsTab extends VerticalLayout {
     public void setServerConfig(LdapServerConfig serverConfig) {
         importTabContent.setServerConfig(serverConfig);
         searchTabContent.setServerConfig(serverConfig);
+        generateTabContent.setServerConfig(serverConfig);
     }
     
     /**
@@ -118,5 +126,6 @@ public class BulkOperationsTab extends VerticalLayout {
     public void clear() {
         importTabContent.clear();
         searchTabContent.clear();
+        generateTabContent.clear();
     }
 }
