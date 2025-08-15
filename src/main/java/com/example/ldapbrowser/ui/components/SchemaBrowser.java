@@ -22,9 +22,19 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 import com.unboundid.ldap.sdk.LDAPException;
-import com.unboundid.ldap.sdk.schema.*;
+import com.unboundid.ldap.sdk.schema.AttributeSyntaxDefinition;
+import com.unboundid.ldap.sdk.schema.AttributeTypeDefinition;
+import com.unboundid.ldap.sdk.schema.MatchingRuleDefinition;
+import com.unboundid.ldap.sdk.schema.MatchingRuleUseDefinition;
+import com.unboundid.ldap.sdk.schema.ObjectClassDefinition;
+import com.unboundid.ldap.sdk.schema.Schema;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
