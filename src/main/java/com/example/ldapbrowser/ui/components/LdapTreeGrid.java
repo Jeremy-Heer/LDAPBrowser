@@ -484,7 +484,7 @@ private void loadChildren(LdapEntry parent) {
 }
 
 private void loadChildren(LdapEntry parent, int page) {
-  if (serverConfig == null || !parent.isHasChildren()) {
+  if (serverConfig == null) {
     return;
   }
 
@@ -492,6 +492,24 @@ private void loadChildren(LdapEntry parent, int page) {
   entryPageState.put(parent.getDn(), page);
 
   try {
+    // First, check if the parent actually has children (lazy check)
+    boolean actuallyHasChildren = ldapService.checkHasChildren(serverConfig.getId(), parent.getDn());
+    
+    if (!actuallyHasChildren) {
+      // Remove the expander since there are no children
+      getUI().ifPresent(ui -> ui.access(() -> {
+        parent.setHasChildren(false);
+        // Remove any placeholder children
+        List<LdapEntry> existingChildren = new ArrayList<>(treeData.getChildren(parent));
+        for (LdapEntry child : existingChildren) {
+          treeData.removeItem(child);
+        }
+        dataProvider.refreshItem(parent, true);
+        showNotification("No child entries found under " + parent.getDn(), NotificationVariant.LUMO_PRIMARY);
+      }));
+      return;
+    }
+
     // Show loading indicator
     getUI().ifPresent(ui -> ui.access(() -> {
       parent.addAttribute("_loading", "true");
@@ -512,49 +530,44 @@ private void loadChildren(LdapEntry parent, int page) {
         treeData.removeItem(child);
       }
 
-      // Add real children
-      for (LdapEntry child : children) {
-        // Ensure all child entries get a chance to show expanders
-        ensureHasChildrenFlagIsSet(child);
-
-        treeData.addItem(parent, child);
-
-        // Add placeholder for children that have or might have children
-        if (child.isHasChildren() || shouldShowExpanderForEntry(child)) {
-          // Check if this child already has any children (including placeholders)
-          List<LdapEntry> childChildren = treeData.getChildren(child);
-          if (childChildren.isEmpty()) {
-            LdapEntry placeholder = createPlaceholderEntry();
-            treeData.addItem(child, placeholder);
-          }
-          // Update the hasChildren flag if we're adding a placeholder
-          if (!child.isHasChildren()) {
-            child.setHasChildren(true);
-          }
-        }
-      }
-
-      // Add pagination controls if needed
-      if (result.hasNextPage() || result.hasPrevPage()) {
-        addPaginationEntries(
-          parent, 
-          parent.getDn(), 
-          result.getCurrentPage(), 
-          result.hasNextPage(), 
-          result.hasPrevPage()
-        );
-      }
-
-      dataProvider.refreshItem(parent, true);
-
       if (children.isEmpty()) {
-        // If no children found, mark as no longer having children and collapse
+        // No children found, remove the expander
         parent.setHasChildren(false);
-        dataProvider.refreshItem(parent);
-        // Collapse the entry since it has no children
-        collapse(parent);
         showNotification("No child entries found under " + parent.getDn(), NotificationVariant.LUMO_PRIMARY);
       } else {
+        // Add real children
+        for (LdapEntry child : children) {
+          // Ensure all child entries get a chance to show expanders
+          ensureHasChildrenFlagIsSet(child);
+
+          treeData.addItem(parent, child);
+
+          // Add placeholder for children that have or might have children
+          if (child.isHasChildren() || shouldShowExpanderForEntry(child)) {
+            // Check if this child already has any children (including placeholders)
+            List<LdapEntry> childChildren = treeData.getChildren(child);
+            if (childChildren.isEmpty()) {
+              LdapEntry placeholder = createPlaceholderEntry();
+              treeData.addItem(child, placeholder);
+            }
+            // Update the hasChildren flag if we're adding a placeholder
+            if (!child.isHasChildren()) {
+              child.setHasChildren(true);
+            }
+          }
+        }
+
+        // Add pagination controls if needed
+        if (result.hasNextPage() || result.hasPrevPage()) {
+          addPaginationEntries(
+            parent, 
+            parent.getDn(), 
+            result.getCurrentPage(), 
+            result.hasNextPage(), 
+            result.hasPrevPage()
+          );
+        }
+
         // Show appropriate notification based on paging
         String message;
         if (result.hasNextPage() || result.hasPrevPage()) {
@@ -565,27 +578,20 @@ private void loadChildren(LdapEntry parent, int page) {
         }
         showNotification(message, NotificationVariant.LUMO_SUCCESS);
       }
+
+      dataProvider.refreshItem(parent, true);
     }));
 
-} catch (LDAPException e) {
-getUI().ifPresent(ui -> ui.access(() -> {
-  // Remove loading indicator
-  parent.getAttributes().remove("_loading");
-  dataProvider.refreshItem(parent);
-
-  showNotification("Failed to load children for " + parent.getDn() + ": " + e.getMessage(),
-  NotificationVariant.LUMO_ERROR);
-}));
-} catch (Exception e) {
-getUI().ifPresent(ui -> ui.access(() -> {
-  // Remove loading indicator
-  parent.getAttributes().remove("_loading");
-  dataProvider.refreshItem(parent);
-
-  showNotification("Unexpected error loading children for " + parent.getDn() + ": " + e.getMessage(),
-  NotificationVariant.LUMO_ERROR);
-}));
-}
+  } catch (Exception e) {
+    getUI().ifPresent(ui -> ui.access(() -> {
+      // Remove loading indicator
+      parent.getAttributes().remove("_loading");
+      dataProvider.refreshItem(parent);
+      
+      showNotification("Failed to load children for " + parent.getDisplayName() + ": " + e.getMessage(), 
+        NotificationVariant.LUMO_ERROR);
+    }));
+  }
 }
 
 public void showSearchResults(List<LdapEntry> results) {

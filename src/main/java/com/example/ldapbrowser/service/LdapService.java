@@ -126,8 +126,9 @@ public List<LdapEntry> browseEntries(String serverId, String baseDn) throws LDAP
   List<LdapEntry> entries = new ArrayList<>();
   for (SearchResultEntry entry : searchResult.getSearchEntries()) {
     LdapEntry ldapEntry = new LdapEntry(entry);
-    // Check if entry has children
-    ldapEntry.setHasChildren(hasChildren(connection, entry.getDN()));
+    // Set hasChildren based on object classes/DN patterns to show expanders by default
+    // Actual children check will be done lazily when expander is clicked
+    ldapEntry.setHasChildren(shouldShowExpanderForEntry(ldapEntry));
     entries.add(ldapEntry);
   }
 
@@ -207,8 +208,9 @@ public BrowseResult browseEntriesWithMetadata(String serverId, String baseDn, in
     // Extract entries from this page
     for (SearchResultEntry entry : searchResult.getSearchEntries()) {
       LdapEntry ldapEntry = new LdapEntry(entry);
-      // Check if entry has children
-      ldapEntry.setHasChildren(hasChildren(connection, entry.getDN()));
+      // Set hasChildren based on object classes/DN patterns to show expanders by default
+      // Actual children check will be done lazily when expander is clicked
+      ldapEntry.setHasChildren(shouldShowExpanderForEntry(ldapEntry));
       allEntries.add(ldapEntry);
     }
     
@@ -253,7 +255,7 @@ public BrowseResult browseEntriesWithMetadata(String serverId, String baseDn, in
       List<LdapEntry> partialEntries = new ArrayList<>();
       for (SearchResultEntry entry : e.getSearchEntries()) {
         LdapEntry ldapEntry = new LdapEntry(entry);
-        ldapEntry.setHasChildren(hasChildren(connection, entry.getDN()));
+        ldapEntry.setHasChildren(shouldShowExpanderForEntry(ldapEntry));
         partialEntries.add(ldapEntry);
       }
       
@@ -858,5 +860,66 @@ if (dn.toLowerCase().startsWith("ou=")) {
 }
 }
 return false;
+}
+
+/**
+* Determine if an entry should show an expander based on its object classes and DN pattern
+* This is used for the initial display without doing an LDAP search
+*/
+private boolean shouldShowExpanderForEntry(LdapEntry entry) {
+  // Check DN pattern first - if it starts with "ou=" it's likely an organizational unit
+  String dn = entry.getDn();
+  if (dn != null && dn.toLowerCase().startsWith("ou=")) {
+    return true;
+  }
+
+  // Check all object classes to determine if this entry should have an expander
+  // But exclude person/user types even if they contain organizational patterns
+  boolean hasPersonClass = false;
+  boolean hasContainerClass = false;
+
+  List<String> objectClasses = entry.getAttributeValues("objectClass");
+  for (String oc : objectClasses) {
+    String lowerOc = oc.toLowerCase();
+
+    // Check if this is a person/user entry
+    if (lowerOc.contains("person") || lowerOc.contains("user") ||
+    lowerOc.contains("inetorgperson") || lowerOc.contains("posixaccount")) {
+      hasPersonClass = true;
+    }
+
+    // Check if this is a container/organizational entry
+    if (lowerOc.equals("organizationalunit") ||
+    lowerOc.contains("organizationalunit") ||
+    lowerOc.equals("organization") ||
+    lowerOc.contains("organization") ||
+    lowerOc.contains("container") ||
+    lowerOc.contains("domain") ||
+    lowerOc.contains("dcobject") ||
+    lowerOc.contains("builtindomain")) {
+      hasContainerClass = true;
+    }
+  }
+
+  // If it's a person/user, don't show expander regardless of other classes
+  if (hasPersonClass && !hasContainerClass) {
+    return false;
+  }
+
+  // If it has container classes, show expander
+  if (hasContainerClass) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+* Check if an entry actually has children by performing an LDAP search
+* This is called lazily when an expander is clicked
+*/
+public boolean checkHasChildren(String serverId, String dn) throws LDAPException {
+  LDAPConnection connection = getConnection(serverId);
+  return hasChildren(connection, dn);
 }
 }
