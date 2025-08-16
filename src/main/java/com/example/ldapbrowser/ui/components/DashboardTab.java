@@ -292,8 +292,9 @@ private VerticalLayout createSearchTabPanel() {
 }
 
   private void onEntrySelected(LdapEntry entry) {
-    // Don't display placeholder entries in the attribute editor
-    if (entry != null && !entry.getDn().startsWith("_placeholder_")) {
+    // Don't display placeholder entries or pagination entries in the attribute editor
+    if (entry != null && !entry.getDn().startsWith("_placeholder_") && 
+        entry.getAttributeValues("isPagination").isEmpty()) {
       // Fetch the complete entry with all attributes from LDAP
       try {
         LdapEntry fullEntry = ldapService.getEntry(serverConfig.getId(), entry.getDn());

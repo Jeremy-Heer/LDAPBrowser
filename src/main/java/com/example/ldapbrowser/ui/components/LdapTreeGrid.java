@@ -13,7 +13,10 @@ import com.vaadin.flow.data.provider.hierarchy.TreeData;
 import com.vaadin.flow.data.provider.hierarchy.TreeDataProvider;
 import com.unboundid.ldap.sdk.LDAPException;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
 * Tree grid component for browsing LDAP entries
@@ -24,6 +27,10 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
   private LdapServerConfig serverConfig;
   private TreeData<LdapEntry> treeData;
   private TreeDataProvider<LdapEntry> dataProvider;
+  
+  // Paging support
+  private final Map<String, Integer> entryPageState = new HashMap<>(); // DN -> current page
+  private static final int PAGE_SIZE = 100;
 
   public LdapTreeGrid(LdapService ldapService) {
     this.ldapService = ldapService;
@@ -100,7 +107,12 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
   asSingleSelect().addValueChangeListener(event -> {
     LdapEntry selectedEntry = event.getValue();
     if (selectedEntry != null) {
-      fireSelectionEvent(selectedEntry);
+      // Check if this is a pagination control entry
+      if (!selectedEntry.getAttributeValues("isPagination").isEmpty()) {
+        handlePaginationClick(selectedEntry);
+        // Clear selection to avoid keeping pagination entry selected
+        asSingleSelect().clear();
+      }
     }
   });
 }
@@ -110,16 +122,132 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
 */
 private LdapEntry createPlaceholderEntry() {
   LdapEntry placeholder = new LdapEntry();
-  placeholder.setDn("_placeholder_" + System.currentTimeMillis() + "_" + Math.random());
-  placeholder.setRdn("Loading...");
+  placeholder.setDn("_placeholder_" + System.nanoTime());
+  placeholder.addAttribute("displayName", "Loading...");
   placeholder.setHasChildren(false);
   return placeholder;
 }
 
 /**
+* Create a pagination control entry
+*/
+private LdapEntry createPaginationControlEntry(String parentDn, int currentPage, boolean hasNextPage, boolean hasPrevPage) {
+  // This method is now used to create individual pagination entries
+  // We'll call it multiple times to create separate Previous/Next entries
+  LdapEntry paginationEntry = new LdapEntry();
+  String entryId = "_pagination_" + parentDn.hashCode() + "_" + System.nanoTime();
+  paginationEntry.setDn(entryId);
+  
+  // This will be overridden by the calling method
+  paginationEntry.addAttribute("isPagination", "true");
+  paginationEntry.addAttribute("parentDn", parentDn);
+  paginationEntry.addAttribute("currentPage", String.valueOf(currentPage));
+  paginationEntry.addAttribute("hasNext", String.valueOf(hasNextPage));
+  paginationEntry.addAttribute("hasPrev", String.valueOf(hasPrevPage));
+  paginationEntry.setHasChildren(false);
+  
+  return paginationEntry;
+}
+
+private void addPaginationEntries(LdapEntry parentEntry, String parentDn, int currentPage, boolean hasNextPage, boolean hasPrevPage) {
+  // Create Previous entry if available
+  if (hasPrevPage) {
+    LdapEntry prevEntry = createPaginationControlEntry(parentDn, currentPage, hasNextPage, hasPrevPage);
+    prevEntry.setDn("_pagination_prev_" + parentDn.hashCode() + "_" + System.nanoTime());
+    prevEntry.addAttribute("displayName", "◀ Previous Page");
+    prevEntry.addAttribute("action", "previous");
+    treeData.addItem(parentEntry, prevEntry);
+  }
+  
+  // Create Next entry if available
+  if (hasNextPage) {
+    LdapEntry nextEntry = createPaginationControlEntry(parentDn, currentPage, hasNextPage, hasPrevPage);
+    nextEntry.setDn("_pagination_next_" + parentDn.hashCode() + "_" + System.nanoTime());
+    nextEntry.addAttribute("displayName", "Next Page ▶");
+    nextEntry.addAttribute("action", "next");
+    treeData.addItem(parentEntry, nextEntry);
+  }
+  
+  // Create page info entry (non-clickable, just for information)
+  if (hasPrevPage || hasNextPage) {
+    LdapEntry infoEntry = createPaginationControlEntry(parentDn, currentPage, hasNextPage, hasPrevPage);
+    infoEntry.setDn("_pagination_info_" + parentDn.hashCode() + "_" + System.nanoTime());
+    infoEntry.addAttribute("displayName", "— Page " + (currentPage + 1) + " —");
+    infoEntry.addAttribute("action", "info");
+    treeData.addItem(parentEntry, infoEntry);
+  }
+}
+
+/**
+* Handle pagination control clicks
+*/
+private void handlePaginationClick(LdapEntry paginationEntry) {
+  String parentDn = paginationEntry.getFirstAttributeValue("parentDn");
+  int currentPage = Integer.parseInt(paginationEntry.getFirstAttributeValue("currentPage"));
+  String action = paginationEntry.getFirstAttributeValue("action");
+  
+  // Don't process info entries
+  if ("info".equals(action)) {
+    return;
+  }
+  
+  // Find the parent entry
+  LdapEntry parentEntry = findEntryByDn(parentDn);
+  if (parentEntry == null) {
+    return;
+  }
+  
+  // Calculate new page based on action
+  int newPage = currentPage;
+  if ("next".equals(action)) {
+    newPage = currentPage + 1;
+  } else if ("previous".equals(action)) {
+    newPage = currentPage - 1;
+  }
+  
+  if (newPage != currentPage) {
+    entryPageState.put(parentDn, newPage);
+    loadChildren(parentEntry, newPage);
+    
+    // Show brief feedback about the action
+    showNotification(String.format("Navigated to %s page (%d)", action, newPage + 1), 
+                     NotificationVariant.LUMO_SUCCESS);
+  }
+}
+
+/**
+* Find an entry by DN in the tree
+*/
+private LdapEntry findEntryByDn(String dn) {
+  return findEntryByDnRecursive(null, dn);
+}
+
+/**
+* Recursively find an entry by DN
+*/
+private LdapEntry findEntryByDnRecursive(LdapEntry parent, String dn) {
+  for (LdapEntry child : treeData.getChildren(parent)) {
+    if (dn.equals(child.getDn())) {
+      return child;
+    }
+    LdapEntry found = findEntryByDnRecursive(child, dn);
+    if (found != null) {
+      return found;
+    }
+  }
+  return null;
+}/**
 * Create an icon component for each entry type
 */
 private Icon createIconComponent(LdapEntry entry) {
+  // Check if this is a pagination control
+  if (!entry.getAttributeValues("isPagination").isEmpty()) {
+    Icon paginationIcon = new Icon(VaadinIcon.ELLIPSIS_DOTS_H);
+    paginationIcon.getStyle().set("color", "var(--lumo-primary-color)");
+    paginationIcon.getStyle().set("cursor", "pointer");
+    return paginationIcon;
+  }
+  
   return getIconForEntry(entry);
 }
 
@@ -238,6 +366,12 @@ private String getEntryDisplayName(LdapEntry entry) {
   if (entry.getDn().startsWith("_placeholder_")) {
     return "Loading...";
   }
+  
+  // Handle pagination control entries
+  if (!entry.getAttributeValues("isPagination").isEmpty()) {
+    return entry.getFirstAttributeValue("displayName");
+  }
+  
   // Special case for Root DSE - show label instead of empty DN
   if (entry.getDn().isEmpty() || "Root DSE".equals(entry.getRdn())) {
     return "Root DSE";
@@ -283,10 +417,16 @@ public void loadRootEntries(String baseDn) throws LDAPException {
 
   if (rootEntries.isEmpty()) {
     showNotification("No entries found under: " + baseDn, NotificationVariant.LUMO_PRIMARY);
-  } else if (result.isSizeLimitExceeded()) {
-  showNotification("Showing first " + rootEntries.size() + " entries only - more than 100 entries found under: " + baseDn,
-  NotificationVariant.LUMO_ERROR);
-}
+  } else {
+    String message;
+    if (result.hasNextPage()) {
+      message = String.format("Loaded %d entries under: %s (more available, expand entries to navigate)", 
+        rootEntries.size(), baseDn);
+    } else {
+      message = "Loaded " + rootEntries.size() + " entries under: " + baseDn;
+    }
+    showNotification(message, NotificationVariant.LUMO_SUCCESS);
+  }
 }
 
 public void loadRootDSEWithNamingContexts() throws LDAPException {
@@ -338,19 +478,18 @@ public void loadRootDSEWithNamingContexts(boolean includePrivateNamingContexts) 
 }
 
 private void loadChildren(LdapEntry parent) {
+  // Get current page for this parent (default to 0)
+  int currentPage = entryPageState.getOrDefault(parent.getDn(), 0);
+  loadChildren(parent, currentPage);
+}
+
+private void loadChildren(LdapEntry parent, int page) {
   if (serverConfig == null || !parent.isHasChildren()) {
     return;
   }
 
-  // Check if we have only placeholder children
-  List<LdapEntry> existingChildren = treeData.getChildren(parent);
-  boolean hasOnlyPlaceholder = existingChildren.size() == 1 &&
-  existingChildren.get(0).getDn().startsWith("_placeholder_");
-
-  // If we already have real children loaded, don't reload
-  if (!existingChildren.isEmpty() && !hasOnlyPlaceholder) {
-    return;
-  }
+  // Store the current page
+  entryPageState.put(parent.getDn(), page);
 
   try {
     // Show loading indicator
@@ -359,17 +498,18 @@ private void loadChildren(LdapEntry parent) {
       dataProvider.refreshItem(parent);
     }));
 
-    // Use the metadata version to detect size limits
-    LdapService.BrowseResult result = ldapService.browseEntriesWithMetadata(serverConfig.getId(), parent.getDn());
+    // Use the metadata version with paging support
+    LdapService.BrowseResult result = ldapService.browseEntriesWithMetadata(serverConfig.getId(), parent.getDn(), page, PAGE_SIZE);
     List<LdapEntry> children = result.getEntries();
 
     getUI().ifPresent(ui -> ui.access(() -> {
       // Remove loading indicator
       parent.getAttributes().remove("_loading");
 
-      // Remove placeholder children if they exist
-      if (hasOnlyPlaceholder) {
-        treeData.removeItem(existingChildren.get(0));
+      // Remove all existing children (including placeholders and pagination controls)
+      List<LdapEntry> existingChildren = new ArrayList<>(treeData.getChildren(parent));
+      for (LdapEntry child : existingChildren) {
+        treeData.removeItem(child);
       }
 
       // Add real children
@@ -394,6 +534,17 @@ private void loadChildren(LdapEntry parent) {
         }
       }
 
+      // Add pagination controls if needed
+      if (result.hasNextPage() || result.hasPrevPage()) {
+        addPaginationEntries(
+          parent, 
+          parent.getDn(), 
+          result.getCurrentPage(), 
+          result.hasNextPage(), 
+          result.hasPrevPage()
+        );
+      }
+
       dataProvider.refreshItem(parent, true);
 
       if (children.isEmpty()) {
@@ -402,14 +553,19 @@ private void loadChildren(LdapEntry parent) {
         dataProvider.refreshItem(parent);
         // Collapse the entry since it has no children
         collapse(parent);
-      } else if (result.isSizeLimitExceeded()) {
-      // Show warning when size limit is exceeded
-      showNotification("Showing first " + children.size() + " entries only - more than 100 children found under " + parent.getDn(),
-      NotificationVariant.LUMO_ERROR);
-    } else {
-    showNotification("Loaded " + children.size() + " child entries", NotificationVariant.LUMO_SUCCESS);
-  }
-}));
+        showNotification("No child entries found under " + parent.getDn(), NotificationVariant.LUMO_PRIMARY);
+      } else {
+        // Show appropriate notification based on paging
+        String message;
+        if (result.hasNextPage() || result.hasPrevPage()) {
+          message = String.format("Loaded page %d (%d entries) for %s - Use pagination controls to navigate", 
+            result.getCurrentPage() + 1, children.size(), parent.getDn());
+        } else {
+          message = "Loaded " + children.size() + " child entries for " + parent.getDn();
+        }
+        showNotification(message, NotificationVariant.LUMO_SUCCESS);
+      }
+    }));
 
 } catch (LDAPException e) {
 getUI().ifPresent(ui -> ui.access(() -> {
@@ -451,6 +607,7 @@ public void showSearchResults(List<LdapEntry> results) {
 public void clear() {
   treeData.clear();
   dataProvider.refreshAll();
+  entryPageState.clear(); // Clear paging state
 }
 
 public void refreshEntry(LdapEntry entry) {
@@ -465,10 +622,6 @@ public void expandEntry(LdapEntry entry) {
     loadChildren(entry);
     expand(entry);
   }
-}
-
-private void fireSelectionEvent(LdapEntry entry) {
-  // This will be handled by the selection listener added in the constructor
 }
 
 /**

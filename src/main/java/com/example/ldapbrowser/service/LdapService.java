@@ -142,6 +142,13 @@ public List<LdapEntry> browseEntries(String serverId, String baseDn) throws LDAP
 * Browse LDAP entries with metadata about size limits
 */
 public BrowseResult browseEntriesWithMetadata(String serverId, String baseDn) throws LDAPException {
+  return browseEntriesWithMetadata(serverId, baseDn, 0, 100);
+}
+
+/**
+* Browse LDAP entries with metadata about size limits and paging support
+*/
+public BrowseResult browseEntriesWithMetadata(String serverId, String baseDn, int page, int pageSize) throws LDAPException {
   LDAPConnection connection = getConnection(serverId);
 
   // Optimize: Only request essential attributes for browsing
@@ -151,42 +158,81 @@ public BrowseResult browseEntriesWithMetadata(String serverId, String baseDn) th
   Filter.createPresenceFilter("objectClass"),
   "objectClass", "cn", "ou", "dc" // Only essential attributes for display
   );
-  searchRequest.setSizeLimit(100); // Limit to 100 entries for performance
+  
+  // For paging, we need to get more entries to determine total count and calculate pages
+  // We'll use a larger size limit and handle paging client-side for better performance
+  searchRequest.setSizeLimit(Math.max(1000, (page + 2) * pageSize)); // Get enough for current page + next page detection
 
   try {
     SearchResult searchResult = connection.search(searchRequest);
 
-    List<LdapEntry> entries = new ArrayList<>();
+    List<LdapEntry> allEntries = new ArrayList<>();
     for (SearchResultEntry entry : searchResult.getSearchEntries()) {
       LdapEntry ldapEntry = new LdapEntry(entry);
       // Check if entry has children
       ldapEntry.setHasChildren(hasChildren(connection, entry.getDN()));
-      entries.add(ldapEntry);
+      allEntries.add(ldapEntry);
     }
 
     // Sort entries by display name
-    entries.sort(Comparator.comparing(LdapEntry::getDisplayName));
+    allEntries.sort(Comparator.comparing(LdapEntry::getDisplayName));
 
+    // Calculate pagination
+    int totalEntries = allEntries.size();
     boolean sizeLimitExceeded = searchResult.getResultCode() == ResultCode.SIZE_LIMIT_EXCEEDED;
-
-    return new BrowseResult(entries, sizeLimitExceeded, entries.size());
+    
+    // If size limit exceeded, we know there are more entries than we retrieved
+    if (sizeLimitExceeded) {
+      totalEntries = -1; // Indicate unknown total count
+    }
+    
+    // Extract page entries
+    int startIndex = page * pageSize;
+    int endIndex = Math.min(startIndex + pageSize, allEntries.size());
+    
+    List<LdapEntry> pageEntries;
+    if (startIndex >= allEntries.size()) {
+      pageEntries = new ArrayList<>(); // Empty page
+    } else {
+      pageEntries = new ArrayList<>(allEntries.subList(startIndex, endIndex));
+    }
+    
+    // Determine if there are more pages
+    boolean hasNextPage = (endIndex < allEntries.size()) || sizeLimitExceeded;
+    boolean hasPrevPage = page > 0;
+    
+    return new BrowseResult(pageEntries, sizeLimitExceeded, totalEntries, page, pageSize, hasNextPage, hasPrevPage);
 
   } catch (LDAPSearchException e) {
   // Handle size limit exceeded gracefully by returning partial results
   if (e.getResultCode() == ResultCode.SIZE_LIMIT_EXCEEDED) {
-    List<LdapEntry> entries = new ArrayList<>();
+    List<LdapEntry> allEntries = new ArrayList<>();
     // Get the partial results from the search exception
     for (SearchResultEntry entry : e.getSearchEntries()) {
       LdapEntry ldapEntry = new LdapEntry(entry);
       // Check if entry has children
       ldapEntry.setHasChildren(hasChildren(connection, entry.getDN()));
-      entries.add(ldapEntry);
+      allEntries.add(ldapEntry);
     }
 
     // Sort entries by display name
-    entries.sort(Comparator.comparing(LdapEntry::getDisplayName));
+    allEntries.sort(Comparator.comparing(LdapEntry::getDisplayName));
 
-    return new BrowseResult(entries, true, entries.size());
+    // Calculate pagination for partial results
+    int startIndex = page * pageSize;
+    int endIndex = Math.min(startIndex + pageSize, allEntries.size());
+    
+    List<LdapEntry> pageEntries;
+    if (startIndex >= allEntries.size()) {
+      pageEntries = new ArrayList<>(); // Empty page
+    } else {
+      pageEntries = new ArrayList<>(allEntries.subList(startIndex, endIndex));
+    }
+    
+    boolean hasNextPage = (endIndex < allEntries.size()) || true; // Always true when size limit exceeded
+    boolean hasPrevPage = page > 0;
+
+    return new BrowseResult(pageEntries, true, -1, page, pageSize, hasNextPage, hasPrevPage);
   } else {
   // Re-throw other types of LDAP exceptions
   throw e;
@@ -201,16 +247,37 @@ public static class BrowseResult {
   private final List<LdapEntry> entries;
   private final boolean sizeLimitExceeded;
   private final int entryCount;
+  private final int currentPage;
+  private final int pageSize;
+  private final boolean hasNextPage;
+  private final boolean hasPrevPage;
 
   public BrowseResult(List<LdapEntry> entries, boolean sizeLimitExceeded, int entryCount) {
+    this(entries, sizeLimitExceeded, entryCount, 0, entries.size(), false, false);
+  }
+
+  public BrowseResult(List<LdapEntry> entries, boolean sizeLimitExceeded, int entryCount, 
+                     int currentPage, int pageSize, boolean hasNextPage, boolean hasPrevPage) {
     this.entries = entries;
     this.sizeLimitExceeded = sizeLimitExceeded;
     this.entryCount = entryCount;
+    this.currentPage = currentPage;
+    this.pageSize = pageSize;
+    this.hasNextPage = hasNextPage;
+    this.hasPrevPage = hasPrevPage;
   }
 
   public List<LdapEntry> getEntries() { return entries; }
   public boolean isSizeLimitExceeded() { return sizeLimitExceeded; }
   public int getEntryCount() { return entryCount; }
+  public int getCurrentPage() { return currentPage; }
+  public int getPageSize() { return pageSize; }
+  public boolean hasNextPage() { return hasNextPage; }
+  public boolean hasPrevPage() { return hasPrevPage; }
+  public int getTotalPages() { 
+    if (entryCount < 0) return -1; // Unknown total
+    return (int) Math.ceil((double) entryCount / pageSize); 
+  }
 }
 
 /**
