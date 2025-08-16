@@ -5,8 +5,8 @@ package com.example.ldapbrowser.ui.components;
 */
 @FunctionalInterface
 public interface EnvironmentRefreshListener {
- /**
- * Called when internal server environments change (start/stop).
- */
- void onEnvironmentChange();
+  /**
+  * Called when internal server environments change (start/stop).
+  */
+  void onEnvironmentChange();
 }

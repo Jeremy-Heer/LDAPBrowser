@@ -30,228 +30,228 @@ import com.unboundid.ldap.sdk.LDAPException;
 @Route("")
 @PageTitle("LDAP Browser")
 public class MainView extends AppLayout implements EnvironmentRefreshListener {
- 
- private final LdapService ldapService;
- private final ConfigurationService configurationService;
- private final InMemoryLdapService inMemoryLdapService;
- private final LoggingService loggingService;
- 
- // Main content components
- private Tabs mainTabs;
- private ServersTab serversTab;
- private DashboardTab dashboardTab;
- private SchemaBrowser schemaBrowser;
- private ExportTab reportsTab;
- private BulkOperationsTab bulkOperationsTab;
- private LogsTab logsTab;
- private DirectorySearchTab directorySearchTab;
- private VerticalLayout contentContainer;
- 
- public MainView(LdapService ldapService, ConfigurationService configurationService, 
-    InMemoryLdapService inMemoryLdapService, LoggingService loggingService) {
-  this.ldapService = ldapService;
-  this.configurationService = configurationService;
-  this.inMemoryLdapService = inMemoryLdapService;
-  this.loggingService = loggingService;
-  
-  initializeComponents();
-  setupLayout();
-  refreshServerList();
- }
- 
- private void initializeComponents() {
-  // Main tabs - Directory Search tab first, Servers renamed to Settings and moved to far right
-  mainTabs = new Tabs();
-  Tab directorySearchTabComponent = new Tab("Directory Search");
-  Tab dashboardTabComponent = new Tab("LDAP Browser");
-  Tab schemaTabComponent = new Tab("Schema");
-  Tab reportsTabComponent = new Tab("Reports");
-  Tab bulkOperationsTabComponent = new Tab("Bulk Operations");
-  Tab logsTabComponent = new Tab("Logs");
-  Tab serversTabComponent = new Tab("Settings");
-  mainTabs.add(directorySearchTabComponent, dashboardTabComponent, schemaTabComponent, reportsTabComponent, bulkOperationsTabComponent, logsTabComponent, serversTabComponent);
-  
-  mainTabs.addSelectedChangeListener(e -> {
-   Tab selectedTab = e.getSelectedTab();
-   if (selectedTab == directorySearchTabComponent) {
-    showDirectorySearch();
-   } else if (selectedTab == dashboardTabComponent) {
-    showDashboard();
-   } else if (selectedTab == schemaTabComponent) {
+
+  private final LdapService ldapService;
+  private final ConfigurationService configurationService;
+  private final InMemoryLdapService inMemoryLdapService;
+  private final LoggingService loggingService;
+
+  // Main content components
+  private Tabs mainTabs;
+  private ServersTab serversTab;
+  private DashboardTab dashboardTab;
+  private SchemaBrowser schemaBrowser;
+  private ExportTab reportsTab;
+  private BulkOperationsTab bulkOperationsTab;
+  private LogsTab logsTab;
+  private DirectorySearchTab directorySearchTab;
+  private VerticalLayout contentContainer;
+
+  public MainView(LdapService ldapService, ConfigurationService configurationService,
+  InMemoryLdapService inMemoryLdapService, LoggingService loggingService) {
+    this.ldapService = ldapService;
+    this.configurationService = configurationService;
+    this.inMemoryLdapService = inMemoryLdapService;
+    this.loggingService = loggingService;
+
+    initializeComponents();
+    setupLayout();
+    refreshServerList();
+  }
+
+  private void initializeComponents() {
+    // Main tabs - Directory Search tab first, Servers renamed to Settings and moved to far right
+    mainTabs = new Tabs();
+    Tab directorySearchTabComponent = new Tab("Directory Search");
+    Tab dashboardTabComponent = new Tab("LDAP Browser");
+    Tab schemaTabComponent = new Tab("Schema");
+    Tab reportsTabComponent = new Tab("Reports");
+    Tab bulkOperationsTabComponent = new Tab("Bulk Operations");
+    Tab logsTabComponent = new Tab("Logs");
+    Tab serversTabComponent = new Tab("Settings");
+    mainTabs.add(directorySearchTabComponent, dashboardTabComponent, schemaTabComponent, reportsTabComponent, bulkOperationsTabComponent, logsTabComponent, serversTabComponent);
+
+    mainTabs.addSelectedChangeListener(e -> {
+      Tab selectedTab = e.getSelectedTab();
+      if (selectedTab == directorySearchTabComponent) {
+        showDirectorySearch();
+      } else if (selectedTab == dashboardTabComponent) {
+      showDashboard();
+    } else if (selectedTab == schemaTabComponent) {
     showSchema();
-   } else if (selectedTab == reportsTabComponent) {
-    showReports();
-   } else if (selectedTab == bulkOperationsTabComponent) {
-    showBulkOperations();
-   } else if (selectedTab == logsTabComponent) {
-    showLogs();
-   } else if (selectedTab == serversTabComponent) {
-    showServers();
-   }
-  });
-  
-  // Tab content components
-  serversTab = new ServersTab(ldapService, configurationService, this, inMemoryLdapService);
-  serversTab.setConnectionListener(this::connectToServer);
-  serversTab.setDisconnectionListener(this::disconnectFromServer);
-  
-  dashboardTab = new DashboardTab(ldapService, configurationService, inMemoryLdapService);
-  directorySearchTab = new DirectorySearchTab(ldapService, configurationService, inMemoryLdapService);
-  schemaBrowser = new SchemaBrowser(ldapService, configurationService, inMemoryLdapService);
-  reportsTab = new ExportTab(ldapService, loggingService, configurationService, inMemoryLdapService);
-  bulkOperationsTab = new BulkOperationsTab(ldapService, loggingService, configurationService, inMemoryLdapService);
-  logsTab = new LogsTab(loggingService);
-  
-  // Content container
-  contentContainer = new VerticalLayout();
-  contentContainer.setSizeFull();
-  contentContainer.setPadding(false);
-  contentContainer.setSpacing(false);
-  
-  // Initially show directory search tab
-  contentContainer.add(directorySearchTab);
- }
- 
- private void setupLayout() {
+  } else if (selectedTab == reportsTabComponent) {
+  showReports();
+} else if (selectedTab == bulkOperationsTabComponent) {
+showBulkOperations();
+} else if (selectedTab == logsTabComponent) {
+showLogs();
+} else if (selectedTab == serversTabComponent) {
+showServers();
+}
+});
+
+// Tab content components
+serversTab = new ServersTab(ldapService, configurationService, this, inMemoryLdapService);
+serversTab.setConnectionListener(this::connectToServer);
+serversTab.setDisconnectionListener(this::disconnectFromServer);
+
+dashboardTab = new DashboardTab(ldapService, configurationService, inMemoryLdapService);
+directorySearchTab = new DirectorySearchTab(ldapService, configurationService, inMemoryLdapService);
+schemaBrowser = new SchemaBrowser(ldapService, configurationService, inMemoryLdapService);
+reportsTab = new ExportTab(ldapService, loggingService, configurationService, inMemoryLdapService);
+bulkOperationsTab = new BulkOperationsTab(ldapService, loggingService, configurationService, inMemoryLdapService);
+logsTab = new LogsTab(loggingService);
+
+// Content container
+contentContainer = new VerticalLayout();
+contentContainer.setSizeFull();
+contentContainer.setPadding(false);
+contentContainer.setSpacing(false);
+
+// Initially show directory search tab
+contentContainer.add(directorySearchTab);
+}
+
+private void setupLayout() {
   // Create main content layout with tabs
   VerticalLayout mainContent = new VerticalLayout();
   mainContent.setSizeFull();
   mainContent.setPadding(false);
   mainContent.setSpacing(false);
-  
+
   // Tabs header
   HorizontalLayout tabsHeader = new HorizontalLayout();
   tabsHeader.setWidthFull();
   tabsHeader.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
   tabsHeader.setPadding(true);
   tabsHeader.addClassName("tabs-header");
-  
+
   tabsHeader.add(mainTabs);
-  
+
   mainContent.add(tabsHeader, contentContainer);
   mainContent.setFlexGrow(1, contentContainer);
-  
+
   // Set up the AppLayout with no navbar - just content
   setContent(mainContent);
- }
- 
- private void showServers() {
+}
+
+private void showServers() {
   contentContainer.removeAll();
   contentContainer.add(serversTab);
- }
- 
- private void showDashboard() {
+}
+
+private void showDashboard() {
   contentContainer.removeAll();
   contentContainer.add(dashboardTab);
- }
- 
- private void showDirectorySearch() {
+}
+
+private void showDirectorySearch() {
   contentContainer.removeAll();
   contentContainer.add(directorySearchTab);
- }
- 
- private void showSchema() {
+}
+
+private void showSchema() {
   contentContainer.removeAll();
   contentContainer.add(schemaBrowser);
- }
- 
- private void showReports() {
+}
+
+private void showReports() {
   contentContainer.removeAll();
   contentContainer.add(reportsTab);
- }
+}
 
- private void showBulkOperations() {
+private void showBulkOperations() {
   contentContainer.removeAll();
   contentContainer.add(bulkOperationsTab);
- }
+}
 
- private void showLogs() {
+private void showLogs() {
   contentContainer.removeAll();
   contentContainer.add(logsTab);
- }
- 
- @Override
- public void onEnvironmentChange() {
+}
+
+@Override
+public void onEnvironmentChange() {
   refreshEnvironmentDropdowns();
- }
- 
- public void refreshEnvironmentDropdowns() {
+}
+
+public void refreshEnvironmentDropdowns() {
   // Refresh environment dropdowns in all tabs that have them
   if (dashboardTab != null) {
-   dashboardTab.refreshEnvironments();
+    dashboardTab.refreshEnvironments();
   }
   if (directorySearchTab != null) {
-   directorySearchTab.refreshEnvironments();
+    directorySearchTab.refreshEnvironments();
   }
   if (schemaBrowser != null) {
-   schemaBrowser.refreshEnvironments();
+    schemaBrowser.refreshEnvironments();
   }
   if (reportsTab != null) {
-   reportsTab.refreshEnvironments();
+    reportsTab.refreshEnvironments();
   }
   if (bulkOperationsTab != null) {
-   bulkOperationsTab.refreshEnvironments();
+    bulkOperationsTab.refreshEnvironments();
   }
- }
- 
- private void refreshServerList() {
+}
+
+private void refreshServerList() {
   serversTab.refreshServerList();
   updateConnectionButtons();
- }
- 
- private void updateConnectionButtons() {
+}
+
+private void updateConnectionButtons() {
   serversTab.updateConnectionButtons();
- }
- 
- private void connectToServer(LdapServerConfig config) {
+}
+
+private void connectToServer(LdapServerConfig config) {
   if (config == null) {
-   showError("Please select a server to connect to.");
-   return;
+    showError("Please select a server to connect to.");
+    return;
   }
-  
+
   try {
-   ldapService.connect(config);
-   updateConnectionButtons();
-   
-   // Update reports and bulk operations tabs with server config
-   reportsTab.setServerConfig(config);
-   bulkOperationsTab.setServerConfig(config);
-   
-   // Automatically load Root DSE and naming contexts for dashboard
-   dashboardTab.loadRootDSEWithNamingContexts();
-   
-   showSuccess("Connected to " + config.getName());
+    ldapService.connect(config);
+    updateConnectionButtons();
+
+    // Update reports and bulk operations tabs with server config
+    reportsTab.setServerConfig(config);
+    bulkOperationsTab.setServerConfig(config);
+
+    // Automatically load Root DSE and naming contexts for dashboard
+    dashboardTab.loadRootDSEWithNamingContexts();
+
+    showSuccess("Connected to " + config.getName());
   } catch (LDAPException e) {
-   showError("Failed to connect: " + e.getMessage());
-  }
- }
- 
- private void disconnectFromServer() {
+  showError("Failed to connect: " + e.getMessage());
+}
+}
+
+private void disconnectFromServer() {
   LdapServerConfig config = serversTab.getSelectedServer();
   if (config != null) {
-   ldapService.disconnect(config.getId());
-   updateConnectionButtons();
-   
-   directorySearchTab.clear();
-   reportsTab.clear();
-   bulkOperationsTab.clear();
-   
-   showInfo("Disconnected from " + config.getName());
+    ldapService.disconnect(config.getId());
+    updateConnectionButtons();
+
+    directorySearchTab.clear();
+    reportsTab.clear();
+    bulkOperationsTab.clear();
+
+    showInfo("Disconnected from " + config.getName());
   }
- }
- 
- private void showSuccess(String message) {
+}
+
+private void showSuccess(String message) {
   Notification notification = Notification.show(message, 3000, Notification.Position.TOP_END);
   notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
- }
- 
- private void showError(String message) {
+}
+
+private void showError(String message) {
   Notification notification = Notification.show(message, 5000, Notification.Position.TOP_END);
   notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
- }
- 
- private void showInfo(String message) {
+}
+
+private void showInfo(String message) {
   Notification notification = Notification.show(message, 3000, Notification.Position.TOP_END);
   notification.addThemeVariants(NotificationVariant.LUMO_PRIMARY);
- }
+}
 }

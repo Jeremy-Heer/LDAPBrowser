@@ -18,31 +18,31 @@ import java.util.*;
 * Entry Comparison sub-tab for comparing LDAP entries across environments
 */
 public class EntryComparisonTab extends VerticalLayout {
-  
+
   private List<SearchResultEntry> comparisonEntries = new ArrayList<>();
   private Grid<ComparisonRow> comparisonGrid;
   private Span titleLabel;
   private Button clearButton;
   private VerticalLayout contentLayout;
   private VerticalLayout placeholderLayout;
-  
+
   // Data model for comparison rows
   public static class ComparisonRow {
     private String attributeName;
     private Map<String, List<String>> valuesByEnvironment;
-    
+
     public ComparisonRow(String attributeName) {
       this.attributeName = attributeName;
       this.valuesByEnvironment = new LinkedHashMap<>();
     }
-    
+
     public String getAttributeName() { return attributeName; }
     public Map<String, List<String>> getValuesByEnvironment() { return valuesByEnvironment; }
-    
+
     public void addEnvironmentValues(String environment, List<String> values) {
       valuesByEnvironment.put(environment, values != null ? values : new ArrayList<>());
     }
-    
+
     public String getFormattedValues(String environment) {
       List<String> values = valuesByEnvironment.get(environment);
       if (values == null || values.isEmpty()) {
@@ -51,36 +51,36 @@ public class EntryComparisonTab extends VerticalLayout {
       return String.join("; ", values);
     }
   }
-  
+
   public EntryComparisonTab() {
     initializeComponents();
     setupLayout();
   }
-  
+
   private void initializeComponents() {
     // Title and controls
     titleLabel = new Span("No entries selected for comparison");
     titleLabel.getStyle().set("font-weight", "bold").set("color", "#333");
-    
+
     clearButton = new Button("Clear Comparison", new Icon(VaadinIcon.TRASH));
     clearButton.addThemeVariants(ButtonVariant.LUMO_SMALL);
     clearButton.setVisible(false);
     clearButton.addClickListener(e -> clearComparison());
-    
+
     // Comparison grid
     comparisonGrid = new Grid<>(ComparisonRow.class, false);
     comparisonGrid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
     comparisonGrid.setSizeFull();
     comparisonGrid.setVisible(false);
-    
+
     // Attribute Name column (fixed)
     comparisonGrid.addColumn(ComparisonRow::getAttributeName)
-          .setHeader("Attribute Name")
-          .setWidth("200px")
-          .setFlexGrow(0)
-          .setSortable(true)
-          .setComparator(Comparator.comparing(ComparisonRow::getAttributeName));
-    
+    .setHeader("Attribute Name")
+    .setWidth("200px")
+    .setFlexGrow(0)
+    .setSortable(true)
+    .setComparator(Comparator.comparing(ComparisonRow::getAttributeName));
+
     // Content layout
     contentLayout = new VerticalLayout();
     contentLayout.setPadding(false);
@@ -89,69 +89,69 @@ public class EntryComparisonTab extends VerticalLayout {
     contentLayout.add(comparisonGrid);
     contentLayout.setFlexGrow(1, comparisonGrid);
     contentLayout.setVisible(false);
-    
+
     // Placeholder layout
     setupPlaceholderContent();
   }
-  
+
   private void setupPlaceholderContent() {
     placeholderLayout = new VerticalLayout();
     placeholderLayout.setPadding(true);
     placeholderLayout.setSpacing(true);
     placeholderLayout.setDefaultHorizontalComponentAlignment(Alignment.CENTER);
     placeholderLayout.getStyle().set("color", "#666");
-    
+
     Icon icon = new Icon(VaadinIcon.TWIN_COL_SELECT);
     icon.setSize("48px");
     icon.getStyle().set("color", "#ccc");
-    
+
     H4 title = new H4("Entry Comparison");
     title.getStyle().set("color", "#333");
-    
+
     Span description = new Span("Compare LDAP entries across different environments to identify differences and similarities.");
     description.getStyle().set("color", "#666").set("font-style", "italic").set("text-align", "center");
-    
+
     Span instructions = new Span("To get started:");
     instructions.getStyle().set("color", "#333").set("font-weight", "bold").set("margin-top", "20px");
-    
+
     VerticalLayout stepsList = new VerticalLayout();
     stepsList.setPadding(false);
     stepsList.setSpacing(false);
     stepsList.setDefaultHorizontalComponentAlignment(Alignment.START);
-    
+
     Span step1 = new Span("1. Go to the Search tab");
     Span step2 = new Span("2. Perform a search to find entries");
     Span step3 = new Span("3. Check the boxes in the 'Compare' column (2-10 entries)");
     Span step4 = new Span("4. Click the 'Compare Selected' button");
-    
+
     step1.getStyle().set("color", "#555");
     step2.getStyle().set("color", "#555");
     step3.getStyle().set("color", "#555");
     step4.getStyle().set("color", "#555");
-    
+
     stepsList.add(step1, step2, step3, step4);
-    
+
     placeholderLayout.add(icon, title, description, instructions, stepsList);
   }
-  
+
   private void setupLayout() {
     setSizeFull();
     setPadding(true);
     setSpacing(true);
     addClassName("entry-comparison-tab");
-    
+
     // Header with title and controls
     HorizontalLayout headerLayout = new HorizontalLayout();
     headerLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
     headerLayout.setWidthFull();
     headerLayout.setJustifyContentMode(JustifyContentMode.BETWEEN);
     headerLayout.add(titleLabel, clearButton);
-    
+
     add(headerLayout, placeholderLayout, contentLayout);
     setFlexGrow(1, placeholderLayout);
     setFlexGrow(1, contentLayout);
   }
-  
+
   /**
   * Set the entries to compare
   */
@@ -160,94 +160,94 @@ public class EntryComparisonTab extends VerticalLayout {
     if (entries.isEmpty()) {
       showPlaceholder();
     } else {
-      buildComparisonTable();
-      showComparisonTable();
-    }
+    buildComparisonTable();
+    showComparisonTable();
   }
-  
-  private void showPlaceholder() {
-    titleLabel.setText("No entries selected for comparison");
-    clearButton.setVisible(false);
-    contentLayout.setVisible(false);
-    placeholderLayout.setVisible(true);
-    setFlexGrow(1, placeholderLayout);
-    setFlexGrow(0, contentLayout);
+}
+
+private void showPlaceholder() {
+  titleLabel.setText("No entries selected for comparison");
+  clearButton.setVisible(false);
+  contentLayout.setVisible(false);
+  placeholderLayout.setVisible(true);
+  setFlexGrow(1, placeholderLayout);
+  setFlexGrow(0, contentLayout);
+}
+
+private void showComparisonTable() {
+  titleLabel.setText(String.format("Comparing %d entries", comparisonEntries.size()));
+  clearButton.setVisible(true);
+  placeholderLayout.setVisible(false);
+  contentLayout.setVisible(true);
+  setFlexGrow(0, placeholderLayout);
+  setFlexGrow(1, contentLayout);
+}
+
+private void buildComparisonTable() {
+  // Clear existing columns except the first one (Attribute Name)
+  while (comparisonGrid.getColumns().size() > 1) {
+    comparisonGrid.removeColumn(comparisonGrid.getColumns().get(1));
   }
-  
-  private void showComparisonTable() {
-    titleLabel.setText(String.format("Comparing %d entries", comparisonEntries.size()));
-    clearButton.setVisible(true);
-    placeholderLayout.setVisible(false);
-    contentLayout.setVisible(true);
-    setFlexGrow(0, placeholderLayout);
-    setFlexGrow(1, contentLayout);
+
+  // Collect all unique attribute names
+  Set<String> allAttributes = new TreeSet<>();
+  for (SearchResultEntry entry : comparisonEntries) {
+    allAttributes.addAll(entry.getAttributes().keySet());
   }
-  
-  private void buildComparisonTable() {
-    // Clear existing columns except the first one (Attribute Name)
-    while (comparisonGrid.getColumns().size() > 1) {
-      comparisonGrid.removeColumn(comparisonGrid.getColumns().get(1));
-    }
-    
-    // Collect all unique attribute names
-    Set<String> allAttributes = new TreeSet<>();
-    for (SearchResultEntry entry : comparisonEntries) {
-      allAttributes.addAll(entry.getAttributes().keySet());
-    }
-    
-    // Add dynamic columns for each entry/environment
+
+  // Add dynamic columns for each entry/environment
+  for (int i = 0; i < comparisonEntries.size(); i++) {
+    SearchResultEntry entry = comparisonEntries.get(i);
+    String columnHeader = String.format("%s\n(%s)",
+    entry.getEnvironmentName(),
+    truncateDn(entry.getDn()));
+
+    final int entryIndex = i;
+    comparisonGrid.addColumn(row -> row.getFormattedValues(getEnvironmentKey(entryIndex)))
+    .setHeader(columnHeader)
+    .setFlexGrow(1)
+    .setResizable(true);
+  }
+
+  // Build comparison rows
+  List<ComparisonRow> comparisonRows = new ArrayList<>();
+  for (String attributeName : allAttributes) {
+    ComparisonRow row = new ComparisonRow(attributeName);
+
     for (int i = 0; i < comparisonEntries.size(); i++) {
       SearchResultEntry entry = comparisonEntries.get(i);
-      String columnHeader = String.format("%s\n(%s)", 
-        entry.getEnvironmentName(), 
-        truncateDn(entry.getDn()));
-      
-      final int entryIndex = i;
-      comparisonGrid.addColumn(row -> row.getFormattedValues(getEnvironmentKey(entryIndex)))
-             .setHeader(columnHeader)
-             .setFlexGrow(1)
-             .setResizable(true);
+      List<String> values = entry.getAttributeValues(attributeName);
+      row.addEnvironmentValues(getEnvironmentKey(i), values);
     }
-    
-    // Build comparison rows
-    List<ComparisonRow> comparisonRows = new ArrayList<>();
-    for (String attributeName : allAttributes) {
-      ComparisonRow row = new ComparisonRow(attributeName);
-      
-      for (int i = 0; i < comparisonEntries.size(); i++) {
-        SearchResultEntry entry = comparisonEntries.get(i);
-        List<String> values = entry.getAttributeValues(attributeName);
-        row.addEnvironmentValues(getEnvironmentKey(i), values);
-      }
-      
-      comparisonRows.add(row);
-    }
-    
-    comparisonGrid.setItems(comparisonRows);
-    comparisonGrid.setVisible(true);
+
+    comparisonRows.add(row);
   }
-  
-  private String getEnvironmentKey(int index) {
-    return "env_" + index;
+
+  comparisonGrid.setItems(comparisonRows);
+  comparisonGrid.setVisible(true);
+}
+
+private String getEnvironmentKey(int index) {
+  return "env_" + index;
+}
+
+private String truncateDn(String dn) {
+  if (dn == null || dn.length() <= 40) {
+    return dn;
   }
-  
-  private String truncateDn(String dn) {
-    if (dn == null || dn.length() <= 40) {
-      return dn;
-    }
-    return dn.substring(0, 37) + "...";
-  }
-  
-  private void clearComparison() {
-    comparisonEntries.clear();
-    comparisonGrid.setItems(new ArrayList<>());
-    showPlaceholder();
-  }
-  
-  /**
-  * Clear the comparison tab content
-  */
-  public void clear() {
-    clearComparison();
-  }
+  return dn.substring(0, 37) + "...";
+}
+
+private void clearComparison() {
+  comparisonEntries.clear();
+  comparisonGrid.setItems(new ArrayList<>());
+  showPlaceholder();
+}
+
+/**
+* Clear the comparison tab content
+*/
+public void clear() {
+  clearComparison();
+}
 }
