@@ -291,29 +291,30 @@ private VerticalLayout createSearchTabPanel() {
   return searchTabPanel;
 }
 
-private void onEntrySelected(LdapEntry entry) {
-  // Don't display placeholder entries in the attribute editor
-  if (entry != null && !entry.getDn().startsWith("_placeholder_")) {
-    // Fetch the complete entry with all attributes from LDAP
-    try {
-      LdapEntry fullEntry = ldapService.getEntry(serverConfig.getId(), entry.getDn());
-      if (fullEntry != null) {
-        attributeEditor.editEntry(fullEntry);
-      } else {
-      attributeEditor.editEntry(entry); // Fallback to tree entry if fetch fails
+  private void onEntrySelected(LdapEntry entry) {
+    // Don't display placeholder entries in the attribute editor
+    if (entry != null && !entry.getDn().startsWith("_placeholder_")) {
+      // Fetch the complete entry with all attributes from LDAP
+      try {
+        LdapEntry fullEntry = ldapService.getEntry(serverConfig.getId(), entry.getDn());
+        if (fullEntry != null) {
+          attributeEditor.editEntry(fullEntry);
+        } else {
+          attributeEditor.editEntry(entry); // Fallback to tree entry if fetch fails
+        }
+      } catch (Exception e) {
+        // Fallback to the entry from tree if full fetch fails
+        attributeEditor.editEntry(entry);
+      }
+      // Set the entry DN as the Search Base DN in the search panel
+      searchPanel.setBaseDn(entry.getDn());
+      
+      // Automatically switch to Entry Details tab when an entry is selected
+      tabSheet.setSelectedTab(entryDetailsTab);
+    } else {
+      attributeEditor.clear();
     }
-  } catch (Exception e) {
-  // Fallback to the entry from tree if full fetch fails
-  attributeEditor.editEntry(entry);
-}
-// Automatically switch to Entry Details tab when an entry is selected
-tabSheet.setSelectedTab(entryDetailsTab);
-} else {
-attributeEditor.clear();
-}
-}
-
-/**
+  }/**
 * Load an entry by DN and switch to the Entry Details tab
 * @param dn The distinguished name of the entry to load
 */
