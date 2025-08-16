@@ -16,104 +16,104 @@ import com.vaadin.flow.theme.lumo.LumoUtility;
 import java.util.List;
 
 /**
- * Directory Search tab containing Search and Entry Comparison sub-tabs
- */
+* Directory Search tab containing Search and Entry Comparison sub-tabs
+*/
 public class DirectorySearchTab extends VerticalLayout {
+  
+  private final LdapService ldapService;
+  private final ConfigurationService configurationService;
+  private final InMemoryLdapService inMemoryLdapService;
+  
+  // Sub-tabs
+  private TabSheet tabSheet;
+  private Tab searchTab;
+  private Tab entryComparisonTab;
+  
+  // Components
+  private DirectorySearchSubTab searchTabContent;
+  private EntryComparisonTab entryComparisonTabContent;
+  
+  public DirectorySearchTab(LdapService ldapService, ConfigurationService configurationService, 
+               InMemoryLdapService inMemoryLdapService) {
+    this.ldapService = ldapService;
+    this.configurationService = configurationService;
+    this.inMemoryLdapService = inMemoryLdapService;
     
-    private final LdapService ldapService;
-    private final ConfigurationService configurationService;
-    private final InMemoryLdapService inMemoryLdapService;
+    initializeComponents();
+    setupLayout();
+  }
+  
+  private void initializeComponents() {
+    // Create sub-tabs
+    tabSheet = new TabSheet();
+    tabSheet.setSizeFull();
     
-    // Sub-tabs
-    private TabSheet tabSheet;
-    private Tab searchTab;
-    private Tab entryComparisonTab;
+    // Search tab (existing functionality)
+    searchTab = new Tab("Search");
+    searchTabContent = new DirectorySearchSubTab(ldapService, configurationService, inMemoryLdapService);
     
-    // Components
-    private DirectorySearchSubTab searchTabContent;
-    private EntryComparisonTab entryComparisonTabContent;
+    // Set up comparison callback to switch to comparison tab
+    searchTabContent.setComparisonCallback(this::showComparison);
     
-    public DirectorySearchTab(LdapService ldapService, ConfigurationService configurationService, 
-                              InMemoryLdapService inMemoryLdapService) {
-        this.ldapService = ldapService;
-        this.configurationService = configurationService;
-        this.inMemoryLdapService = inMemoryLdapService;
-        
-        initializeComponents();
-        setupLayout();
-    }
+    tabSheet.add(searchTab, searchTabContent);
     
-    private void initializeComponents() {
-        // Create sub-tabs
-        tabSheet = new TabSheet();
-        tabSheet.setSizeFull();
-        
-        // Search tab (existing functionality)
-        searchTab = new Tab("Search");
-        searchTabContent = new DirectorySearchSubTab(ldapService, configurationService, inMemoryLdapService);
-        
-        // Set up comparison callback to switch to comparison tab
-        searchTabContent.setComparisonCallback(this::showComparison);
-        
-        tabSheet.add(searchTab, searchTabContent);
-        
-        // Entry Comparison tab (new functionality)
-        entryComparisonTab = new Tab("Entry Comparison");
-        entryComparisonTabContent = new EntryComparisonTab();
-        tabSheet.add(entryComparisonTab, entryComparisonTabContent);
-        
-        // Set Search as the default selected tab
-        tabSheet.setSelectedTab(searchTab);
-    }
+    // Entry Comparison tab (new functionality)
+    entryComparisonTab = new Tab("Entry Comparison");
+    entryComparisonTabContent = new EntryComparisonTab();
+    tabSheet.add(entryComparisonTab, entryComparisonTabContent);
     
-    private void setupLayout() {
-        setSizeFull();
-        setPadding(true);
-        setSpacing(true);
-        addClassName("directory-search-tab");
-        
-        // Title with icon
-        HorizontalLayout titleLayout = new HorizontalLayout();
-        titleLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-        titleLayout.setSpacing(true);
-        
-        Icon searchIcon = new Icon(VaadinIcon.SEARCH);
-        searchIcon.setSize("20px");
-        searchIcon.getStyle().set("color", "#2196f3");
-        
-        H3 title = new H3("Directory Search");
-        title.addClassNames(LumoUtility.Margin.NONE);
-        title.getStyle().set("color", "#333");
-        
-        titleLayout.add(searchIcon, title);
-        
-        add(titleLayout, tabSheet);
-        setFlexGrow(1, tabSheet);
-    }
+    // Set Search as the default selected tab
+    tabSheet.setSelectedTab(searchTab);
+  }
+  
+  private void setupLayout() {
+    setSizeFull();
+    setPadding(true);
+    setSpacing(true);
+    addClassName("directory-search-tab");
     
-    /**
-     * Clear the content of all sub-tabs
-     */
-    public void clear() {
-        searchTabContent.clear();
-        entryComparisonTabContent.clear();
-    }
+    // Title with icon
+    HorizontalLayout titleLayout = new HorizontalLayout();
+    titleLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+    titleLayout.setSpacing(true);
     
-    /**
-     * Refresh environments in the search tab
-     */
-    public void refreshEnvironments() {
-        searchTabContent.refreshEnvironments();
-    }
+    Icon searchIcon = new Icon(VaadinIcon.SEARCH);
+    searchIcon.setSize("20px");
+    searchIcon.getStyle().set("color", "#2196f3");
     
-    /**
-     * Show comparison with the provided entries and switch to comparison tab
-     */
-    private void showComparison(List<SearchResultEntry> entries) {
-        // Set the entries in the comparison tab
-        entryComparisonTabContent.setComparisonEntries(entries);
-        
-        // Switch to the comparison tab
-        tabSheet.setSelectedTab(entryComparisonTab);
-    }
+    H3 title = new H3("Directory Search");
+    title.addClassNames(LumoUtility.Margin.NONE);
+    title.getStyle().set("color", "#333");
+    
+    titleLayout.add(searchIcon, title);
+    
+    add(titleLayout, tabSheet);
+    setFlexGrow(1, tabSheet);
+  }
+  
+  /**
+  * Clear the content of all sub-tabs
+  */
+  public void clear() {
+    searchTabContent.clear();
+    entryComparisonTabContent.clear();
+  }
+  
+  /**
+  * Refresh environments in the search tab
+  */
+  public void refreshEnvironments() {
+    searchTabContent.refreshEnvironments();
+  }
+  
+  /**
+  * Show comparison with the provided entries and switch to comparison tab
+  */
+  private void showComparison(List<SearchResultEntry> entries) {
+    // Set the entries in the comparison tab
+    entryComparisonTabContent.setComparisonEntries(entries);
+    
+    // Switch to the comparison tab
+    tabSheet.setSelectedTab(entryComparisonTab);
+  }
 }
