@@ -3,14 +3,17 @@ package com.example.ldapbrowser.ui.components;
 import com.example.ldapbrowser.model.SearchResultEntry;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.combobox.MultiSelectComboBox;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H4;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.data.renderer.ComponentRenderer;
 
 import java.util.*;
 
@@ -25,6 +28,8 @@ public class EntryComparisonTab extends VerticalLayout {
   private Button clearButton;
   private VerticalLayout contentLayout;
   private VerticalLayout placeholderLayout;
+  private MultiSelectComboBox<String> hideAttributesComboBox;
+  private Set<String> hiddenAttributes = new HashSet<>();
 
   // Data model for comparison rows
   public static class ComparisonRow {
@@ -48,7 +53,7 @@ public class EntryComparisonTab extends VerticalLayout {
       if (values == null || values.isEmpty()) {
         return "";
       }
-      return String.join("; ", values);
+      return String.join("\n", values);
     }
   }
 
@@ -66,6 +71,16 @@ public class EntryComparisonTab extends VerticalLayout {
     clearButton.addThemeVariants(ButtonVariant.LUMO_SMALL);
     clearButton.setVisible(false);
     clearButton.addClickListener(e -> clearComparison());
+
+    // Hide Attributes multiselect dropdown
+    hideAttributesComboBox = new MultiSelectComboBox<>();
+    hideAttributesComboBox.setLabel("Hide Attributes");
+    hideAttributesComboBox.setWidth("300px");
+    hideAttributesComboBox.setVisible(false);
+    hideAttributesComboBox.addSelectionListener(e -> {
+      hiddenAttributes = new HashSet<>(e.getAllSelectedItems());
+      refreshComparisonGrid();
+    });
 
     // Comparison grid
     comparisonGrid = new Grid<>(ComparisonRow.class, false);
@@ -86,7 +101,8 @@ public class EntryComparisonTab extends VerticalLayout {
     contentLayout.setPadding(false);
     contentLayout.setSpacing(true);
     contentLayout.setSizeFull();
-    contentLayout.add(comparisonGrid);
+    contentLayout.add(hideAttributesComboBox, comparisonGrid);
+    contentLayout.setFlexGrow(0, hideAttributesComboBox);
     contentLayout.setFlexGrow(1, comparisonGrid);
     contentLayout.setVisible(false);
 
@@ -168,6 +184,7 @@ public class EntryComparisonTab extends VerticalLayout {
 private void showPlaceholder() {
   titleLabel.setText("No entries selected for comparison");
   clearButton.setVisible(false);
+  hideAttributesComboBox.setVisible(false);
   contentLayout.setVisible(false);
   placeholderLayout.setVisible(true);
   setFlexGrow(1, placeholderLayout);
@@ -177,6 +194,7 @@ private void showPlaceholder() {
 private void showComparisonTable() {
   titleLabel.setText(String.format("Comparing %d entries", comparisonEntries.size()));
   clearButton.setVisible(true);
+  hideAttributesComboBox.setVisible(true);
   placeholderLayout.setVisible(false);
   contentLayout.setVisible(true);
   setFlexGrow(0, placeholderLayout);
@@ -195,6 +213,10 @@ private void buildComparisonTable() {
     allAttributes.addAll(entry.getAttributes().keySet());
   }
 
+  // Update hide attributes dropdown with all available attributes
+  hideAttributesComboBox.setItems(allAttributes);
+  hideAttributesComboBox.select(hiddenAttributes);
+
   // Add dynamic columns for each entry/environment
   for (int i = 0; i < comparisonEntries.size(); i++) {
     SearchResultEntry entry = comparisonEntries.get(i);
@@ -203,15 +225,46 @@ private void buildComparisonTable() {
     truncateDn(entry.getDn()));
 
     final int entryIndex = i;
-    comparisonGrid.addColumn(row -> row.getFormattedValues(getEnvironmentKey(entryIndex)))
+    comparisonGrid.addColumn(new ComponentRenderer<>(row -> {
+      String formattedValues = row.getFormattedValues(getEnvironmentKey(entryIndex));
+      if (formattedValues.isEmpty()) {
+        return new Span("");
+      }
+      
+      Div container = new Div();
+      container.getStyle()
+        .set("white-space", "pre-line")
+        .set("word-wrap", "break-word")
+        .set("line-height", "1.4");
+      
+      container.setText(formattedValues);
+      return container;
+    }))
     .setHeader(columnHeader)
     .setFlexGrow(1)
     .setResizable(true);
   }
 
-  // Build comparison rows
+  // Build and display comparison rows
+  refreshComparisonGrid();
+  comparisonGrid.setVisible(true);
+}
+
+private void refreshComparisonGrid() {
+  // Collect all unique attribute names
+  Set<String> allAttributes = new TreeSet<>();
+  for (SearchResultEntry entry : comparisonEntries) {
+    allAttributes.addAll(entry.getAttributes().keySet());
+  }
+
+  // Build comparison rows, filtering out hidden attributes
   List<ComparisonRow> comparisonRows = new ArrayList<>();
   for (String attributeName : allAttributes) {
+    // Skip if this attribute is in the hidden set
+    if (hiddenAttributes.contains(attributeName)) {
+      continue;
+    }
+
     ComparisonRow row = new ComparisonRow(attributeName);
 
     for (int i = 0; i < comparisonEntries.size(); i++) {
@@ -224,7 +277,6 @@ private void buildComparisonTable() {
   }
 
   comparisonGrid.setItems(comparisonRows);
-  comparisonGrid.setVisible(true);
 }
 
 private String getEnvironmentKey(int index) {
@@ -240,6 +292,8 @@ private String truncateDn(String dn) {
 
 private void clearComparison() {
   comparisonEntries.clear();
+  hiddenAttributes.clear();
+  hideAttributesComboBox.clear();
   comparisonGrid.setItems(new ArrayList<>());
   showPlaceholder();
 }
