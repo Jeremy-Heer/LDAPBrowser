@@ -607,7 +607,12 @@ public void showSearchResults(List<LdapEntry> results) {
 public void clear() {
   treeData.clear();
   dataProvider.refreshAll();
-  entryPageState.clear(); // Clear paging state
+  entryPageState.clear(); // Clear client-side paging state
+  
+  // Clear server-side paging state if server config is available
+  if (serverConfig != null) {
+    ldapService.clearPagingState(serverConfig.getId());
+  }
 }
 
 public void refreshEntry(LdapEntry entry) {

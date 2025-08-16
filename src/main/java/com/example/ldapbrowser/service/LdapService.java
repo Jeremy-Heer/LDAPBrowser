@@ -22,10 +22,12 @@ import com.unboundid.ldap.sdk.SearchResultEntry;
 import com.unboundid.ldap.sdk.SearchScope;
 import com.unboundid.ldap.sdk.SimpleBindRequest;
 import com.unboundid.ldap.sdk.ResultCode;
+import com.unboundid.ldap.sdk.controls.SimplePagedResultsControl;
 import com.unboundid.ldap.sdk.extensions.StartTLSExtendedRequest;
 import com.unboundid.ldap.sdk.schema.Schema;
 import com.unboundid.util.ssl.SSLUtil;
 import com.unboundid.util.ssl.TrustAllTrustManager;
+import com.unboundid.asn1.ASN1OctetString;
 import org.springframework.stereotype.Service;
 
 import javax.net.ssl.SSLSocketFactory;
@@ -45,6 +47,8 @@ import java.util.stream.Collectors;
 public class LdapService {
 
   private final Map<String, LDAPConnection> connections = new HashMap<>();
+  private final Map<String, byte[]> pagingCookies = new HashMap<>(); // Store paging cookies for LDAP paged search
+  private final Map<String, Integer> currentPages = new HashMap<>(); // Track current page for each search context
   private final LoggingService loggingService;
 
   public LdapService(LoggingService loggingService) {
@@ -151,93 +155,162 @@ public BrowseResult browseEntriesWithMetadata(String serverId, String baseDn) th
 public BrowseResult browseEntriesWithMetadata(String serverId, String baseDn, int page, int pageSize) throws LDAPException {
   LDAPConnection connection = getConnection(serverId);
 
-  // Optimize: Only request essential attributes for browsing
-  SearchRequest searchRequest = new SearchRequest(
-  baseDn,
-  SearchScope.ONE,
-  Filter.createPresenceFilter("objectClass"),
-  "objectClass", "cn", "ou", "dc" // Only essential attributes for display
-  );
+  // Create a unique key for this search context
+  String searchKey = serverId + ":" + baseDn;
   
-  // For paging, we need to get more entries to determine total count and calculate pages
-  // We'll use a larger size limit and handle paging client-side for better performance
-  searchRequest.setSizeLimit(Math.max(1000, (page + 2) * pageSize)); // Get enough for current page + next page detection
-
   try {
-    SearchResult searchResult = connection.search(searchRequest);
-
     List<LdapEntry> allEntries = new ArrayList<>();
+    boolean hasMorePages = false;
+    boolean sizeLimitExceeded = false;
+    
+    // Get current stored page and cookie for this search context
+    Integer storedPage = currentPages.get(searchKey);
+    byte[] cookie = pagingCookies.get(searchKey);
+    
+    // Handle different navigation scenarios
+    if (page == 0) {
+      // First page - start fresh
+      pagingCookies.remove(searchKey);
+      currentPages.put(searchKey, 0);
+      cookie = null;
+    } else if (storedPage == null || storedPage != page - 1) {
+      // We don't have the right cookie position - need to iterate from beginning
+      // This happens when jumping to arbitrary pages or after a refresh
+      return browseEntriesWithPagingIteration(serverId, baseDn, page, pageSize);
+    }
+    // else: we have the right cookie for sequential navigation (page = storedPage + 1)
+    
+    // Create the paged search control
+    SimplePagedResultsControl pagedControl;
+    if (cookie != null) {
+      pagedControl = new SimplePagedResultsControl(pageSize, new ASN1OctetString(cookie), false);
+    } else {
+      pagedControl = new SimplePagedResultsControl(pageSize, false);
+    }
+    
+    // Optimize: Only request essential attributes for browsing
+    SearchRequest searchRequest = new SearchRequest(
+      baseDn,
+      SearchScope.ONE,
+      Filter.createPresenceFilter("objectClass"),
+      "objectClass", "cn", "ou", "dc" // Only essential attributes for display
+    );
+    
+    // Add the paged results control
+    searchRequest.addControl(pagedControl);
+    
+    // Don't set a size limit when using paged search controls
+    // The page size in the control handles this
+    
+    SearchResult searchResult = connection.search(searchRequest);
+    
+    // Extract entries from this page
     for (SearchResultEntry entry : searchResult.getSearchEntries()) {
       LdapEntry ldapEntry = new LdapEntry(entry);
       // Check if entry has children
       ldapEntry.setHasChildren(hasChildren(connection, entry.getDN()));
       allEntries.add(ldapEntry);
     }
-
+    
     // Sort entries by display name
     allEntries.sort(Comparator.comparing(LdapEntry::getDisplayName));
-
-    // Calculate pagination
-    int totalEntries = allEntries.size();
-    boolean sizeLimitExceeded = searchResult.getResultCode() == ResultCode.SIZE_LIMIT_EXCEEDED;
     
-    // If size limit exceeded, we know there are more entries than we retrieved
-    if (sizeLimitExceeded) {
-      totalEntries = -1; // Indicate unknown total count
+    // Check for paged results response control to get the cookie for next page
+    SimplePagedResultsControl responseControl = null;
+    for (Control control : searchResult.getResponseControls()) {
+      if (control instanceof SimplePagedResultsControl) {
+        responseControl = (SimplePagedResultsControl) control;
+        break;
+      }
     }
     
-    // Extract page entries
-    int startIndex = page * pageSize;
-    int endIndex = Math.min(startIndex + pageSize, allEntries.size());
-    
-    List<LdapEntry> pageEntries;
-    if (startIndex >= allEntries.size()) {
-      pageEntries = new ArrayList<>(); // Empty page
-    } else {
-      pageEntries = new ArrayList<>(allEntries.subList(startIndex, endIndex));
+    if (responseControl != null) {
+      ASN1OctetString cookieOctetString = responseControl.getCookie();
+      if (cookieOctetString != null && cookieOctetString.getValueLength() > 0) {
+        // Store cookie for next page
+        byte[] nextCookie = cookieOctetString.getValue();
+        pagingCookies.put(searchKey, nextCookie);
+        currentPages.put(searchKey, page);
+        hasMorePages = true;
+      } else {
+        // No more pages
+        pagingCookies.remove(searchKey);
+        currentPages.remove(searchKey);
+        hasMorePages = false;
+      }
     }
     
-    // Determine if there are more pages
-    boolean hasNextPage = (endIndex < allEntries.size()) || sizeLimitExceeded;
+    // Calculate pagination info
     boolean hasPrevPage = page > 0;
+    boolean hasNextPage = hasMorePages;
     
-    return new BrowseResult(pageEntries, sizeLimitExceeded, totalEntries, page, pageSize, hasNextPage, hasPrevPage);
-
+    return new BrowseResult(allEntries, sizeLimitExceeded, -1, page, pageSize, hasNextPage, hasPrevPage);
+    
   } catch (LDAPSearchException e) {
-  // Handle size limit exceeded gracefully by returning partial results
-  if (e.getResultCode() == ResultCode.SIZE_LIMIT_EXCEEDED) {
-    List<LdapEntry> allEntries = new ArrayList<>();
-    // Get the partial results from the search exception
-    for (SearchResultEntry entry : e.getSearchEntries()) {
-      LdapEntry ldapEntry = new LdapEntry(entry);
-      // Check if entry has children
-      ldapEntry.setHasChildren(hasChildren(connection, entry.getDN()));
-      allEntries.add(ldapEntry);
-    }
-
-    // Sort entries by display name
-    allEntries.sort(Comparator.comparing(LdapEntry::getDisplayName));
-
-    // Calculate pagination for partial results
-    int startIndex = page * pageSize;
-    int endIndex = Math.min(startIndex + pageSize, allEntries.size());
-    
-    List<LdapEntry> pageEntries;
-    if (startIndex >= allEntries.size()) {
-      pageEntries = new ArrayList<>(); // Empty page
+    // Handle size limit exceeded or other search errors
+    if (e.getResultCode() == ResultCode.SIZE_LIMIT_EXCEEDED) {
+      // Fallback to partial results
+      List<LdapEntry> partialEntries = new ArrayList<>();
+      for (SearchResultEntry entry : e.getSearchEntries()) {
+        LdapEntry ldapEntry = new LdapEntry(entry);
+        ldapEntry.setHasChildren(hasChildren(connection, entry.getDN()));
+        partialEntries.add(ldapEntry);
+      }
+      
+      partialEntries.sort(Comparator.comparing(LdapEntry::getDisplayName));
+      
+      return new BrowseResult(partialEntries, true, -1, page, pageSize, true, page > 0);
     } else {
-      pageEntries = new ArrayList<>(allEntries.subList(startIndex, endIndex));
+      // Re-throw other types of LDAP exceptions
+      throw e;
+    }
+  }
+}
+
+/**
+* Helper method to iterate through pages when jumping to a specific page
+* This is necessary because LDAP paged search doesn't support jumping to arbitrary pages
+*/
+private BrowseResult browseEntriesWithPagingIteration(String serverId, String baseDn, int targetPage, int pageSize) throws LDAPException {
+  // Clear any existing state and start from page 0
+  String searchKey = serverId + ":" + baseDn;
+  pagingCookies.remove(searchKey);
+  currentPages.remove(searchKey);
+  
+  // Iterate through pages until we reach the target page
+  boolean hasMorePages = true;
+  BrowseResult lastResult = null;
+  
+  for (int currentPage = 0; currentPage <= targetPage && hasMorePages; currentPage++) {
+    lastResult = browseEntriesWithMetadata(serverId, baseDn, currentPage, pageSize);
+    
+    if (currentPage == targetPage) {
+      // This is our target page
+      return lastResult;
     }
     
-    boolean hasNextPage = (endIndex < allEntries.size()) || true; // Always true when size limit exceeded
-    boolean hasPrevPage = page > 0;
+    hasMorePages = lastResult.hasNextPage();
+  }
+  
+  // If we reach here, the target page doesn't exist
+  return new BrowseResult(new ArrayList<>(), false, -1, targetPage, pageSize, false, targetPage > 0);
+}
 
-    return new BrowseResult(pageEntries, true, -1, page, pageSize, hasNextPage, hasPrevPage);
-  } else {
-  // Re-throw other types of LDAP exceptions
-  throw e;
+/**
+* Clear all paging cookies for a specific server
+*/
+public void clearPagingState(String serverId) {
+  pagingCookies.entrySet().removeIf(entry -> entry.getKey().startsWith(serverId + ":"));
+  currentPages.entrySet().removeIf(entry -> entry.getKey().startsWith(serverId + ":"));
 }
-}
+
+/**
+* Clear paging cookies for a specific search context
+*/
+public void clearPagingState(String serverId, String baseDn) {
+  String searchKey = serverId + ":" + baseDn;
+  pagingCookies.remove(searchKey);
+  currentPages.remove(searchKey);
 }
 
 /**
