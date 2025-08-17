@@ -62,8 +62,12 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
     .setResizable(true)
     .setSortable(false);
 
+    // Hide the header row completely to remove the resizer
+    getElement().executeJs("this.shadowRoot.querySelector('thead').style.display = 'none'");
+
     // Style the tree grid
     addClassName("ldap-tree-grid");
+    addClassName("no-header"); // Add class for CSS styling
     getStyle().set("border", "1px solid var(--lumo-contrast-20pct)");
     getStyle().set("margin", "0px");
     getStyle().set("padding", "0px");

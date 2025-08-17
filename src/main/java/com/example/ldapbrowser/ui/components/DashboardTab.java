@@ -84,6 +84,10 @@ public class DashboardTab extends VerticalLayout {
     // Initialize private naming contexts checkbox
     includePrivateNamingContextsCheckbox = new Checkbox("Include private naming contexts");
     includePrivateNamingContextsCheckbox.getStyle().set("font-size", "0.85em");
+    includePrivateNamingContextsCheckbox.getStyle().set("margin", "0px");
+    includePrivateNamingContextsCheckbox.getStyle().set("padding", "var(--lumo-space-xs)");
+    includePrivateNamingContextsCheckbox.getStyle().set("padding-top", "0px");
+    includePrivateNamingContextsCheckbox.getStyle().set("padding-bottom", "0px");
     includePrivateNamingContextsCheckbox.addValueChangeListener(event -> {
       // Reload the tree when the checkbox state changes
       if (treeGrid != null) {
@@ -100,16 +104,6 @@ private void setupLayout() {
   setSizeFull();
   setPadding(false);
   setSpacing(false);
-
-  // Environment dropdown at the top
-  HorizontalLayout environmentLayout = new HorizontalLayout();
-  environmentLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.END);
-  environmentLayout.setPadding(false);
-  environmentLayout.getStyle().set("padding-left", "var(--lumo-space-m)");
-  environmentLayout.getStyle().set("padding-right", "var(--lumo-space-m)");
-  environmentLayout.getStyle().set("padding-top", "var(--lumo-space-xs)");
-  environmentLayout.getStyle().set("padding-bottom", "var(--lumo-space-xs)");
-  environmentLayout.add(environmentDropdown.getSingleSelectComponent());
 
   // Create left sidebar with LDAP browser
   VerticalLayout leftSidebar = new VerticalLayout();
@@ -140,7 +134,13 @@ private void setupLayout() {
   refreshButton.addClickListener(e -> refreshLdapBrowser());
   refreshButton.getStyle().set("color", "#4a90e2");
 
-  browserHeader.add(treeIcon, browserTitle, refreshButton);
+  // Style the checkbox for header placement
+  includePrivateNamingContextsCheckbox.getStyle().set("font-size", "0.85em");
+  includePrivateNamingContextsCheckbox.getStyle().set("margin", "0px");
+  includePrivateNamingContextsCheckbox.getStyle().set("margin-left", "var(--lumo-space-m)");
+  includePrivateNamingContextsCheckbox.getStyle().set("margin-right", "var(--lumo-space-s)");
+
+  browserHeader.add(treeIcon, browserTitle, includePrivateNamingContextsCheckbox, refreshButton);
   browserHeader.setFlexGrow(1, browserTitle);
 
   // Apply tree styling and completely remove all spacing
@@ -149,13 +149,36 @@ private void setupLayout() {
   treeGrid.getStyle().set("padding", "0px");
   treeGrid.getStyle().set("border-top", "none");
 
-  leftSidebar.add(browserHeader, includePrivateNamingContextsCheckbox, treeGrid);
+  leftSidebar.add(browserHeader, treeGrid);
   leftSidebar.setFlexGrow(1, treeGrid);
-  leftSidebar.getStyle().set("gap", "0px"); // Remove any gap between components
-
-  // Create tabbed interface for Entry Details and Search
+  leftSidebar.getStyle().set("gap", "0px"); // Remove any gap between components  // Create tabbed interface for Entry Details and Search
   tabSheet = new TabSheet();
   tabSheet.setSizeFull();
+
+  // Create horizontal layout for tabs and environment dropdown
+  VerticalLayout rightPanel = new VerticalLayout();
+  rightPanel.setSizeFull();
+  rightPanel.setPadding(false);
+  rightPanel.setSpacing(false);
+
+  // Environment dropdown layout - positioned at the top right
+  HorizontalLayout environmentLayout = new HorizontalLayout();
+  environmentLayout.setWidthFull();
+  environmentLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+  environmentLayout.setPadding(false);
+  environmentLayout.getStyle().set("padding-left", "var(--lumo-space-m)");
+  environmentLayout.getStyle().set("padding-right", "var(--lumo-space-m)");
+  environmentLayout.getStyle().set("padding-top", "var(--lumo-space-xs)");
+  environmentLayout.getStyle().set("padding-bottom", "var(--lumo-space-xs)");
+  
+  // Add spacer to push environment dropdown to the right
+  Span spacer = new Span();
+  environmentLayout.add(spacer, environmentDropdown.getSingleSelectComponent());
+  environmentLayout.setFlexGrow(1, spacer);
+
+  // Add environment layout and tabsheet to right panel
+  rightPanel.add(environmentLayout, tabSheet);
+  rightPanel.setFlexGrow(1, tabSheet);
 
   // Entry Details Tab
   entryDetailsTab = new Tab("Entry Details");
@@ -179,9 +202,9 @@ private void setupLayout() {
   mainHorizontalSplit.setSizeFull();
   mainHorizontalSplit.setSplitterPosition(25); // 25% for left sidebar
   mainHorizontalSplit.addToPrimary(leftSidebar);
-  mainHorizontalSplit.addToSecondary(tabSheet);
+  mainHorizontalSplit.addToSecondary(rightPanel);
 
-  add(environmentLayout, mainHorizontalSplit);
+  add(mainHorizontalSplit);
   setFlexGrow(1, mainHorizontalSplit);
 }
 
