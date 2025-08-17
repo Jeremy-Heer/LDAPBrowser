@@ -41,8 +41,8 @@ public class DirectorySearchSubTab extends VerticalLayout {
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
 
-  // Environment selection
-  private EnvironmentDropdown environmentDropdown;
+  // Parent tab reference for environment dropdown
+  private DirectorySearchTab parentTab;
 
   // Search components
   private TextField nameField;
@@ -101,10 +101,14 @@ public class DirectorySearchSubTab extends VerticalLayout {
     setupLayout();
   }
 
-  private void initializeComponents() {
-    // Environment dropdown for multi-select
-    environmentDropdown = new EnvironmentDropdown(ldapService, configurationService, inMemoryLdapService, true);
+  /**
+  * Set the parent tab to access the environment dropdown
+  */
+  public void setParentTab(DirectorySearchTab parentTab) {
+    this.parentTab = parentTab;
+  }
 
+  private void initializeComponents() {
     // Search field
     nameField = new TextField("Name");
     nameField.setPlaceholder("Enter search term...");
@@ -273,11 +277,6 @@ private void setupLayout() {
   setSpacing(true);
   addClassName("directory-search-sub-tab");
 
-  // Environment dropdown
-  HorizontalLayout environmentLayout = new HorizontalLayout();
-  environmentLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.END);
-  environmentLayout.add(environmentDropdown.getMultiSelectComponentWithIcon());
-
   // Search form
   HorizontalLayout searchForm = new HorizontalLayout();
   searchForm.setDefaultVerticalComponentAlignment(Alignment.END);
@@ -301,20 +300,22 @@ private void setupLayout() {
   searchForm.setFlexGrow(1, nameFieldContainer);
 
   // Add components to layout
-  add(environmentLayout, searchForm, new Hr(), resultsContainer);
+  add(searchForm, new Hr(), resultsContainer);
   setFlexGrow(1, resultsContainer);
 }
 
-private void updateSearchButton() {
+public void updateSearchButton() {
   String searchTerm = nameField.getValue();
-  Set<LdapServerConfig> selectedEnvironments = environmentDropdown.getSelectedEnvironments();
+  Set<LdapServerConfig> selectedEnvironments = parentTab != null ? 
+    parentTab.getSelectedEnvironments() : new HashSet<>();
   searchButton.setEnabled(searchTerm != null && !searchTerm.trim().isEmpty() && !selectedEnvironments.isEmpty());
 }
 
 private void performSearch() {
   String searchTerm = nameField.getValue();
   SearchType searchType = typeComboBox.getValue();
-  Set<LdapServerConfig> selectedEnvironments = environmentDropdown.getSelectedEnvironments();
+  Set<LdapServerConfig> selectedEnvironments = parentTab != null ? 
+    parentTab.getSelectedEnvironments() : new HashSet<>();
 
   if (searchTerm == null || searchTerm.trim().isEmpty()) {
     showError("Please enter a search term");
@@ -433,9 +434,9 @@ public void clear() {
 }
 
 public void refreshEnvironments() {
-  if (environmentDropdown != null) {
-    environmentDropdown.refreshEnvironments();
-  }
+  // Environment dropdown is now handled by the parent tab
+  // This method is kept for compatibility but does nothing
+  updateSearchButton();
 }
 
 private void showSuccess(String message) {

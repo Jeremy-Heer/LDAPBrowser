@@ -1,6 +1,7 @@
 package com.example.ldapbrowser.ui.components;
 
 import com.example.ldapbrowser.model.SearchResultEntry;
+import com.example.ldapbrowser.model.LdapServerConfig;
 import com.example.ldapbrowser.service.LdapService;
 import com.example.ldapbrowser.service.ConfigurationService;
 import com.example.ldapbrowser.service.InMemoryLdapService;
@@ -14,6 +15,7 @@ import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 
 import java.util.List;
+import java.util.Set;
 
 /**
 * Directory Search tab containing Search and Entry Comparison sub-tabs
@@ -23,6 +25,9 @@ public class DirectorySearchTab extends VerticalLayout {
   private final LdapService ldapService;
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
+
+  // Environment dropdown
+  private EnvironmentDropdown environmentDropdown;
 
   // Sub-tabs
   private TabSheet tabSheet;
@@ -44,6 +49,9 @@ public class DirectorySearchTab extends VerticalLayout {
   }
 
   private void initializeComponents() {
+    // Initialize environment dropdown
+    environmentDropdown = new EnvironmentDropdown(ldapService, configurationService, inMemoryLdapService, true);
+    
     // Create sub-tabs
     tabSheet = new TabSheet();
     tabSheet.setSizeFull();
@@ -51,6 +59,15 @@ public class DirectorySearchTab extends VerticalLayout {
     // Search tab (existing functionality)
     searchTab = new Tab("Search");
     searchTabContent = new DirectorySearchSubTab(ldapService, configurationService, inMemoryLdapService);
+
+    // Set parent tab reference for environment dropdown access
+    searchTabContent.setParentTab(this);
+
+    // Add listener to environment dropdown to update search button
+    environmentDropdown.addMultiSelectionListener(environments -> {
+      // Notify search tab that environments changed
+      searchTabContent.updateSearchButton();
+    });
 
     // Set up comparison callback to switch to comparison tab
     searchTabContent.setComparisonCallback(this::showComparison);
@@ -72,10 +89,16 @@ public class DirectorySearchTab extends VerticalLayout {
     setSpacing(true);
     addClassName("directory-search-tab");
 
-    // Title with icon
+    // Title with icon and environment dropdown
     HorizontalLayout titleLayout = new HorizontalLayout();
     titleLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
     titleLayout.setSpacing(true);
+    titleLayout.setWidthFull();
+
+    // Left side: icon and title
+    HorizontalLayout leftSide = new HorizontalLayout();
+    leftSide.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+    leftSide.setSpacing(true);
 
     Icon searchIcon = new Icon(VaadinIcon.SEARCH);
     searchIcon.setSize("20px");
@@ -85,7 +108,16 @@ public class DirectorySearchTab extends VerticalLayout {
     title.addClassNames(LumoUtility.Margin.NONE);
     title.getStyle().set("color", "#333");
 
-    titleLayout.add(searchIcon, title);
+    leftSide.add(searchIcon, title);
+
+    // Right side: environment dropdown
+    HorizontalLayout rightSide = new HorizontalLayout();
+    rightSide.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+    rightSide.add(environmentDropdown.getMultiSelectComponentWithIcon());
+
+    titleLayout.add(leftSide, rightSide);
+    titleLayout.setFlexGrow(1, leftSide);
+    titleLayout.setFlexGrow(0, rightSide);
 
     add(titleLayout, tabSheet);
     setFlexGrow(1, tabSheet);
@@ -100,9 +132,10 @@ public class DirectorySearchTab extends VerticalLayout {
   }
 
   /**
-  * Refresh environments in the search tab
+  * Refresh environments in the dropdown and search tab
   */
   public void refreshEnvironments() {
+    environmentDropdown.refreshEnvironments();
     searchTabContent.refreshEnvironments();
   }
 
@@ -115,5 +148,12 @@ public class DirectorySearchTab extends VerticalLayout {
 
     // Switch to the comparison tab
     tabSheet.setSelectedTab(entryComparisonTab);
+  }
+
+  /**
+  * Get the selected environments from the environment dropdown
+  */
+  public Set<LdapServerConfig> getSelectedEnvironments() {
+    return environmentDropdown.getSelectedEnvironments();
   }
 }
