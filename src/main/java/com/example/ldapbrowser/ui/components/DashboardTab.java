@@ -14,6 +14,7 @@ import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.ClientCallable;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.contextmenu.ContextMenu;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.splitlayout.SplitLayout;
@@ -49,6 +50,7 @@ public class DashboardTab extends VerticalLayout {
 
   // Private naming contexts option
   private Checkbox includePrivateNamingContextsCheckbox;
+  private ContextMenu settingsContextMenu;
 
   public DashboardTab(LdapService ldapService, ConfigurationService configurationService,
   InMemoryLdapService inMemoryLdapService) {
@@ -84,11 +86,6 @@ public class DashboardTab extends VerticalLayout {
 
     // Initialize private naming contexts checkbox
     includePrivateNamingContextsCheckbox = new Checkbox("Include private naming contexts");
-    includePrivateNamingContextsCheckbox.getStyle().set("font-size", "0.85em");
-    includePrivateNamingContextsCheckbox.getStyle().set("margin", "0px");
-    includePrivateNamingContextsCheckbox.getStyle().set("padding", "var(--lumo-space-xs)");
-    includePrivateNamingContextsCheckbox.getStyle().set("padding-top", "0px");
-    includePrivateNamingContextsCheckbox.getStyle().set("padding-bottom", "0px");
     includePrivateNamingContextsCheckbox.addValueChangeListener(event -> {
       // Reload the tree when the checkbox state changes
       if (treeGrid != null) {
@@ -135,13 +132,25 @@ private void setupLayout() {
   refreshButton.addClickListener(e -> refreshLdapBrowser());
   refreshButton.getStyle().set("color", "#4a90e2");
 
-  // Style the checkbox for header placement
-  includePrivateNamingContextsCheckbox.getStyle().set("font-size", "0.85em");
-  includePrivateNamingContextsCheckbox.getStyle().set("margin", "0px");
-  includePrivateNamingContextsCheckbox.getStyle().set("margin-left", "var(--lumo-space-m)");
-  includePrivateNamingContextsCheckbox.getStyle().set("margin-right", "var(--lumo-space-s)");
+  // Add settings button with cog icon
+  Button settingsButton = new Button(new Icon(VaadinIcon.COG));
+  settingsButton.addThemeVariants(ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
+  settingsButton.setTooltipText("LDAP Browser Settings");
+  settingsButton.getStyle().set("color", "#4a90e2");
 
-  browserHeader.add(treeIcon, browserTitle, includePrivateNamingContextsCheckbox, refreshButton);
+  // Create context menu for settings
+  settingsContextMenu = new ContextMenu(settingsButton);
+  settingsContextMenu.setOpenOnClick(true);
+  
+  // Add the checkbox to the context menu
+  VerticalLayout settingsContent = new VerticalLayout();
+  settingsContent.setPadding(false);
+  settingsContent.setSpacing(false);
+  settingsContent.getStyle().set("padding", "var(--lumo-space-s)");
+  settingsContent.add(includePrivateNamingContextsCheckbox);
+  settingsContextMenu.add(settingsContent);
+
+  browserHeader.add(treeIcon, browserTitle, settingsButton, refreshButton);
   browserHeader.setFlexGrow(1, browserTitle);
 
   // Apply tree styling and completely remove all spacing
