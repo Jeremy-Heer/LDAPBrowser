@@ -104,7 +104,11 @@ private void setupLayout() {
   // Environment dropdown at the top
   HorizontalLayout environmentLayout = new HorizontalLayout();
   environmentLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.END);
-  environmentLayout.setPadding(true);
+  environmentLayout.setPadding(false);
+  environmentLayout.getStyle().set("padding-left", "var(--lumo-space-m)");
+  environmentLayout.getStyle().set("padding-right", "var(--lumo-space-m)");
+  environmentLayout.getStyle().set("padding-top", "var(--lumo-space-xs)");
+  environmentLayout.getStyle().set("padding-bottom", "var(--lumo-space-xs)");
   environmentLayout.add(environmentDropdown.getSingleSelectComponent());
 
   // Create left sidebar with LDAP browser
