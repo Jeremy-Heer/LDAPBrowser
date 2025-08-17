@@ -640,6 +640,27 @@ public void expandEntry(LdapEntry entry) {
 }
 
 /**
+* Collapse all expanded entries in the tree
+*/
+public void collapseAll() {
+  // Get all root items and recursively collapse their expanded children
+  treeData.getRootItems().forEach(this::collapseRecursively);
+}
+
+/**
+* Recursively collapse an entry and all its expanded children
+*/
+private void collapseRecursively(LdapEntry entry) {
+  // First, recursively collapse all children
+  treeData.getChildren(entry).forEach(this::collapseRecursively);
+  
+  // Then collapse this entry if it's expanded
+  if (isExpanded(entry)) {
+    collapse(entry);
+  }
+}
+
+/**
 * Ensure that entries that typically have children are marked as such
 */
 private void ensureHasChildrenFlagIsSet(LdapEntry entry) {

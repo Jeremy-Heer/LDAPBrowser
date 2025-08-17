@@ -541,6 +541,10 @@ public void refreshEnvironments() {
 private void refreshLdapBrowser() {
   if (serverConfig != null && treeGrid != null) {
     try {
+      // Collapse all expanded entries before refreshing
+      treeGrid.collapseAll();
+      
+      // Reload the tree data
       treeGrid.loadRootDSEWithNamingContexts(includePrivateNamingContextsCheckbox.getValue());
     } catch (Exception e) {
     // Error will be handled by the tree grid component
