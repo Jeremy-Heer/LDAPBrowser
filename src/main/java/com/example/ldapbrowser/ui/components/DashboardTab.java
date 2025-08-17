@@ -11,6 +11,7 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.ClientCallable;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -218,11 +219,28 @@ private void onEnvironmentSelected(LdapServerConfig environment) {
     newEntryTab.setServerConfig(environment);
     searchPanel.setServerConfig(environment);
 
-    // Load the tree for the new environment
-    loadRootDSEWithNamingContexts();
+    // Auto-refresh the tree grid for the newly selected environment
+    // Schedule the refresh to happen after potential connection establishment
+    getUI().ifPresent(ui -> {
+      // Use a small delay to allow the connection from EnvironmentDropdown to complete
+      ui.getElement().executeJs(
+        "setTimeout(() => { $0.$server.loadRootDSEForNewEnvironment(); }, 300)",
+        getElement()
+      );
+    });
   } else {
   clear();
 }
+}
+
+/**
+* Public method callable from client-side JavaScript to load the tree for a new environment
+*/
+@ClientCallable
+public void loadRootDSEForNewEnvironment() {
+  if (serverConfig != null) {
+    loadRootDSEWithNamingContexts();
+  }
 }
 
 /**
