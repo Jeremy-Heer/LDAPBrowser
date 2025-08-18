@@ -497,7 +497,19 @@ private void showEntryDetailsDialog(LdapEntry entry, LdapServerConfig environmen
   // Create an attribute editor for display-only mode
   AttributeEditor attributeEditor = new AttributeEditor(ldapService);
   attributeEditor.setServerConfig(environment);
-  attributeEditor.editEntry(entry);
+  
+  // Try to fetch complete entry with schema for optimized display
+  try {
+    LdapService.EntryWithSchema entryWithSchema = ldapService.getEntryWithSchema(environment.getId(), entry.getDn());
+    if (entryWithSchema != null) {
+      attributeEditor.editEntryWithSchema(entryWithSchema.getEntry(), entryWithSchema.getSchema());
+    } else {
+      attributeEditor.editEntry(entry);
+    }
+  } catch (Exception e) {
+    // Fallback to regular method if optimized fetch fails
+    attributeEditor.editEntry(entry);
+  }
 
   // Make it read-only by disabling editing buttons
   attributeEditor.getChildren().forEach(component -> {

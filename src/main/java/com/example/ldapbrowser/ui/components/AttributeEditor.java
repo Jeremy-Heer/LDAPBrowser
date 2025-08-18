@@ -10,7 +10,6 @@ import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.contextmenu.ContextMenu;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -20,7 +19,6 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.Modification;
@@ -47,6 +45,7 @@ public class AttributeEditor extends VerticalLayout {
   private LdapServerConfig serverConfig;
   private LdapEntry currentEntry;
   private LdapEntry fullEntry; // Cache of full entry with all attributes
+  private Schema cachedSchema; // Cache schema to avoid multiple LDAP calls
 
   // Removed redundant titleLabel field
   private Span dnLabel;
@@ -54,7 +53,6 @@ public class AttributeEditor extends VerticalLayout {
   private HorizontalLayout entryTypeDisplay;
   private Checkbox showOperationalAttributesCheckbox;
   private Grid<AttributeRow> attributeGrid;
-  private Grid.Column<AttributeRow> attributeColumn;
   private Button addAttributeButton;
   private Button saveButton;
   private Button refreshButton;
@@ -96,7 +94,7 @@ public class AttributeEditor extends VerticalLayout {
     attributeGrid.setSizeFull();
 
     // Configure attribute grid columns
-    attributeColumn = attributeGrid.addColumn(new ComponentRenderer<Span, AttributeRow>(this::createAttributeNameComponent))
+    attributeGrid.addColumn(new ComponentRenderer<Span, AttributeRow>(this::createAttributeNameComponent))
     .setHeader("Attribute")
     .setFlexGrow(1)
     .setSortable(true)
@@ -170,6 +168,7 @@ public class AttributeEditor extends VerticalLayout {
   public void editEntry(LdapEntry entry) {
     this.currentEntry = entry;
     this.fullEntry = entry; // Store the full entry
+    this.cachedSchema = null; // Clear cached schema for new entry
 
     if (entry != null) {
       // Removed redundant titleLabel.setText() call
@@ -185,9 +184,35 @@ public class AttributeEditor extends VerticalLayout {
       copyDnButton.setEnabled(true);
       showOperationalAttributesCheckbox.setEnabled(true);
     } else {
-    clear();
+      clear();
+    }
   }
-}
+
+  /**
+   * Optimized method to edit entry with pre-fetched schema information.
+   * This version avoids multiple schema lookups during rendering.
+   */
+  public void editEntryWithSchema(LdapEntry entry, Schema schema) {
+    this.currentEntry = entry;
+    this.fullEntry = entry; // Store the full entry
+    this.cachedSchema = schema; // Cache the schema to avoid repeated lookups
+
+    if (entry != null) {
+      dnLabel.setText("DN: " + entry.getDn());
+
+      // Update entry type display
+      updateEntryTypeDisplay(entry);
+
+      // Refresh attribute display based on operational attributes setting
+      refreshAttributeDisplay();
+
+      setButtonsEnabled(true);
+      copyDnButton.setEnabled(true);
+      showOperationalAttributesCheckbox.setEnabled(true);
+    } else {
+      clear();
+    }
+  }
 
 /**
 * Refresh the attribute display based on current settings
@@ -211,9 +236,79 @@ private void refreshAttributeDisplay() {
     rows.add(new AttributeRow(attrName, attr.getValue()));
   }
 
+  // Sort attributes according to priority: objectClass > required > optional > operational
+  sortAttributeRows(rows, showOperational);
+
   attributeGrid.setItems(rows);
-  // Sort by attribute name by default
-  attributeGrid.sort(List.of(new GridSortOrder<>(attributeColumn, SortDirection.ASCENDING)));
+}
+
+/**
+ * Sort attribute rows according to priority and within each category by name:
+ * 1. objectClass attributes first (sorted by name)
+ * 2. Required attributes second (sorted by name)
+ * 3. Optional attributes third (sorted by name)
+ * 4. Operational attributes last (sorted by name)
+ */
+private void sortAttributeRows(List<AttributeRow> rows, boolean showOperational) {
+  rows.sort((row1, row2) -> {
+    String attr1 = row1.getName();
+    String attr2 = row2.getName();
+    
+    // Get attribute classifications
+    int priority1 = getAttributeSortPriority(attr1, showOperational);
+    int priority2 = getAttributeSortPriority(attr2, showOperational);
+    
+    // First sort by priority (lower number = higher priority)
+    if (priority1 != priority2) {
+      return Integer.compare(priority1, priority2);
+    }
+    
+    // Within same priority group, sort alphabetically by attribute name
+    return attr1.compareToIgnoreCase(attr2);
+  });
+}
+
+/**
+ * Get sorting priority for an attribute:
+ * 1 = objectClass (highest priority)
+ * 2 = required attributes
+ * 3 = optional attributes  
+ * 4 = operational attributes (lowest priority)
+ * 5 = regular/unknown attributes
+ */
+private int getAttributeSortPriority(String attributeName, boolean showOperational) {
+  String lowerName = attributeName.toLowerCase();
+  
+  // objectClass always comes first
+  if ("objectclass".equals(lowerName)) {
+    return 1;
+  }
+  
+  // Check if operational attribute
+  if (isOperationalAttribute(attributeName)) {
+    return showOperational ? 4 : 5; // Only show if operational checkbox is checked
+  }
+  
+  // Classify based on cached schema if available
+  try {
+    if (cachedSchema != null && currentEntry != null) {
+      AttributeClassification classification = classifyAttribute(attributeName, cachedSchema);
+      switch (classification) {
+        case REQUIRED:
+          return 2;
+        case OPTIONAL:
+          return 3;
+        case OPERATIONAL:
+          return showOperational ? 4 : 5;
+        default:
+          return 5; // Regular attributes
+      }
+    }
+  } catch (Exception e) {
+    // If schema classification fails, treat as regular attribute
+  }
+  
+  return 5; // Default for regular/unknown attributes
 }
 
 /**
@@ -244,35 +339,32 @@ private Span createAttributeNameComponent(AttributeRow row) {
   Span nameSpan = new Span(row.getName());
   
   try {
-    if (serverConfig != null && ldapService.isConnected(serverConfig.getId())) {
-      Schema schema = ldapService.getSchema(serverConfig.getId());
-      if (schema != null && currentEntry != null) {
-        AttributeClassification classification = classifyAttribute(row.getName(), schema);
-        
-        switch (classification) {
-          case REQUIRED:
-            nameSpan.getStyle().set("color", "#d32f2f"); // Red for required (must)
-            nameSpan.getElement().setAttribute("title", "Required attribute (must)");
-            break;
-          case OPTIONAL:
-            nameSpan.getStyle().set("color", "#1976d2"); // Blue for optional (may)
-            nameSpan.getElement().setAttribute("title", "Optional attribute (may)");
-            break;
-          case OPERATIONAL:
-            if (showOperationalAttributesCheckbox.getValue()) {
-              nameSpan.getStyle().set("color", "#f57c00"); // Orange for operational
-              nameSpan.getElement().setAttribute("title", "Operational attribute");
-            }
-            break;
-          case REGULAR:
-          default:
-            // Default color for regular attributes not defined in object classes
-            break;
-        }
+    if (cachedSchema != null && currentEntry != null) {
+      AttributeClassification classification = classifyAttribute(row.getName(), cachedSchema);
+      
+      switch (classification) {
+        case REQUIRED:
+          nameSpan.getStyle().set("color", "#d32f2f"); // Red for required (must)
+          nameSpan.getElement().setAttribute("title", "Required attribute (must)");
+          break;
+        case OPTIONAL:
+          nameSpan.getStyle().set("color", "#1976d2"); // Blue for optional (may)
+          nameSpan.getElement().setAttribute("title", "Optional attribute (may)");
+          break;
+        case OPERATIONAL:
+          if (showOperationalAttributesCheckbox.getValue()) {
+            nameSpan.getStyle().set("color", "#f57c00"); // Orange for operational
+            nameSpan.getElement().setAttribute("title", "Operational attribute");
+          }
+          break;
+        case REGULAR:
+        default:
+          // Default color for regular attributes not defined in object classes
+          break;
       }
     }
   } catch (Exception e) {
-    // If schema lookup fails, just display with default styling
+    // If schema classification fails, just display with default styling
   }
   
   return nameSpan;
@@ -501,6 +593,7 @@ return "LDAP Entry";
 public void clear() {
   currentEntry = null;
   fullEntry = null;
+  cachedSchema = null; // Clear cached schema
   // Removed redundant titleLabel.setText() call
   dnLabel.setText("No entry selected");
   entryTypeDisplay.removeAll();
@@ -931,6 +1024,11 @@ public static class AttributeRow {
   public AttributeRow(String name, List<String> values) {
     this.name = name;
     this.values = new ArrayList<>(values);
+    
+    // Sort objectClass values alphabetically
+    if ("objectClass".equalsIgnoreCase(name)) {
+      this.values.sort(String.CASE_INSENSITIVE_ORDER);
+    }
   }
 
   public String getName() {

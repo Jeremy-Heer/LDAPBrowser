@@ -349,17 +349,32 @@ private VerticalLayout createSearchTabPanel() {
     // Don't display placeholder entries or pagination entries in the attribute editor
     if (entry != null && !entry.getDn().startsWith("_placeholder_") && 
         entry.getAttributeValues("isPagination").isEmpty()) {
-      // Fetch the complete entry with all attributes from LDAP
+      // Fetch the complete entry with schema information in one optimized call
       try {
-        LdapEntry fullEntry = ldapService.getEntry(serverConfig.getId(), entry.getDn());
-        if (fullEntry != null) {
-          attributeEditor.editEntry(fullEntry);
+        LdapService.EntryWithSchema entryWithSchema = ldapService.getEntryWithSchema(serverConfig.getId(), entry.getDn());
+        if (entryWithSchema != null) {
+          attributeEditor.editEntryWithSchema(entryWithSchema.getEntry(), entryWithSchema.getSchema());
         } else {
-          attributeEditor.editEntry(entry); // Fallback to tree entry if fetch fails
+          // Fallback to regular method if optimized call fails
+          LdapEntry fullEntry = ldapService.getEntry(serverConfig.getId(), entry.getDn());
+          if (fullEntry != null) {
+            attributeEditor.editEntry(fullEntry);
+          } else {
+            attributeEditor.editEntry(entry); // Fallback to tree entry if fetch fails
+          }
         }
       } catch (Exception e) {
-        // Fallback to the entry from tree if full fetch fails
-        attributeEditor.editEntry(entry);
+        // Fallback to the entry from tree if optimized fetch fails
+        try {
+          LdapEntry fullEntry = ldapService.getEntry(serverConfig.getId(), entry.getDn());
+          if (fullEntry != null) {
+            attributeEditor.editEntry(fullEntry);
+          } else {
+            attributeEditor.editEntry(entry);
+          }
+        } catch (Exception fallbackException) {
+          attributeEditor.editEntry(entry);
+        }
       }
       // Set the entry DN as the Search Base DN in the search panel
       searchPanel.setBaseDn(entry.getDn());

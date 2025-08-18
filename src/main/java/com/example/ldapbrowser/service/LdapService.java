@@ -454,6 +454,58 @@ public LdapEntry getEntry(String serverId, String dn) throws LDAPException {
 }
 
 /**
+* Result class for optimized entry details fetching that includes both entry and schema
+*/
+public static class EntryWithSchema {
+  private final LdapEntry entry;
+  private final Schema schema;
+  
+  public EntryWithSchema(LdapEntry entry, Schema schema) {
+    this.entry = entry;
+    this.schema = schema;
+  }
+  
+  public LdapEntry getEntry() {
+    return entry;
+  }
+  
+  public Schema getSchema() {
+    return schema;
+  }
+}
+
+/**
+* Optimized method to get entry details with schema information in a single optimized call.
+* This reduces LDAP queries when displaying entry details by fetching both entry and schema
+* information together, instead of making separate calls for each attribute classification.
+*/
+public EntryWithSchema getEntryWithSchema(String serverId, String dn) throws LDAPException {
+  LDAPConnection connection = getConnection(serverId);
+
+  // Fetch both entry and schema in an optimized way
+  // First get the entry with all attributes
+  SearchRequest searchRequest = new SearchRequest(
+    dn,
+    SearchScope.BASE,
+    Filter.createPresenceFilter("objectClass"),
+    "*", "+" // Request all user attributes (*) and operational attributes (+)
+  );
+
+  SearchResult searchResult = connection.search(searchRequest);
+  
+  if (searchResult.getEntryCount() == 0) {
+    return null;
+  }
+  
+  LdapEntry ldapEntry = new LdapEntry(searchResult.getSearchEntries().get(0));
+  
+  // Get schema information in the same connection context
+  Schema schema = connection.getSchema();
+  
+  return new EntryWithSchema(ldapEntry, schema);
+}
+
+/**
 * Get only DN of entries matching filter - optimized for bulk operations
 */
 public List<String> getDNsOnly(String serverId, String baseDn, String filter, SearchScope scope) throws LDAPException {
