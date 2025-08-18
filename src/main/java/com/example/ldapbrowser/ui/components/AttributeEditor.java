@@ -976,9 +976,10 @@ private void refreshEntry() {
   }
 
   try {
-    LdapEntry refreshedEntry = ldapService.getEntry(serverConfig.getId(), currentEntry.getDn());
-    if (refreshedEntry != null) {
-      editEntry(refreshedEntry);
+    // Use getEntryWithSchema to preserve attribute formatting
+    LdapService.EntryWithSchema entryWithSchema = ldapService.getEntryWithSchema(serverConfig.getId(), currentEntry.getDn());
+    if (entryWithSchema != null) {
+      editEntryWithSchema(entryWithSchema.getEntry(), entryWithSchema.getSchema());
       showInfo("Entry refreshed.");
     } else {
     showError("Entry not found.");
