@@ -312,92 +312,122 @@ private void initializeSyntaxGrid() {
   });
 }
 
-private void setupLayout() {
-  setSizeFull();
-  setPadding(false);
-  setSpacing(false);
+  private void setupLayout() {
+    setSizeFull();
+    setPadding(false);
+    setSpacing(false);
 
-  // Environment dropdown
-  HorizontalLayout environmentLayout = new HorizontalLayout();
-  environmentLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.END);
-  environmentLayout.setPadding(true);
-  environmentLayout.add(environmentDropdown.getSingleSelectComponent());
+    // Create left panel with schema browser controls and search results
+    VerticalLayout leftPanel = new VerticalLayout();
+    leftPanel.setSizeFull();
+    leftPanel.setPadding(false);
+    leftPanel.setSpacing(false);
+    leftPanel.addClassName("ds-panel");
 
-  // Top controls
-  HorizontalLayout controlsLayout = new HorizontalLayout();
-  controlsLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-  controlsLayout.setPadding(true);
-  controlsLayout.setSpacing(true);
-  controlsLayout.addClassName("schema-controls");
+    // Left panel header with Schema Browser title, search field and refresh button
+    HorizontalLayout schemaHeader = new HorizontalLayout();
+    schemaHeader.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+    schemaHeader.setPadding(true);
+    schemaHeader.addClassName("ds-panel-header");
+    schemaHeader.getStyle().set("margin-bottom", "0px");
 
-  Icon schemaIcon = new Icon(VaadinIcon.COGS);
-  schemaIcon.setSize("16px");
-  schemaIcon.getStyle().set("color", "#4a90e2");
+    Icon schemaIcon = new Icon(VaadinIcon.COGS);
+    schemaIcon.setSize("16px");
+    schemaIcon.getStyle().set("color", "#4a90e2");
 
-  H3 title = new H3("Schema Browser");
-  title.addClassNames(LumoUtility.Margin.NONE);
-  title.getStyle().set("font-size", "1.1em").set("font-weight", "600").set("color", "#333");
+    H3 title = new H3("Schema Browser");
+    title.addClassNames(LumoUtility.Margin.NONE);
+    title.getStyle().set("font-size", "0.9em").set("font-weight", "600").set("color", "#333");
 
-  controlsLayout.add(schemaIcon, title);
-  controlsLayout.setFlexGrow(1, new Span()); // Spacer
-  controlsLayout.add(searchField, refreshButton);
+    schemaHeader.add(schemaIcon, title, searchField, refreshButton);
+    schemaHeader.setFlexGrow(1, title);
 
-  // Main content with tabs
-  VerticalLayout contentLayout = new VerticalLayout();
-  contentLayout.setSizeFull();
-  contentLayout.setPadding(false);
-  contentLayout.setSpacing(false);
+    // Schema tabs container
+    VerticalLayout schemaTabsContainer = new VerticalLayout();
+    schemaTabsContainer.setSizeFull();
+    schemaTabsContainer.setPadding(false);
+    schemaTabsContainer.setSpacing(false);
 
-  contentLayout.add(schemaTabs);
+    schemaTabsContainer.add(schemaTabs);
 
-  // Split layout for grid and details
-  SplitLayout splitLayout = new SplitLayout();
-  splitLayout.setSizeFull();
-  splitLayout.setSplitterPosition(70); // 70% for grid, 30% for details
+    // Grid container for search results
+    gridContainer = new VerticalLayout();
+    gridContainer.setSizeFull();
+    gridContainer.setPadding(false);
+    gridContainer.setSpacing(false);
+    gridContainer.addClassName("schema-grid-container");
 
-  // Grid container
-  gridContainer = new VerticalLayout();
-  gridContainer.setSizeFull();
-  gridContainer.setPadding(false);
-  gridContainer.setSpacing(false);
-  gridContainer.addClassName("schema-grid-container");
+    // Initially show object classes
+    gridContainer.add(objectClassGrid);
 
-  // Initially show object classes
-  gridContainer.add(objectClassGrid);
+    schemaTabsContainer.add(gridContainer);
+    schemaTabsContainer.setFlexGrow(1, gridContainer);
 
-  // Details container
-  VerticalLayout detailsContainer = new VerticalLayout();
-  detailsContainer.setSizeFull();
-  detailsContainer.setPadding(false);
-  detailsContainer.setSpacing(false);
-  detailsContainer.addClassName("schema-details-container");
+    // Apply grid styling and remove spacing
+    gridContainer.getStyle().set("margin", "0px");
+    gridContainer.getStyle().set("padding", "0px");
 
-  HorizontalLayout detailsHeader = new HorizontalLayout();
-  detailsHeader.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-  detailsHeader.setPadding(true);
-  detailsHeader.addClassName("ds-panel-header");
+    leftPanel.add(schemaHeader, schemaTabsContainer);
+    leftPanel.setFlexGrow(1, schemaTabsContainer);
+    leftPanel.getStyle().set("gap", "0px"); // Remove any gap between components
 
-  Icon detailsIcon = new Icon(VaadinIcon.INFO_CIRCLE);
-  detailsIcon.setSize("14px");
-  H3 detailsTitle = new H3("Details");
-  detailsTitle.addClassNames(LumoUtility.Margin.NONE);
-  detailsTitle.getStyle().set("font-size", "0.9em").set("font-weight", "600").set("color", "#333");
-  detailsHeader.add(detailsIcon, detailsTitle);
+    // Create right panel with environment dropdown and details
+    VerticalLayout rightPanel = new VerticalLayout();
+    rightPanel.setSizeFull();
+    rightPanel.setPadding(false);
+    rightPanel.setSpacing(false);
 
-  detailsContainer.add(detailsHeader, detailsPanel);
-  detailsContainer.setFlexGrow(1, detailsPanel);
+    // Environment dropdown layout - positioned at the top right
+    HorizontalLayout environmentLayout = new HorizontalLayout();
+    environmentLayout.setWidthFull();
+    environmentLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+    environmentLayout.setPadding(false);
+    environmentLayout.getStyle().set("padding-left", "var(--lumo-space-m)");
+    environmentLayout.getStyle().set("padding-right", "var(--lumo-space-m)");
+    environmentLayout.getStyle().set("padding-top", "var(--lumo-space-xs)");
+    environmentLayout.getStyle().set("padding-bottom", "var(--lumo-space-xs)");
+    
+    // Add spacer to push environment dropdown to the right
+    Span spacer = new Span();
+    environmentLayout.add(spacer, environmentDropdown.getSingleSelectComponent());
+    environmentLayout.setFlexGrow(1, spacer);
 
-  splitLayout.addToPrimary(gridContainer);
-  splitLayout.addToSecondary(detailsContainer);
+    // Details container
+    VerticalLayout detailsContainer = new VerticalLayout();
+    detailsContainer.setSizeFull();
+    detailsContainer.setPadding(false);
+    detailsContainer.setSpacing(false);
+    detailsContainer.addClassName("schema-details-container");
 
-  contentLayout.add(splitLayout);
-  contentLayout.setFlexGrow(1, splitLayout);
+    HorizontalLayout detailsHeader = new HorizontalLayout();
+    detailsHeader.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+    detailsHeader.setPadding(true);
+    detailsHeader.addClassName("ds-panel-header");
 
-  add(environmentLayout, controlsLayout, contentLayout);
-  setFlexGrow(1, contentLayout);
-}
+    Icon detailsIcon = new Icon(VaadinIcon.INFO_CIRCLE);
+    detailsIcon.setSize("14px");
+    H3 detailsTitle = new H3("Schema Details");
+    detailsTitle.addClassNames(LumoUtility.Margin.NONE);
+    detailsTitle.getStyle().set("font-size", "0.9em").set("font-weight", "600").set("color", "#333");
+    detailsHeader.add(detailsIcon, detailsTitle);
 
-private void onEnvironmentSelected(LdapServerConfig environment) {
+    detailsContainer.add(detailsHeader, detailsPanel);
+    detailsContainer.setFlexGrow(1, detailsPanel);
+
+    // Add environment layout and details to right panel
+    rightPanel.add(environmentLayout, detailsContainer);
+    rightPanel.setFlexGrow(1, detailsContainer);
+
+    // Create main split layout (horizontal)
+    SplitLayout mainHorizontalSplit = new SplitLayout();
+    mainHorizontalSplit.setSizeFull();
+    mainHorizontalSplit.setSplitterPosition(70); // 70% for left panel, 30% for details
+    mainHorizontalSplit.addToPrimary(leftPanel);
+    mainHorizontalSplit.addToSecondary(rightPanel);
+
+    add(mainHorizontalSplit);
+    setFlexGrow(1, mainHorizontalSplit);
+  }private void onEnvironmentSelected(LdapServerConfig environment) {
   this.serverConfig = environment;
   if (environment != null) {
     loadSchema();
