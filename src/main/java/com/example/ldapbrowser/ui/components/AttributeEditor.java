@@ -57,6 +57,7 @@ public class AttributeEditor extends VerticalLayout {
   private Button saveButton;
   private Button refreshButton;
   private Button deleteEntryButton;
+  private boolean hasPendingChanges = false;
 
   public AttributeEditor(LdapService ldapService) {
     this.ldapService = ldapService;
@@ -125,6 +126,8 @@ public class AttributeEditor extends VerticalLayout {
 
     // Initially disable all buttons
     setButtonsEnabled(false);
+    // Initialize pending changes state
+    clearPendingChanges();
   }
 
   private void setupLayout() {
@@ -147,17 +150,19 @@ public class AttributeEditor extends VerticalLayout {
 
     header.add(entryTypeDisplay, dnRow);
 
-    // Controls layout (operational attributes checkbox)
-    HorizontalLayout controlsLayout = new HorizontalLayout();
-    controlsLayout.setPadding(false);
-    controlsLayout.setSpacing(true);
-    controlsLayout.add(showOperationalAttributesCheckbox);
-
-    // Action buttons
+    // Action buttons with operational attributes checkbox on the right
     HorizontalLayout buttonLayout = new HorizontalLayout();
+    buttonLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+    buttonLayout.setPadding(false);
+    buttonLayout.setSpacing(true);
     buttonLayout.add(addAttributeButton, saveButton, refreshButton, deleteEntryButton);
+    
+    // Add spacer and checkbox on the right
+    Span spacer = new Span();
+    buttonLayout.add(spacer, showOperationalAttributesCheckbox);
+    buttonLayout.setFlexGrow(1, spacer);
 
-    add(header, controlsLayout, buttonLayout, attributeGrid);
+    add(header, buttonLayout, attributeGrid);
     setFlexGrow(1, attributeGrid);
   }
 
@@ -169,6 +174,7 @@ public class AttributeEditor extends VerticalLayout {
     this.currentEntry = entry;
     this.fullEntry = entry; // Store the full entry
     this.cachedSchema = null; // Clear cached schema for new entry
+    clearPendingChanges(); // Clear any pending changes when loading new entry
 
     if (entry != null) {
       // Removed redundant titleLabel.setText() call
@@ -196,6 +202,7 @@ public class AttributeEditor extends VerticalLayout {
     this.currentEntry = entry;
     this.fullEntry = entry; // Store the full entry
     this.cachedSchema = schema; // Cache the schema to avoid repeated lookups
+    clearPendingChanges(); // Clear any pending changes when loading new entry
 
     if (entry != null) {
       dnLabel.setText("DN: " + entry.getDn());
@@ -722,6 +729,7 @@ public void clear() {
   currentEntry = null;
   fullEntry = null;
   cachedSchema = null; // Clear cached schema
+  clearPendingChanges(); // Clear any pending changes
   // Removed redundant titleLabel.setText() call
   dnLabel.setText("No entry selected");
   entryTypeDisplay.removeAll();
@@ -732,14 +740,51 @@ public void clear() {
   showOperationalAttributesCheckbox.setValue(false);
 }
 
-private void setButtonsEnabled(boolean enabled) {
-  addAttributeButton.setEnabled(enabled);
-  saveButton.setEnabled(enabled);
-  refreshButton.setEnabled(enabled);
-  deleteEntryButton.setEnabled(enabled);
-}
+  private void setButtonsEnabled(boolean enabled) {
+    addAttributeButton.setEnabled(enabled);
+    saveButton.setEnabled(enabled);
+    refreshButton.setEnabled(enabled);
+    deleteEntryButton.setEnabled(enabled);
+  }
 
-private VerticalLayout createValueComponent(AttributeRow row) {
+  /**
+   * Mark that there are pending changes that need to be saved
+   */
+  private void markPendingChanges() {
+    hasPendingChanges = true;
+    updateSaveButtonAppearance();
+  }
+
+  /**
+   * Clear pending changes indicator
+   */
+  private void clearPendingChanges() {
+    hasPendingChanges = false;
+    updateSaveButtonAppearance();
+  }
+
+  /**
+   * Update save button appearance based on pending changes
+   */
+  private void updateSaveButtonAppearance() {
+    if (hasPendingChanges) {
+      saveButton.setText("Save Changes *");
+      saveButton.getStyle().set("font-weight", "bold");
+      saveButton.getStyle().set("background-color", "#ff6b35");
+      saveButton.getStyle().set("color", "white");
+      if (!saveButton.getThemeNames().contains(ButtonVariant.LUMO_PRIMARY.getVariantName())) {
+        saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+      }
+    } else {
+      saveButton.setText("Save Changes");
+      saveButton.getStyle().remove("font-weight");
+      saveButton.getStyle().remove("background-color");
+      saveButton.getStyle().remove("color");
+      // Keep primary theme for consistency
+    }
+  }
+
+  private VerticalLayout createValueComponent(AttributeRow row) {
   VerticalLayout layout = new VerticalLayout();
   layout.setPadding(false);
   layout.setSpacing(false);
@@ -872,19 +917,17 @@ private void openAddAttributeDialog() {
       }
       
       currentEntry.setAttributeValues(attributeName, mergedValues);
+      markPendingChanges();
       showSuccess("Added " + (mergedValues.size() - existingValues.size()) + " new value(s) to existing attribute '" + attributeName + "'.");
     } else {
       // New attribute, set values directly
       currentEntry.setAttributeValues(attributeName, values);
+      markPendingChanges();
       showSuccess("Added new attribute '" + attributeName + "' with " + values.size() + " value(s).");
     }
 
-    // Refresh display with schema to maintain font color formatting
-    if (cachedSchema != null) {
-      editEntryWithSchema(currentEntry, cachedSchema);
-    } else {
-      editEntry(currentEntry);
-    }
+    // Refresh display without clearing pending changes
+    refreshAttributeDisplay();
 
     dialog.close();
   });
@@ -935,13 +978,10 @@ private void openEditAttributeDialog(AttributeRow row) {
 
     // Update current entry
     currentEntry.setAttributeValues(row.getName(), values);
+    markPendingChanges();
     
-    // Refresh display with schema to maintain font color formatting
-    if (cachedSchema != null) {
-      editEntryWithSchema(currentEntry, cachedSchema);
-    } else {
-      editEntry(currentEntry);
-    }
+    // Refresh display without clearing pending changes
+    refreshAttributeDisplay();
 
     dialog.close();
   });
@@ -1040,13 +1080,10 @@ private void openEditObjectClassDialog(AttributeRow row) {
 
     // Update current entry
     currentEntry.setAttributeValues(row.getName(), finalValues);
+    markPendingChanges();
     
-    // Refresh display with schema to maintain font color formatting
-    if (cachedSchema != null) {
-      editEntryWithSchema(currentEntry, cachedSchema);
-    } else {
-      editEntry(currentEntry);
-    }
+    // Refresh display without clearing pending changes
+    refreshAttributeDisplay();
 
     dialog.close();
   });
@@ -1091,13 +1128,10 @@ private void deleteAttribute(AttributeRow row) {
   dialog.setConfirmText("Delete");
   dialog.addConfirmListener(e -> {
     currentEntry.getAttributes().remove(row.getName());
+    markPendingChanges();
     
-    // Refresh display with schema to maintain font color formatting
-    if (cachedSchema != null) {
-      editEntryWithSchema(currentEntry, cachedSchema);
-    } else {
-      editEntry(currentEntry);
-    }
+    // Refresh display without clearing pending changes
+    refreshAttributeDisplay();
   });
   dialog.open();
 }
@@ -1246,6 +1280,7 @@ private void saveChanges() {
     }
 
     ldapService.modifyEntry(serverConfig.getId(), currentEntry.getDn(), modifications);
+    clearPendingChanges();
     showSuccess("Entry saved successfully.");
     
     // Automatically refresh the entry to sync with server state and prevent 
@@ -1301,6 +1336,7 @@ private void refreshEntry() {
     LdapService.EntryWithSchema entryWithSchema = ldapService.getEntryWithSchema(serverConfig.getId(), currentEntry.getDn());
     if (entryWithSchema != null) {
       editEntryWithSchema(entryWithSchema.getEntry(), entryWithSchema.getSchema());
+      clearPendingChanges();
       showInfo("Entry refreshed.");
     } else {
     showError("Entry not found.");
