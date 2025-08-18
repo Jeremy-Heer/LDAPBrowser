@@ -792,6 +792,27 @@ private void openAddAttributeDialog() {
   TextArea valueArea = new TextArea("Values (one per line)");
   valueArea.setWidthFull();
   valueArea.setHeight("200px");
+  
+  // Update valueArea and dialog title when attribute is selected
+  nameField.addValueChangeListener(event -> {
+    String selectedAttribute = event.getValue();
+    if (selectedAttribute != null && !selectedAttribute.trim().isEmpty()) {
+      List<String> existingValues = currentEntry.getAttributeValues(selectedAttribute.trim());
+      if (existingValues != null && !existingValues.isEmpty()) {
+        dialog.setHeaderTitle("Add Values to Existing Attribute: " + selectedAttribute);
+        valueArea.setLabel("New values to add (one per line) - Existing: " + existingValues.size() + " value(s)");
+        valueArea.setPlaceholder("Enter new values to add to the existing " + existingValues.size() + " value(s)...");
+      } else {
+        dialog.setHeaderTitle("Add New Attribute: " + selectedAttribute);
+        valueArea.setLabel("Values (one per line)");
+        valueArea.setPlaceholder("Enter values for the new attribute...");
+      }
+    } else {
+      dialog.setHeaderTitle("Add Attribute");
+      valueArea.setLabel("Values (one per line)");
+      valueArea.setPlaceholder("");
+    }
+  });
 
   Button saveButton = new Button("Add", e -> {
     String name = nameField.getValue();
@@ -816,9 +837,37 @@ private void openAddAttributeDialog() {
       return;
     }
 
-    // Add to current entry
-    currentEntry.setAttributeValues(name.trim(), values);
-    editEntry(currentEntry); // Refresh display
+    // Check if attribute already exists and append values instead of replacing
+    String attributeName = name.trim();
+    List<String> existingValues = currentEntry.getAttributeValues(attributeName);
+    
+    if (existingValues != null && !existingValues.isEmpty()) {
+      // Attribute exists, merge with existing values
+      List<String> mergedValues = new ArrayList<>(existingValues);
+      
+      // Add new values that don't already exist (case-insensitive comparison)
+      for (String newValue : values) {
+        boolean exists = mergedValues.stream()
+          .anyMatch(existing -> existing.equalsIgnoreCase(newValue));
+        if (!exists) {
+          mergedValues.add(newValue);
+        }
+      }
+      
+      currentEntry.setAttributeValues(attributeName, mergedValues);
+      showSuccess("Added " + (mergedValues.size() - existingValues.size()) + " new value(s) to existing attribute '" + attributeName + "'.");
+    } else {
+      // New attribute, set values directly
+      currentEntry.setAttributeValues(attributeName, values);
+      showSuccess("Added new attribute '" + attributeName + "' with " + values.size() + " value(s).");
+    }
+
+    // Refresh display with schema to maintain font color formatting
+    if (cachedSchema != null) {
+      editEntryWithSchema(currentEntry, cachedSchema);
+    } else {
+      editEntry(currentEntry);
+    }
 
     dialog.close();
   });
@@ -869,7 +918,13 @@ private void openEditAttributeDialog(AttributeRow row) {
 
     // Update current entry
     currentEntry.setAttributeValues(row.getName(), values);
-    editEntry(currentEntry); // Refresh display
+    
+    // Refresh display with schema to maintain font color formatting
+    if (cachedSchema != null) {
+      editEntryWithSchema(currentEntry, cachedSchema);
+    } else {
+      editEntry(currentEntry);
+    }
 
     dialog.close();
   });
@@ -968,7 +1023,13 @@ private void openEditObjectClassDialog(AttributeRow row) {
 
     // Update current entry
     currentEntry.setAttributeValues(row.getName(), finalValues);
-    editEntry(currentEntry); // Refresh display
+    
+    // Refresh display with schema to maintain font color formatting
+    if (cachedSchema != null) {
+      editEntryWithSchema(currentEntry, cachedSchema);
+    } else {
+      editEntry(currentEntry);
+    }
 
     dialog.close();
   });
@@ -1013,7 +1074,13 @@ private void deleteAttribute(AttributeRow row) {
   dialog.setConfirmText("Delete");
   dialog.addConfirmListener(e -> {
     currentEntry.getAttributes().remove(row.getName());
-    editEntry(currentEntry); // Refresh display
+    
+    // Refresh display with schema to maintain font color formatting
+    if (cachedSchema != null) {
+      editEntryWithSchema(currentEntry, cachedSchema);
+    } else {
+      editEntry(currentEntry);
+    }
   });
   dialog.open();
 }
