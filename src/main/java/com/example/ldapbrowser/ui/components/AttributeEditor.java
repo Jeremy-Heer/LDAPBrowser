@@ -229,7 +229,8 @@ private void refreshAttributeDisplay() {
     String attrName = attr.getKey();
 
     // Filter operational attributes if checkbox is unchecked
-    if (!showOperational && isOperationalAttribute(attrName)) {
+    // Use schema-based detection for consistency with styling
+    if (!showOperational && isOperationalAttributeComprehensive(attrName)) {
       continue;
     }
 
@@ -330,6 +331,23 @@ private boolean isOperationalAttribute(String attributeName) {
   lowerName.startsWith("ds-") ||
   lowerName.startsWith("nsds-") ||
   lowerName.contains("timestamp");
+}
+
+/**
+ * Comprehensive check for operational attributes using both pattern matching and schema
+ */
+private boolean isOperationalAttributeComprehensive(String attributeName) {
+  // First check using pattern-based detection
+  if (isOperationalAttribute(attributeName)) {
+    return true;
+  }
+  
+  // Then check schema if available
+  if (cachedSchema != null) {
+    return isOperationalAttributeBySchema(attributeName, cachedSchema);
+  }
+  
+  return false;
 }
 
 /**
