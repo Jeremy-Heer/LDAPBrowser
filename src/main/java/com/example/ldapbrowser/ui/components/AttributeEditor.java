@@ -6,6 +6,7 @@ import com.example.ldapbrowser.service.LdapService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
+import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.contextmenu.ContextMenu;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -18,7 +19,6 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
-import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.Modification;
@@ -470,7 +470,100 @@ private boolean isOperationalAttributeBySchema(String attributeName, Schema sche
   }
   
   return false;
-}/**
+}
+
+/**
+ * Get all available object classes from schema for type-ahead functionality
+ */
+private List<String> getAvailableObjectClasses() {
+  List<String> objectClasses = new ArrayList<>();
+  
+  if (cachedSchema != null) {
+    try {
+      for (ObjectClassDefinition objectClass : cachedSchema.getObjectClasses()) {
+        objectClasses.add(objectClass.getNameOrOID());
+        
+        // Also add alternative names if available
+        String[] names = objectClass.getNames();
+        if (names != null) {
+          for (String name : names) {
+            if (!objectClasses.contains(name)) {
+              objectClasses.add(name);
+            }
+          }
+        }
+      }
+      
+      // Sort alphabetically for better user experience
+      objectClasses.sort(String.CASE_INSENSITIVE_ORDER);
+    } catch (Exception e) {
+      // If schema access fails, return empty list
+    }
+  }
+  
+  return objectClasses;
+}
+
+/**
+ * Get all valid attributes (required and optional) for current object classes
+ */
+private List<String> getValidAttributesForCurrentEntry() {
+  Set<String> validAttributes = new HashSet<>();
+  
+  if (cachedSchema != null && currentEntry != null) {
+    try {
+      // Get object classes for the current entry
+      List<String> objectClasses = currentEntry.getAttributeValues("objectClass");
+      if (objectClasses != null) {
+        for (String objectClassName : objectClasses) {
+          ObjectClassDefinition objectClass = cachedSchema.getObjectClass(objectClassName);
+          if (objectClass != null) {
+            // Add required attributes
+            String[] required = objectClass.getRequiredAttributes();
+            if (required != null) {
+              for (String attr : required) {
+                validAttributes.add(attr);
+              }
+            }
+            
+            // Add optional attributes
+            String[] optional = objectClass.getOptionalAttributes();
+            if (optional != null) {
+              for (String attr : optional) {
+                validAttributes.add(attr);
+              }
+            }
+          }
+        }
+      }
+      
+      // Also add commonly used attributes that might not be in schema
+      validAttributes.add("cn");
+      validAttributes.add("sn");
+      validAttributes.add("givenName");
+      validAttributes.add("mail");
+      validAttributes.add("telephoneNumber");
+      validAttributes.add("description");
+      validAttributes.add("displayName");
+      validAttributes.add("memberOf");
+      validAttributes.add("member");
+      validAttributes.add("uniqueMember");
+      
+    } catch (Exception e) {
+      // If schema access fails, provide basic attributes
+      validAttributes.add("cn");
+      validAttributes.add("sn");
+      validAttributes.add("description");
+    }
+  }
+  
+  // Convert to sorted list
+  List<String> result = new ArrayList<>(validAttributes);
+  result.sort(String.CASE_INSENSITIVE_ORDER);
+  return result;
+}
+
+/**
 * Update the entry type display with appropriate icon and description
 */
 private void updateEntryTypeDisplay(LdapEntry entry) {
@@ -683,8 +776,18 @@ private void openAddAttributeDialog() {
   Dialog dialog = new Dialog();
   dialog.setHeaderTitle("Add Attribute");
 
-  TextField nameField = new TextField("Attribute Name");
+  // Use ComboBox with type-ahead for attribute name
+  ComboBox<String> nameField = new ComboBox<>("Attribute Name");
   nameField.setWidthFull();
+  nameField.setAllowCustomValue(true);
+  nameField.setItems(getValidAttributesForCurrentEntry());
+  nameField.setPlaceholder("Type to search attributes...");
+  
+  // Enable filtering as user types
+  nameField.addCustomValueSetListener(event -> {
+    String customValue = event.getDetail();
+    nameField.setValue(customValue);
+  });
 
   TextArea valueArea = new TextArea("Values (one per line)");
   valueArea.setWidthFull();
@@ -733,6 +836,12 @@ private void openAddAttributeDialog() {
 }
 
 private void openEditAttributeDialog(AttributeRow row) {
+  // Special handling for objectClass attribute
+  if ("objectClass".equalsIgnoreCase(row.getName())) {
+    openEditObjectClassDialog(row);
+    return;
+  }
+  
   Dialog dialog = new Dialog();
   dialog.setHeaderTitle("Edit Attribute: " + row.getName());
 
@@ -775,6 +884,125 @@ private void openEditAttributeDialog(AttributeRow row) {
   dialog.getFooter().add(cancelButton, saveButton);
 
   dialog.open();
+}
+
+/**
+ * Special dialog for editing objectClass attribute with type-ahead functionality
+ */
+private void openEditObjectClassDialog(AttributeRow row) {
+  Dialog dialog = new Dialog();
+  dialog.setHeaderTitle("Edit Object Classes");
+
+  // Create a vertical layout for multiple object class selections
+  VerticalLayout objectClassLayout = new VerticalLayout();
+  objectClassLayout.setPadding(false);
+  objectClassLayout.setSpacing(true);
+  objectClassLayout.setWidthFull();
+
+  // Current values as editable combo boxes
+  List<ComboBox<String>> comboBoxes = new ArrayList<>();
+  List<String> availableObjectClasses = getAvailableObjectClasses();
+  
+  // Add existing values
+  for (String existingValue : row.getValues()) {
+    ComboBox<String> objectClassCombo = createObjectClassComboBox(availableObjectClasses);
+    objectClassCombo.setValue(existingValue);
+    
+    Button removeButton = new Button(new Icon(VaadinIcon.MINUS));
+    removeButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
+    removeButton.addClickListener(e -> {
+      objectClassLayout.remove(objectClassCombo.getParent().get());
+      comboBoxes.remove(objectClassCombo);
+    });
+    
+    HorizontalLayout rowLayout = new HorizontalLayout(objectClassCombo, removeButton);
+    rowLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+    rowLayout.setFlexGrow(1, objectClassCombo);
+    
+    objectClassLayout.add(rowLayout);
+    comboBoxes.add(objectClassCombo);
+  }
+  
+  // Add button for new object classes
+  Button addObjectClassButton = new Button("Add Object Class", new Icon(VaadinIcon.PLUS));
+  addObjectClassButton.addClickListener(e -> {
+    ComboBox<String> newObjectClassCombo = createObjectClassComboBox(availableObjectClasses);
+    
+    Button removeButton = new Button(new Icon(VaadinIcon.MINUS));
+    removeButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
+    removeButton.addClickListener(removeEvent -> {
+      objectClassLayout.remove(newObjectClassCombo.getParent().get());
+      comboBoxes.remove(newObjectClassCombo);
+    });
+    
+    HorizontalLayout rowLayout = new HorizontalLayout(newObjectClassCombo, removeButton);
+    rowLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+    rowLayout.setFlexGrow(1, newObjectClassCombo);
+    
+    // Insert before the add button
+    objectClassLayout.addComponentAtIndex(objectClassLayout.getComponentCount() - 1, rowLayout);
+    comboBoxes.add(newObjectClassCombo);
+  });
+
+  objectClassLayout.add(addObjectClassButton);
+
+  Button saveButton = new Button("Save", e -> {
+    List<String> newValues = new ArrayList<>();
+    
+    for (ComboBox<String> comboBox : comboBoxes) {
+      String value = comboBox.getValue();
+      if (value != null && !value.trim().isEmpty()) {
+        newValues.add(value.trim());
+      }
+    }
+
+    if (newValues.isEmpty()) {
+      showError("At least one object class is required.");
+      return;
+    }
+
+    // Remove duplicates and sort
+    Set<String> uniqueValues = new HashSet<>(newValues);
+    List<String> finalValues = new ArrayList<>(uniqueValues);
+    finalValues.sort(String.CASE_INSENSITIVE_ORDER);
+
+    // Update current entry
+    currentEntry.setAttributeValues(row.getName(), finalValues);
+    editEntry(currentEntry); // Refresh display
+
+    dialog.close();
+  });
+  saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+  Button cancelButton = new Button("Cancel", e -> dialog.close());
+
+  VerticalLayout mainLayout = new VerticalLayout(objectClassLayout);
+  mainLayout.setWidth("500px");
+  mainLayout.setMaxHeight("400px");
+
+  dialog.add(mainLayout);
+  dialog.getFooter().add(cancelButton, saveButton);
+
+  dialog.open();
+}
+
+/**
+ * Create a ComboBox for object class selection with type-ahead
+ */
+private ComboBox<String> createObjectClassComboBox(List<String> availableObjectClasses) {
+  ComboBox<String> comboBox = new ComboBox<>();
+  comboBox.setWidthFull();
+  comboBox.setAllowCustomValue(true);
+  comboBox.setItems(availableObjectClasses);
+  comboBox.setPlaceholder("Type to search object classes...");
+  
+  // Enable custom value input
+  comboBox.addCustomValueSetListener(event -> {
+    String customValue = event.getDetail();
+    comboBox.setValue(customValue);
+  });
+  
+  return comboBox;
 }
 
 private void deleteAttribute(AttributeRow row) {
