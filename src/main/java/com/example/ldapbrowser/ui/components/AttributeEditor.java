@@ -330,7 +330,24 @@ private boolean isOperationalAttribute(String attributeName) {
   lowerName.equals("structuralobjectclass") ||
   lowerName.startsWith("ds-") ||
   lowerName.startsWith("nsds-") ||
-  lowerName.contains("timestamp");
+  lowerName.contains("timestamp") ||
+  // Additional common operational attributes
+  lowerName.equals("entrydn") ||
+  lowerName.equals("modifiersname") ||
+  lowerName.equals("creatorsname") ||
+  lowerName.equals("modifytimestamp") ||
+  lowerName.equals("createtimestamp") ||
+  lowerName.equals("contextcsn") ||
+  lowerName.equals("numsubordinates") ||
+  lowerName.equals("subordinatecount") ||
+  lowerName.startsWith("operational") ||
+  lowerName.startsWith("ds") ||
+  lowerName.startsWith("ads-") ||
+  lowerName.startsWith("ibm-") ||
+  lowerName.startsWith("sun-") ||
+  lowerName.startsWith("oracle-") ||
+  lowerName.startsWith("microsoft-") ||
+  lowerName.startsWith("novell-");
 }
 
 /**
@@ -1230,6 +1247,10 @@ private void saveChanges() {
 
     ldapService.modifyEntry(serverConfig.getId(), currentEntry.getDn(), modifications);
     showSuccess("Entry saved successfully.");
+    
+    // Automatically refresh the entry to sync with server state and prevent 
+    // operational attribute conflicts on subsequent saves
+    refreshEntry();
 
   } catch (LDAPException e) {
   showError("Failed to save entry: " + e.getMessage());
@@ -1239,15 +1260,20 @@ private void saveChanges() {
 private List<Modification> createModifications(LdapEntry original, LdapEntry modified) {
   List<Modification> modifications = new ArrayList<>();
 
-  // Find removed attributes
+  // Find removed attributes (excluding operational attributes)
   for (String attrName : original.getAttributeNames()) {
-    if (!modified.getAttributeNames().contains(attrName)) {
+    if (!modified.getAttributeNames().contains(attrName) && !isOperationalAttributeComprehensive(attrName)) {
       modifications.add(new Modification(ModificationType.DELETE, attrName));
     }
   }
 
-  // Find added/modified attributes
+  // Find added/modified attributes (excluding operational attributes)
   for (String attrName : modified.getAttributeNames()) {
+    // Skip operational attributes - they are managed by the LDAP server
+    if (isOperationalAttributeComprehensive(attrName)) {
+      continue;
+    }
+    
     List<String> originalValues = original.getAttributeValues(attrName);
     List<String> modifiedValues = modified.getAttributeValues(attrName);
 
