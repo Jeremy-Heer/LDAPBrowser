@@ -63,7 +63,7 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
     .setSortable(false);
 
     // Hide the header row completely to remove the resizer
-    getElement().executeJs("this.shadowRoot.querySelector('thead').style.display = 'none'");
+    hideGridHeader();
 
     // Style the tree grid
     addClassName("ldap-tree-grid");
@@ -71,6 +71,17 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
     getStyle().set("border", "1px solid var(--lumo-contrast-20pct)");
     getStyle().set("margin", "0px");
     getStyle().set("padding", "0px");
+
+    // Add attach listener to ensure header stays hidden when switching tabs
+    addAttachListener(event -> {
+      // Use a small delay to ensure the DOM is ready
+      getUI().ifPresent(ui -> ui.access(() -> {
+        ui.getElement().executeJs(
+          "setTimeout(() => { if ($0.shadowRoot && $0.shadowRoot.querySelector('thead')) { $0.shadowRoot.querySelector('thead').style.display = 'none'; } }, 50)",
+          getElement()
+        );
+      }));
+    });
 
     // Add keyboard navigation
     getElement().setAttribute("tabindex", "0");
@@ -119,6 +130,13 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
       }
     }
   });
+}
+
+/**
+* Hide the grid header to provide a clean tree view
+*/
+private void hideGridHeader() {
+  getElement().executeJs("this.shadowRoot.querySelector('thead').style.display = 'none'");
 }
 
 /**
