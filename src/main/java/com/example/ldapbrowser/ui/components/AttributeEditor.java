@@ -25,12 +25,18 @@ import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.Modification;
 import com.unboundid.ldap.sdk.ModificationType;
+import com.unboundid.ldap.sdk.schema.AttributeTypeDefinition;
+import com.unboundid.ldap.sdk.schema.AttributeUsage;
+import com.unboundid.ldap.sdk.schema.ObjectClassDefinition;
+import com.unboundid.ldap.sdk.schema.Schema;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
 * Component for editing LDAP entry attributes
@@ -90,10 +96,11 @@ public class AttributeEditor extends VerticalLayout {
     attributeGrid.setSizeFull();
 
     // Configure attribute grid columns
-    attributeColumn = attributeGrid.addColumn(AttributeRow::getName)
+    attributeColumn = attributeGrid.addColumn(new ComponentRenderer<Span, AttributeRow>(this::createAttributeNameComponent))
     .setHeader("Attribute")
     .setFlexGrow(1)
-    .setSortable(true);
+    .setSortable(true)
+    .setComparator(AttributeRow::getName);
 
     attributeGrid.addColumn(new ComponentRenderer<>(this::createValueComponent))
     .setHeader("Values")
@@ -210,8 +217,8 @@ private void refreshAttributeDisplay() {
 }
 
 /**
-* Check if an attribute is operational (system-generated)
-*/
+ * Check if an attribute is operational (system-generated)
+ */
 private boolean isOperationalAttribute(String attributeName) {
   String lowerName = attributeName.toLowerCase();
   return lowerName.startsWith("create") ||
@@ -231,6 +238,129 @@ private boolean isOperationalAttribute(String attributeName) {
 }
 
 /**
+ * Create a styled component for attribute name based on schema classification
+ */
+private Span createAttributeNameComponent(AttributeRow row) {
+  Span nameSpan = new Span(row.getName());
+  
+  try {
+    if (serverConfig != null && ldapService.isConnected(serverConfig.getId())) {
+      Schema schema = ldapService.getSchema(serverConfig.getId());
+      if (schema != null && currentEntry != null) {
+        AttributeClassification classification = classifyAttribute(row.getName(), schema);
+        
+        switch (classification) {
+          case REQUIRED:
+            nameSpan.getStyle().set("color", "#d32f2f"); // Red for required (must)
+            nameSpan.getElement().setAttribute("title", "Required attribute (must)");
+            break;
+          case OPTIONAL:
+            nameSpan.getStyle().set("color", "#1976d2"); // Blue for optional (may)
+            nameSpan.getElement().setAttribute("title", "Optional attribute (may)");
+            break;
+          case OPERATIONAL:
+            if (showOperationalAttributesCheckbox.getValue()) {
+              nameSpan.getStyle().set("color", "#f57c00"); // Orange for operational
+              nameSpan.getElement().setAttribute("title", "Operational attribute");
+            }
+            break;
+          case REGULAR:
+          default:
+            // Default color for regular attributes not defined in object classes
+            break;
+        }
+      }
+    }
+  } catch (Exception e) {
+    // If schema lookup fails, just display with default styling
+  }
+  
+  return nameSpan;
+}
+
+/**
+ * Classification types for attributes
+ */
+private enum AttributeClassification {
+  REQUIRED,   // Must attributes from object classes
+  OPTIONAL,   // May attributes from object classes
+  OPERATIONAL, // Operational/system attributes
+  REGULAR     // Regular attributes not classified by object class
+}
+
+/**
+ * Classify an attribute based on schema information
+ */
+private AttributeClassification classifyAttribute(String attributeName, Schema schema) {
+  // Check if it's operational first
+  if (isOperationalAttributeBySchema(attributeName, schema)) {
+    return AttributeClassification.OPERATIONAL;
+  }
+  
+  // Get object classes for the current entry
+  List<String> objectClasses = currentEntry.getAttributeValues("objectClass");
+  if (objectClasses == null || objectClasses.isEmpty()) {
+    return AttributeClassification.REGULAR;
+  }
+  
+  Set<String> requiredAttributes = new HashSet<>();
+  Set<String> optionalAttributes = new HashSet<>();
+  
+  // Collect required and optional attributes from all object classes
+  for (String objectClassName : objectClasses) {
+    ObjectClassDefinition objectClass = schema.getObjectClass(objectClassName);
+    if (objectClass != null) {
+      // Add required attributes
+      String[] required = objectClass.getRequiredAttributes();
+      if (required != null) {
+        for (String attr : required) {
+          requiredAttributes.add(attr.toLowerCase());
+        }
+      }
+      
+      // Add optional attributes
+      String[] optional = objectClass.getOptionalAttributes();
+      if (optional != null) {
+        for (String attr : optional) {
+          optionalAttributes.add(attr.toLowerCase());
+        }
+      }
+    }
+  }
+  
+  String lowerAttributeName = attributeName.toLowerCase();
+  
+  // Check if it's a required attribute
+  if (requiredAttributes.contains(lowerAttributeName)) {
+    return AttributeClassification.REQUIRED;
+  }
+  
+  // Check if it's an optional attribute
+  if (optionalAttributes.contains(lowerAttributeName)) {
+    return AttributeClassification.OPTIONAL;
+  }
+  
+  return AttributeClassification.REGULAR;
+}
+
+/**
+ * Check if an attribute is operational based on schema information
+ */
+private boolean isOperationalAttributeBySchema(String attributeName, Schema schema) {
+  // First check using our existing operational attribute detection
+  if (isOperationalAttribute(attributeName)) {
+    return true;
+  }
+  
+  // Check schema for attribute type usage
+  AttributeTypeDefinition attributeType = schema.getAttributeType(attributeName);
+  if (attributeType != null) {
+    AttributeUsage usage = attributeType.getUsage();
+    return usage != null && usage == AttributeUsage.DIRECTORY_OPERATION;
+  }
+  
+  return false;
+}/**
 * Update the entry type display with appropriate icon and description
 */
 private void updateEntryTypeDisplay(LdapEntry entry) {

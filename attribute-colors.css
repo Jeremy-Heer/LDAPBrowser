@@ -1,0 +1,46 @@
+/* Custom CSS styles for LDAP Browser Attribute Color Coding */
+
+/* Required attributes (must) - Red */
+.attribute-required {
+    color: #d32f2f !important;
+    font-weight: 500;
+}
+
+/* Optional attributes (may) - Blue */
+.attribute-optional {
+    color: #1976d2 !important;
+    font-weight: 500;
+}
+
+/* Operational attributes - Orange */
+.attribute-operational {
+    color: #f57c00 !important;
+    font-weight: 500;
+}
+
+/* Regular attributes - Default */
+.attribute-regular {
+    color: inherit;
+    font-weight: normal;
+}
+
+/* Tooltip styling for attribute information */
+.attribute-tooltip {
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+/* 
+ * Color Reference:
+ * 
+ * Red (#d32f2f):    Required attributes (must)
+ * Blue (#1976d2):   Optional attributes (may)  
+ * Orange (#f57c00): Operational attributes
+ * Default:          Regular/unclassified attributes
+ *
+ * These colors provide good contrast and are accessible
+ * for users with common color vision deficiencies.
+ */
