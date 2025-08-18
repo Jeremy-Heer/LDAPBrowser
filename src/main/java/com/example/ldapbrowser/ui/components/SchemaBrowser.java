@@ -6,6 +6,10 @@ import com.example.ldapbrowser.service.ConfigurationService;
 import com.example.ldapbrowser.service.InMemoryLdapService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
+import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.dialog.Dialog;
+import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
@@ -18,6 +22,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.splitlayout.SplitLayout;
 import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.Tabs;
+import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.theme.lumo.LumoUtility;
@@ -60,6 +65,8 @@ public class SchemaBrowser extends VerticalLayout {
   private Tabs schemaTabs;
   private TextField searchField;
   private Button refreshButton;
+  private Button addObjectClassButton;
+  private Button addAttributeTypeButton;
 
   // Schema type grids
   private Grid<ObjectClassDefinition> objectClassGrid;
@@ -105,6 +112,17 @@ public class SchemaBrowser extends VerticalLayout {
     refreshButton.addThemeVariants(ButtonVariant.LUMO_SMALL);
     refreshButton.addClickListener(e -> loadSchema());
 
+    // Add schema element buttons
+    addObjectClassButton = new Button("Add Object Class", new Icon(VaadinIcon.PLUS));
+    addObjectClassButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_PRIMARY);
+    addObjectClassButton.addClickListener(e -> openAddObjectClassDialog());
+    addObjectClassButton.setEnabled(false);
+
+    addAttributeTypeButton = new Button("Add Attribute Type", new Icon(VaadinIcon.PLUS));
+    addAttributeTypeButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_PRIMARY);
+    addAttributeTypeButton.addClickListener(e -> openAddAttributeTypeDialog());
+    addAttributeTypeButton.setEnabled(false);
+
     // Schema tabs
     schemaTabs = new Tabs();
     Tab objectClassTab = new Tab("Object Classes");
@@ -119,18 +137,23 @@ public class SchemaBrowser extends VerticalLayout {
       if (selectedTab == objectClassTab) {
         currentView = "objectClasses";
         showObjectClasses();
+        updateAddButtons();
       } else if (selectedTab == attributeTypeTab) {
       currentView = "attributeTypes";
       showAttributeTypes();
+      updateAddButtons();
     } else if (selectedTab == matchingRuleTab) {
     currentView = "matchingRules";
     showMatchingRules();
+    updateAddButtons();
   } else if (selectedTab == matchingRuleUseTab) {
   currentView = "matchingRuleUse";
   showMatchingRuleUse();
+  updateAddButtons();
 } else if (selectedTab == syntaxTab) {
 currentView = "syntaxes";
 showSyntaxes();
+updateAddButtons();
 }
 });
 
@@ -339,7 +362,7 @@ private void initializeSyntaxGrid() {
     title.addClassNames(LumoUtility.Margin.NONE);
     title.getStyle().set("font-size", "0.9em").set("font-weight", "600").set("color", "#333");
 
-    schemaHeader.add(schemaIcon, title, searchField, refreshButton);
+    schemaHeader.add(schemaIcon, title, searchField, addObjectClassButton, addAttributeTypeButton, refreshButton);
     schemaHeader.setFlexGrow(1, title);
 
     // Schema tabs container
@@ -464,13 +487,16 @@ try {
   schema = ldapService.getSchema(serverConfig.getId());
   if (schema != null) {
     showObjectClasses(); // Default view
+    updateAddButtons();
     showSuccess("Schema loaded successfully");
   } else {
   showError("No schema information available");
+  updateAddButtons();
 }
 } catch (LDAPException e) {
 showError("Failed to load schema: " + e.getMessage());
 schema = null;
+updateAddButtons();
 }
 }
 
@@ -834,6 +860,7 @@ public void clear() {
   syntaxGrid.setItems();
   detailsPanel.removeAll();
   detailsPanel.add(new Span("Select a schema element to view details"));
+  updateAddButtons();
 }
 
 private void showSuccess(String message) {
@@ -849,6 +876,439 @@ private void showError(String message) {
 public void refreshEnvironments() {
   if (environmentDropdown != null) {
     environmentDropdown.refreshEnvironments();
+  }
+}
+
+  /**
+   * Update visibility of add buttons based on current view and server capabilities
+   */
+  private void updateAddButtons() {
+    boolean hasSchema = schema != null && serverConfig != null;
+    boolean canAddSchema = hasSchema && canModifySchema();
+
+    if ("objectClasses".equals(currentView)) {
+      addObjectClassButton.setVisible(true);
+      addAttributeTypeButton.setVisible(false);
+    } else if ("attributeTypes".equals(currentView)) {
+      addObjectClassButton.setVisible(false);
+      addAttributeTypeButton.setVisible(true);
+    } else {
+      addObjectClassButton.setVisible(false);
+      addAttributeTypeButton.setVisible(false);
+    }
+
+    addObjectClassButton.setEnabled(canAddSchema);
+    addAttributeTypeButton.setEnabled(canAddSchema);
+  }
+
+  /**
+   * Check if the current server supports schema modifications
+   */
+  private boolean canModifySchema() {
+    if (serverConfig == null) {
+      return false;
+    }
+    
+    // For in-memory servers, always allow schema modifications
+    if (inMemoryLdapService.isInMemoryServer(serverConfig.getId())) {
+      return true;
+    }
+    
+    // For external servers, check if they support schema modifications
+    try {
+      return ldapService.supportsSchemaModification(serverConfig.getId());
+    } catch (Exception e) {
+      return false;
+    }
+  }/**
+ * Open dialog for adding a new object class
+ */
+private void openAddObjectClassDialog() {
+  Dialog dialog = new Dialog();
+  dialog.setHeaderTitle("Add Object Class");
+  dialog.setWidth("600px");
+  dialog.setHeight("750px");
+
+  FormLayout formLayout = new FormLayout();
+  formLayout.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1));
+
+  // Add warning for external servers
+  if (serverConfig != null && !inMemoryLdapService.isInMemoryServer(serverConfig.getId())) {
+    Span warningSpan = new Span("⚠️ Adding schema elements to external LDAP servers may require administrator privileges and could affect production systems.");
+    warningSpan.getStyle().set("color", "#ff6b35");
+    warningSpan.getStyle().set("font-size", "0.875rem");
+    warningSpan.getStyle().set("margin-bottom", "1rem");
+    warningSpan.getStyle().set("display", "block");
+    formLayout.add(warningSpan);
+  }
+
+  // Basic fields
+  TextField nameField = new TextField("Name*");
+  nameField.setRequired(true);
+  
+  TextField oidField = new TextField("OID*");
+  oidField.setRequired(true);
+  oidField.setHelperText("Object identifier (e.g., 1.2.3.4.5.6.7.8)");
+  
+  TextField descriptionField = new TextField("Description");
+  
+  ComboBox<String> typeComboBox = new ComboBox<>("Type");
+  typeComboBox.setItems("STRUCTURAL", "AUXILIARY", "ABSTRACT");
+  typeComboBox.setValue("STRUCTURAL");
+  
+  Checkbox obsoleteCheckbox = new Checkbox("Obsolete");
+
+  // Superior classes
+  TextArea superiorClassesField = new TextArea("Superior Classes");
+  superiorClassesField.setHelperText("One per line (e.g., top, person)");
+  superiorClassesField.setHeight("80px");
+
+  // Required attributes
+  TextArea requiredAttributesField = new TextArea("Required Attributes (MUST)");
+  requiredAttributesField.setHelperText("One per line (e.g., cn, sn, objectClass)");
+  requiredAttributesField.setHeight("100px");
+
+  // Optional attributes
+  TextArea optionalAttributesField = new TextArea("Optional Attributes (MAY)");
+  optionalAttributesField.setHelperText("One per line (e.g., mail, telephoneNumber)");
+  optionalAttributesField.setHeight("100px");
+
+  formLayout.add(nameField, oidField, descriptionField, typeComboBox, obsoleteCheckbox,
+                 superiorClassesField, requiredAttributesField, optionalAttributesField);
+
+  // Buttons
+  Button saveButton = new Button("Add Object Class", e -> {
+    if (validateAndSaveObjectClass(dialog, nameField, oidField, descriptionField,
+                                 typeComboBox, obsoleteCheckbox, superiorClassesField,
+                                 requiredAttributesField, optionalAttributesField)) {
+      dialog.close();
+    }
+  });
+  saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+  Button cancelButton = new Button("Cancel", e -> dialog.close());
+
+  dialog.add(formLayout);
+  dialog.getFooter().add(cancelButton, saveButton);
+  dialog.open();
+}
+
+/**
+ * Open dialog for adding a new attribute type
+ */
+private void openAddAttributeTypeDialog() {
+  Dialog dialog = new Dialog();
+  dialog.setHeaderTitle("Add Attribute Type");
+  dialog.setWidth("600px");
+  dialog.setHeight("650px");
+
+  FormLayout formLayout = new FormLayout();
+  formLayout.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1));
+
+  // Add warning for external servers
+  if (serverConfig != null && !inMemoryLdapService.isInMemoryServer(serverConfig.getId())) {
+    Span warningSpan = new Span("⚠️ Adding schema elements to external LDAP servers may require administrator privileges and could affect production systems.");
+    warningSpan.getStyle().set("color", "#ff6b35");
+    warningSpan.getStyle().set("font-size", "0.875rem");
+    warningSpan.getStyle().set("margin-bottom", "1rem");
+    warningSpan.getStyle().set("display", "block");
+    formLayout.add(warningSpan);
+  }
+
+  // Basic fields
+  TextField nameField = new TextField("Name*");
+  nameField.setRequired(true);
+  
+  TextField oidField = new TextField("OID*");
+  oidField.setRequired(true);
+  oidField.setHelperText("Object identifier (e.g., 1.2.3.4.5.6.7.8)");
+  
+  TextField descriptionField = new TextField("Description");
+  
+  TextField syntaxOidField = new TextField("Syntax OID*");
+  syntaxOidField.setRequired(true);
+  syntaxOidField.setValue("1.3.6.1.4.1.1466.115.121.1.15"); // DirectoryString
+  syntaxOidField.setHelperText("Common: 1.3.6.1.4.1.1466.115.121.1.15 (Directory String)");
+
+  TextField superiorTypeField = new TextField("Superior Type");
+  superiorTypeField.setHelperText("Inherited attribute type (optional)");
+
+  ComboBox<String> usageComboBox = new ComboBox<>("Usage");
+  usageComboBox.setItems("USER_APPLICATIONS", "DIRECTORY_OPERATION", "DISTRIBUTED_OPERATION", "DSA_OPERATION");
+  usageComboBox.setValue("USER_APPLICATIONS");
+
+  // Checkboxes
+  Checkbox singleValuedCheckbox = new Checkbox("Single Valued");
+  Checkbox obsoleteCheckbox = new Checkbox("Obsolete");
+  Checkbox collectiveCheckbox = new Checkbox("Collective");
+  Checkbox noUserModificationCheckbox = new Checkbox("No User Modification");
+
+  // Matching rules
+  TextField equalityMatchingRuleField = new TextField("Equality Matching Rule");
+  TextField orderingMatchingRuleField = new TextField("Ordering Matching Rule");
+  TextField substringMatchingRuleField = new TextField("Substring Matching Rule");
+
+  formLayout.add(nameField, oidField, descriptionField, syntaxOidField, superiorTypeField,
+                 usageComboBox, singleValuedCheckbox, obsoleteCheckbox, collectiveCheckbox,
+                 noUserModificationCheckbox, equalityMatchingRuleField, orderingMatchingRuleField,
+                 substringMatchingRuleField);
+
+  // Buttons
+  Button saveButton = new Button("Add Attribute Type", e -> {
+    if (validateAndSaveAttributeType(dialog, nameField, oidField, descriptionField,
+                                   syntaxOidField, superiorTypeField, usageComboBox,
+                                   singleValuedCheckbox, obsoleteCheckbox, collectiveCheckbox,
+                                   noUserModificationCheckbox, equalityMatchingRuleField,
+                                   orderingMatchingRuleField, substringMatchingRuleField)) {
+      dialog.close();
+    }
+  });
+  saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+  Button cancelButton = new Button("Cancel", e -> dialog.close());
+
+  dialog.add(formLayout);
+  dialog.getFooter().add(cancelButton, saveButton);
+  dialog.open();
+}
+
+/**
+ * Validate and save new object class
+ */
+private boolean validateAndSaveObjectClass(Dialog dialog, TextField nameField, TextField oidField,
+                                         TextField descriptionField, ComboBox<String> typeComboBox,
+                                         Checkbox obsoleteCheckbox, TextArea superiorClassesField,
+                                         TextArea requiredAttributesField, TextArea optionalAttributesField) {
+  // Validate required fields
+  if (nameField.getValue() == null || nameField.getValue().trim().isEmpty()) {
+    showError("Name is required");
+    nameField.focus();
+    return false;
+  }
+
+  if (oidField.getValue() == null || oidField.getValue().trim().isEmpty()) {
+    showError("OID is required");
+    oidField.focus();
+    return false;
+  }
+
+  // Check if OID already exists
+  if (schema.getObjectClass(oidField.getValue()) != null) {
+    showError("An object class with this OID already exists");
+    oidField.focus();
+    return false;
+  }
+
+  // Check if name already exists
+  if (schema.getObjectClass(nameField.getValue()) != null) {
+    showError("An object class with this name already exists");
+    nameField.focus();
+    return false;
+  }
+
+  try {
+    // Build object class definition string
+    StringBuilder objectClassDef = new StringBuilder();
+    objectClassDef.append("( ").append(oidField.getValue());
+    
+    objectClassDef.append(" NAME '").append(nameField.getValue()).append("'");
+    
+    if (descriptionField.getValue() != null && !descriptionField.getValue().trim().isEmpty()) {
+      objectClassDef.append(" DESC '").append(descriptionField.getValue().trim()).append("'");
+    }
+
+    if (obsoleteCheckbox.getValue()) {
+      objectClassDef.append(" OBSOLETE");
+    }
+
+    // Superior classes
+    String superiorClasses = superiorClassesField.getValue();
+    if (superiorClasses != null && !superiorClasses.trim().isEmpty()) {
+      String[] superiors = superiorClasses.split("\n");
+      if (superiors.length == 1) {
+        objectClassDef.append(" SUP ").append(superiors[0].trim());
+      } else if (superiors.length > 1) {
+        objectClassDef.append(" SUP ( ");
+        for (int i = 0; i < superiors.length; i++) {
+          if (i > 0) objectClassDef.append(" $ ");
+          objectClassDef.append(superiors[i].trim());
+        }
+        objectClassDef.append(" )");
+      }
+    }
+
+    // Object class type
+    if (typeComboBox.getValue() != null) {
+      objectClassDef.append(" ").append(typeComboBox.getValue());
+    }
+
+    // Required attributes
+    String requiredAttributes = requiredAttributesField.getValue();
+    if (requiredAttributes != null && !requiredAttributes.trim().isEmpty()) {
+      String[] musts = requiredAttributes.split("\n");
+      if (musts.length == 1) {
+        objectClassDef.append(" MUST ").append(musts[0].trim());
+      } else if (musts.length > 1) {
+        objectClassDef.append(" MUST ( ");
+        for (int i = 0; i < musts.length; i++) {
+          if (i > 0) objectClassDef.append(" $ ");
+          objectClassDef.append(musts[i].trim());
+        }
+        objectClassDef.append(" )");
+      }
+    }
+
+    // Optional attributes
+    String optionalAttributes = optionalAttributesField.getValue();
+    if (optionalAttributes != null && !optionalAttributes.trim().isEmpty()) {
+      String[] mays = optionalAttributes.split("\n");
+      if (mays.length == 1) {
+        objectClassDef.append(" MAY ").append(mays[0].trim());
+      } else if (mays.length > 1) {
+        objectClassDef.append(" MAY ( ");
+        for (int i = 0; i < mays.length; i++) {
+          if (i > 0) objectClassDef.append(" $ ");
+          objectClassDef.append(mays[i].trim());
+        }
+        objectClassDef.append(" )");
+      }
+    }
+
+    objectClassDef.append(" )");
+
+    // Add to appropriate server type
+    if (inMemoryLdapService.isInMemoryServer(serverConfig.getId())) {
+      // Add to in-memory server
+      inMemoryLdapService.addObjectClassToSchema(serverConfig.getId(), objectClassDef.toString());
+    } else {
+      // Add to external LDAP server
+      ldapService.addObjectClassToSchema(serverConfig.getId(), objectClassDef.toString());
+    }
+    
+    // Reload schema
+    loadSchema();
+    
+    showSuccess("Object class '" + nameField.getValue() + "' added successfully");
+    return true;
+
+  } catch (Exception e) {
+    showError("Failed to add object class: " + e.getMessage());
+    return false;
+  }
+}
+
+/**
+ * Validate and save new attribute type
+ */
+private boolean validateAndSaveAttributeType(Dialog dialog, TextField nameField, TextField oidField,
+                                           TextField descriptionField, TextField syntaxOidField,
+                                           TextField superiorTypeField, ComboBox<String> usageComboBox,
+                                           Checkbox singleValuedCheckbox, Checkbox obsoleteCheckbox,
+                                           Checkbox collectiveCheckbox, Checkbox noUserModificationCheckbox,
+                                           TextField equalityMatchingRuleField, TextField orderingMatchingRuleField,
+                                           TextField substringMatchingRuleField) {
+  // Validate required fields
+  if (nameField.getValue() == null || nameField.getValue().trim().isEmpty()) {
+    showError("Name is required");
+    nameField.focus();
+    return false;
+  }
+
+  if (oidField.getValue() == null || oidField.getValue().trim().isEmpty()) {
+    showError("OID is required");
+    oidField.focus();
+    return false;
+  }
+
+  if (syntaxOidField.getValue() == null || syntaxOidField.getValue().trim().isEmpty()) {
+    showError("Syntax OID is required");
+    syntaxOidField.focus();
+    return false;
+  }
+
+  // Check if OID already exists
+  if (schema.getAttributeType(oidField.getValue()) != null) {
+    showError("An attribute type with this OID already exists");
+    oidField.focus();
+    return false;
+  }
+
+  // Check if name already exists
+  if (schema.getAttributeType(nameField.getValue()) != null) {
+    showError("An attribute type with this name already exists");
+    nameField.focus();
+    return false;
+  }
+
+  try {
+    // Build attribute type definition string
+    StringBuilder attributeDef = new StringBuilder();
+    attributeDef.append("( ").append(oidField.getValue());
+    
+    attributeDef.append(" NAME '").append(nameField.getValue()).append("'");
+    
+    if (descriptionField.getValue() != null && !descriptionField.getValue().trim().isEmpty()) {
+      attributeDef.append(" DESC '").append(descriptionField.getValue().trim()).append("'");
+    }
+
+    if (obsoleteCheckbox.getValue()) {
+      attributeDef.append(" OBSOLETE");
+    }
+
+    if (superiorTypeField.getValue() != null && !superiorTypeField.getValue().trim().isEmpty()) {
+      attributeDef.append(" SUP ").append(superiorTypeField.getValue().trim());
+    }
+
+    if (equalityMatchingRuleField.getValue() != null && !equalityMatchingRuleField.getValue().trim().isEmpty()) {
+      attributeDef.append(" EQUALITY ").append(equalityMatchingRuleField.getValue().trim());
+    }
+
+    if (orderingMatchingRuleField.getValue() != null && !orderingMatchingRuleField.getValue().trim().isEmpty()) {
+      attributeDef.append(" ORDERING ").append(orderingMatchingRuleField.getValue().trim());
+    }
+
+    if (substringMatchingRuleField.getValue() != null && !substringMatchingRuleField.getValue().trim().isEmpty()) {
+      attributeDef.append(" SUBSTR ").append(substringMatchingRuleField.getValue().trim());
+    }
+
+    attributeDef.append(" SYNTAX ").append(syntaxOidField.getValue().trim());
+
+    if (singleValuedCheckbox.getValue()) {
+      attributeDef.append(" SINGLE-VALUE");
+    }
+
+    if (collectiveCheckbox.getValue()) {
+      attributeDef.append(" COLLECTIVE");
+    }
+
+    if (noUserModificationCheckbox.getValue()) {
+      attributeDef.append(" NO-USER-MODIFICATION");
+    }
+
+    if (usageComboBox.getValue() != null && !"USER_APPLICATIONS".equals(usageComboBox.getValue())) {
+      attributeDef.append(" USAGE ").append(usageComboBox.getValue().toLowerCase().replace("_", ""));
+    }
+
+    attributeDef.append(" )");
+
+    // Add to appropriate server type
+    if (inMemoryLdapService.isInMemoryServer(serverConfig.getId())) {
+      // Add to in-memory server
+      inMemoryLdapService.addAttributeTypeToSchema(serverConfig.getId(), attributeDef.toString());
+    } else {
+      // Add to external LDAP server
+      ldapService.addAttributeTypeToSchema(serverConfig.getId(), attributeDef.toString());
+    }
+    
+    // Reload schema
+    loadSchema();
+    
+    showSuccess("Attribute type '" + nameField.getValue() + "' added successfully");
+    return true;
+
+  } catch (Exception e) {
+    showError("Failed to add attribute type: " + e.getMessage());
+    return false;
   }
 }
 }

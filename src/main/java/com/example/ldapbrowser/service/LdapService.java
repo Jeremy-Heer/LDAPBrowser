@@ -15,6 +15,7 @@ import com.unboundid.ldap.sdk.LDAPConnection;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.LDAPSearchException;
 import com.unboundid.ldap.sdk.Modification;
+import com.unboundid.ldap.sdk.ModificationType;
 import com.unboundid.ldap.sdk.ModifyRequest;
 import com.unboundid.ldap.sdk.SearchRequest;
 import com.unboundid.ldap.sdk.SearchResult;
@@ -655,6 +656,119 @@ public void deleteEntry(String serverId, String dn) throws LDAPException {
 public Schema getSchema(String serverId) throws LDAPException {
   LDAPConnection connection = getConnection(serverId);
   return connection.getSchema();
+}
+
+/**
+* Add an object class to the schema of an external LDAP server
+*/
+public void addObjectClassToSchema(String serverId, String objectClassDefinition) throws LDAPException {
+  LDAPConnection connection = getConnection(serverId);
+  
+  try {
+    // Get the schema subentry DN from root DSE
+    String schemaDN = getSchemaSubentryDN(serverId);
+    if (schemaDN == null) {
+      throw new LDAPException(ResultCode.NO_SUCH_OBJECT, "Cannot determine schema subentry DN");
+    }
+    
+    // Create modification to add the object class
+    Modification modification = new Modification(ModificationType.ADD, "objectClasses", objectClassDefinition);
+    
+    // Apply the modification
+    ModifyRequest modifyRequest = new ModifyRequest(schemaDN, modification);
+    connection.modify(modifyRequest);
+    
+    loggingService.logModification("Server " + serverId, schemaDN, "ADD_OBJECT_CLASS");
+  } catch (LDAPException e) {
+    loggingService.logModificationError("Server " + serverId, "schema", "ADD_OBJECT_CLASS", e.getMessage());
+    throw e;
+  }
+}
+
+/**
+* Add an attribute type to the schema of an external LDAP server
+*/
+public void addAttributeTypeToSchema(String serverId, String attributeTypeDefinition) throws LDAPException {
+  LDAPConnection connection = getConnection(serverId);
+  
+  try {
+    // Get the schema subentry DN from root DSE
+    String schemaDN = getSchemaSubentryDN(serverId);
+    if (schemaDN == null) {
+      throw new LDAPException(ResultCode.NO_SUCH_OBJECT, "Cannot determine schema subentry DN");
+    }
+    
+    // Create modification to add the attribute type
+    Modification modification = new Modification(ModificationType.ADD, "attributeTypes", attributeTypeDefinition);
+    
+    // Apply the modification
+    ModifyRequest modifyRequest = new ModifyRequest(schemaDN, modification);
+    connection.modify(modifyRequest);
+    
+    loggingService.logModification("Server " + serverId, schemaDN, "ADD_ATTRIBUTE_TYPE");
+  } catch (LDAPException e) {
+    loggingService.logModificationError("Server " + serverId, "schema", "ADD_ATTRIBUTE_TYPE", e.getMessage());
+    throw e;
+  }
+}
+
+/**
+* Get the schema subentry DN from the root DSE
+*/
+private String getSchemaSubentryDN(String serverId) throws LDAPException {
+  Entry rootDSE = getRootDSE(serverId);
+  
+  if (rootDSE != null) {
+    // Try common attributes for schema subentry
+    String[] possibleAttributes = {"subschemaSubentry", "schemaNamingContext", "schemaSubentry"};
+    
+    for (String attr : possibleAttributes) {
+      String schemaDN = rootDSE.getAttributeValue(attr);
+      if (schemaDN != null && !schemaDN.trim().isEmpty()) {
+        return schemaDN;
+      }
+    }
+  }
+  
+  // Fallback to common default
+  return "cn=schema";
+}
+
+/**
+* Check if the server supports schema modifications
+*/
+public boolean supportsSchemaModification(String serverId) {
+  try {
+    Entry rootDSE = getRootDSE(serverId);
+    if (rootDSE != null) {
+      // Check for schema modification support indicators
+      String[] supportedFeatures = rootDSE.getAttributeValues("supportedFeatures");
+      if (supportedFeatures != null) {
+        for (String feature : supportedFeatures) {
+          // Check for various schema modification OIDs
+          if ("1.3.6.1.4.1.4203.1.5.1".equals(feature) || // All Operational Attributes
+              "1.3.6.1.4.1.42.2.27.9.5.4".equals(feature)) { // Sun DS Schema Modification
+            return true;
+          }
+        }
+      }
+      
+      // Check if schema subentry exists and is writable
+      String schemaDN = getSchemaSubentryDN(serverId);
+      if (schemaDN != null) {
+        try {
+          LdapEntry schemaEntry = getEntry(serverId, schemaDN);
+          return schemaEntry != null;
+        } catch (LDAPException e) {
+          // Schema entry not accessible
+          return false;
+        }
+      }
+    }
+    return false;
+  } catch (Exception e) {
+    return false;
+  }
 }
 
 /**
