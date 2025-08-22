@@ -8,6 +8,7 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.combobox.MultiSelectComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
@@ -38,8 +39,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -920,14 +923,133 @@ public void refreshEnvironments() {
     } catch (Exception e) {
       return false;
     }
-  }/**
+  }
+
+/**
+ * Get available object class names from schema for selectors
+ */
+private List<String> getAvailableObjectClassNames() {
+  List<String> objectClassNames = new ArrayList<>();
+  if (schema != null) {
+    try {
+      Collection<ObjectClassDefinition> objectClasses = schema.getObjectClasses();
+      for (ObjectClassDefinition oc : objectClasses) {
+        String name = oc.getNameOrOID();
+        if (name != null && !name.trim().isEmpty()) {
+          objectClassNames.add(name);
+        }
+      }
+      objectClassNames.sort(String.CASE_INSENSITIVE_ORDER);
+    } catch (Exception e) {
+      // If schema access fails, return empty list
+    }
+  }
+  return objectClassNames;
+}
+
+/**
+ * Get available attribute type names from schema for selectors
+ */
+private List<String> getAvailableAttributeTypeNames() {
+  List<String> attributeNames = new ArrayList<>();
+  if (schema != null) {
+    try {
+      Collection<AttributeTypeDefinition> attributeTypes = schema.getAttributeTypes();
+      for (AttributeTypeDefinition at : attributeTypes) {
+        String name = at.getNameOrOID();
+        if (name != null && !name.trim().isEmpty()) {
+          attributeNames.add(name);
+        }
+      }
+      attributeNames.sort(String.CASE_INSENSITIVE_ORDER);
+    } catch (Exception e) {
+      // If schema access fails, return empty list
+    }
+  }
+  return attributeNames;
+}
+
+/**
+ * Get available matching rule names from schema for selectors
+ */
+private List<String> getAvailableMatchingRuleNames() {
+  List<String> matchingRuleNames = new ArrayList<>();
+  if (schema != null) {
+    try {
+      Collection<MatchingRuleDefinition> matchingRules = schema.getMatchingRules();
+      for (MatchingRuleDefinition mr : matchingRules) {
+        String name = mr.getNameOrOID();
+        if (name != null && !name.trim().isEmpty()) {
+          matchingRuleNames.add(name);
+        }
+      }
+      matchingRuleNames.sort(String.CASE_INSENSITIVE_ORDER);
+    } catch (Exception e) {
+      // If schema access fails, return empty list
+    }
+  }
+  return matchingRuleNames;
+}
+
+/**
+ * Get available syntax OIDs from schema for selectors
+ */
+private List<String> getAvailableSyntaxOIDs() {
+  List<String> syntaxOIDs = new ArrayList<>();
+  if (schema != null) {
+    try {
+      Collection<AttributeSyntaxDefinition> syntaxes = schema.getAttributeSyntaxes();
+      for (AttributeSyntaxDefinition syn : syntaxes) {
+        String oid = syn.getOID();
+        if (oid != null && !oid.trim().isEmpty()) {
+          syntaxOIDs.add(oid);
+        }
+      }
+      syntaxOIDs.sort(String.CASE_INSENSITIVE_ORDER);
+    } catch (Exception e) {
+      // If schema access fails, return empty list
+    }
+  }
+  return syntaxOIDs;
+}
+
+/**
+ * Create a multi-select component with existing items from schema
+ */
+private MultiSelectComboBox<String> createSchemaMultiSelect(String label, String placeholder, List<String> items) {
+  MultiSelectComboBox<String> multiSelect = new MultiSelectComboBox<>(label);
+  multiSelect.setPlaceholder(placeholder);
+  multiSelect.setItems(items);
+  multiSelect.setWidth("100%");
+  return multiSelect;
+}
+
+/**
+ * Create a combobox component with existing items from schema
+ */
+private ComboBox<String> createSchemaComboBox(String label, String placeholder, List<String> items) {
+  ComboBox<String> comboBox = new ComboBox<>(label);
+  comboBox.setPlaceholder(placeholder);
+  comboBox.setItems(items);
+  comboBox.setWidth("100%");
+  comboBox.setAllowCustomValue(true);
+  comboBox.addCustomValueSetListener(e -> {
+    String customValue = e.getDetail();
+    if (customValue != null && !customValue.trim().isEmpty()) {
+      comboBox.setValue(customValue);
+    }
+  });
+  return comboBox;
+}
+
+/**
  * Open dialog for adding a new object class
  */
 private void openAddObjectClassDialog() {
   Dialog dialog = new Dialog();
   dialog.setHeaderTitle("Add Object Class");
-  dialog.setWidth("600px");
-  dialog.setHeight("750px");
+  dialog.setWidth("700px");
+  dialog.setHeight("800px");
 
   FormLayout formLayout = new FormLayout();
   formLayout.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1));
@@ -958,29 +1080,58 @@ private void openAddObjectClassDialog() {
   
   Checkbox obsoleteCheckbox = new Checkbox("Obsolete");
 
-  // Superior classes
-  TextArea superiorClassesField = new TextArea("Superior Classes");
-  superiorClassesField.setHelperText("One per line (e.g., top, person)");
-  superiorClassesField.setHeight("80px");
+  // Get available schema elements for selectors
+  List<String> availableObjectClasses = getAvailableObjectClassNames();
+  List<String> availableAttributes = getAvailableAttributeTypeNames();
 
-  // Required attributes
-  TextArea requiredAttributesField = new TextArea("Required Attributes (MUST)");
-  requiredAttributesField.setHelperText("One per line (e.g., cn, sn, objectClass)");
-  requiredAttributesField.setHeight("100px");
+  // Superior classes - enhanced with selector
+  MultiSelectComboBox<String> superiorClassesSelector = createSchemaMultiSelect(
+    "Superior Classes (Select)", 
+    "Choose from existing object classes...", 
+    availableObjectClasses
+  );
+  superiorClassesSelector.setHelperText("Select from existing object classes or type new ones");
+  
+  TextArea superiorClassesField = new TextArea("Superior Classes (Manual Entry)");
+  superiorClassesField.setHelperText("One per line (e.g., top, person) - Alternative to selector above");
+  superiorClassesField.setHeight("60px");
 
-  // Optional attributes
-  TextArea optionalAttributesField = new TextArea("Optional Attributes (MAY)");
-  optionalAttributesField.setHelperText("One per line (e.g., mail, telephoneNumber)");
-  optionalAttributesField.setHeight("100px");
+  // Required attributes - enhanced with selector
+  MultiSelectComboBox<String> requiredAttributesSelector = createSchemaMultiSelect(
+    "Required Attributes (MUST) - Select", 
+    "Choose from existing attributes...", 
+    availableAttributes
+  );
+  requiredAttributesSelector.setHelperText("Select from existing attribute types or type new ones");
+  
+  TextArea requiredAttributesField = new TextArea("Required Attributes (MUST) - Manual Entry");
+  requiredAttributesField.setHelperText("One per line (e.g., cn, sn, objectClass) - Alternative to selector above");
+  requiredAttributesField.setHeight("80px");
+
+  // Optional attributes - enhanced with selector
+  MultiSelectComboBox<String> optionalAttributesSelector = createSchemaMultiSelect(
+    "Optional Attributes (MAY) - Select", 
+    "Choose from existing attributes...", 
+    availableAttributes
+  );
+  optionalAttributesSelector.setHelperText("Select from existing attribute types or type new ones");
+  
+  TextArea optionalAttributesField = new TextArea("Optional Attributes (MAY) - Manual Entry");
+  optionalAttributesField.setHelperText("One per line (e.g., mail, telephoneNumber) - Alternative to selector above");
+  optionalAttributesField.setHeight("80px");
 
   formLayout.add(nameField, oidField, descriptionField, typeComboBox, obsoleteCheckbox,
-                 superiorClassesField, requiredAttributesField, optionalAttributesField);
+                 superiorClassesSelector, superiorClassesField,
+                 requiredAttributesSelector, requiredAttributesField,
+                 optionalAttributesSelector, optionalAttributesField);
 
   // Buttons
   Button saveButton = new Button("Add Object Class", e -> {
     if (validateAndSaveObjectClass(dialog, nameField, oidField, descriptionField,
-                                 typeComboBox, obsoleteCheckbox, superiorClassesField,
-                                 requiredAttributesField, optionalAttributesField)) {
+                                 typeComboBox, obsoleteCheckbox, 
+                                 superiorClassesSelector, superiorClassesField,
+                                 requiredAttributesSelector, requiredAttributesField,
+                                 optionalAttributesSelector, optionalAttributesField)) {
       dialog.close();
     }
   });
@@ -999,8 +1150,8 @@ private void openAddObjectClassDialog() {
 private void openAddAttributeTypeDialog() {
   Dialog dialog = new Dialog();
   dialog.setHeaderTitle("Add Attribute Type");
-  dialog.setWidth("600px");
-  dialog.setHeight("650px");
+  dialog.setWidth("700px");
+  dialog.setHeight("750px");
 
   FormLayout formLayout = new FormLayout();
   formLayout.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1));
@@ -1025,13 +1176,36 @@ private void openAddAttributeTypeDialog() {
   
   TextField descriptionField = new TextField("Description");
   
-  TextField syntaxOidField = new TextField("Syntax OID*");
+  // Get available schema elements for selectors
+  List<String> availableSyntaxes = getAvailableSyntaxOIDs();
+  List<String> availableAttributes = getAvailableAttributeTypeNames();
+  List<String> availableMatchingRules = getAvailableMatchingRuleNames();
+  
+  // Syntax OID - enhanced with selector
+  ComboBox<String> syntaxOidSelector = createSchemaComboBox(
+    "Syntax OID* (Select)", 
+    "Choose from available syntaxes...", 
+    availableSyntaxes
+  );
+  syntaxOidSelector.setRequired(true);
+  syntaxOidSelector.setValue("1.3.6.1.4.1.1466.115.121.1.15"); // DirectoryString
+  syntaxOidSelector.setHelperText("Select from existing syntaxes or enter custom OID");
+  
+  TextField syntaxOidField = new TextField("Syntax OID* (Manual Entry)");
   syntaxOidField.setRequired(true);
   syntaxOidField.setValue("1.3.6.1.4.1.1466.115.121.1.15"); // DirectoryString
-  syntaxOidField.setHelperText("Common: 1.3.6.1.4.1.1466.115.121.1.15 (Directory String)");
+  syntaxOidField.setHelperText("Common: 1.3.6.1.4.1.1466.115.121.1.15 (Directory String) - Alternative to selector above");
 
-  TextField superiorTypeField = new TextField("Superior Type");
-  superiorTypeField.setHelperText("Inherited attribute type (optional)");
+  // Superior Type - enhanced with selector
+  ComboBox<String> superiorTypeSelector = createSchemaComboBox(
+    "Superior Type (Select)", 
+    "Choose from existing attribute types...", 
+    availableAttributes
+  );
+  superiorTypeSelector.setHelperText("Select from existing attribute types or enter custom name");
+  
+  TextField superiorTypeField = new TextField("Superior Type (Manual Entry)");
+  superiorTypeField.setHelperText("Inherited attribute type (optional) - Alternative to selector above");
 
   ComboBox<String> usageComboBox = new ComboBox<>("Usage");
   usageComboBox.setItems("USER_APPLICATIONS", "DIRECTORY_OPERATION", "DISTRIBUTED_OPERATION", "DSA_OPERATION");
@@ -1043,23 +1217,56 @@ private void openAddAttributeTypeDialog() {
   Checkbox collectiveCheckbox = new Checkbox("Collective");
   Checkbox noUserModificationCheckbox = new Checkbox("No User Modification");
 
-  // Matching rules
-  TextField equalityMatchingRuleField = new TextField("Equality Matching Rule");
-  TextField orderingMatchingRuleField = new TextField("Ordering Matching Rule");
-  TextField substringMatchingRuleField = new TextField("Substring Matching Rule");
+  // Matching rules - enhanced with selectors
+  ComboBox<String> equalityMatchingRuleSelector = createSchemaComboBox(
+    "Equality Matching Rule (Select)", 
+    "Choose from existing matching rules...", 
+    availableMatchingRules
+  );
+  equalityMatchingRuleSelector.setHelperText("Select from existing matching rules or enter custom name");
+  
+  TextField equalityMatchingRuleField = new TextField("Equality Matching Rule (Manual Entry)");
+  equalityMatchingRuleField.setHelperText("Alternative to selector above");
+  
+  ComboBox<String> orderingMatchingRuleSelector = createSchemaComboBox(
+    "Ordering Matching Rule (Select)", 
+    "Choose from existing matching rules...", 
+    availableMatchingRules
+  );
+  orderingMatchingRuleSelector.setHelperText("Select from existing matching rules or enter custom name");
+  
+  TextField orderingMatchingRuleField = new TextField("Ordering Matching Rule (Manual Entry)");
+  orderingMatchingRuleField.setHelperText("Alternative to selector above");
+  
+  ComboBox<String> substringMatchingRuleSelector = createSchemaComboBox(
+    "Substring Matching Rule (Select)", 
+    "Choose from existing matching rules...", 
+    availableMatchingRules
+  );
+  substringMatchingRuleSelector.setHelperText("Select from existing matching rules or enter custom name");
+  
+  TextField substringMatchingRuleField = new TextField("Substring Matching Rule (Manual Entry)");
+  substringMatchingRuleField.setHelperText("Alternative to selector above");
 
-  formLayout.add(nameField, oidField, descriptionField, syntaxOidField, superiorTypeField,
+  formLayout.add(nameField, oidField, descriptionField, 
+                 syntaxOidSelector, syntaxOidField,
+                 superiorTypeSelector, superiorTypeField,
                  usageComboBox, singleValuedCheckbox, obsoleteCheckbox, collectiveCheckbox,
-                 noUserModificationCheckbox, equalityMatchingRuleField, orderingMatchingRuleField,
-                 substringMatchingRuleField);
+                 noUserModificationCheckbox, 
+                 equalityMatchingRuleSelector, equalityMatchingRuleField,
+                 orderingMatchingRuleSelector, orderingMatchingRuleField,
+                 substringMatchingRuleSelector, substringMatchingRuleField);
 
   // Buttons
   Button saveButton = new Button("Add Attribute Type", e -> {
     if (validateAndSaveAttributeType(dialog, nameField, oidField, descriptionField,
-                                   syntaxOidField, superiorTypeField, usageComboBox,
+                                   syntaxOidSelector, syntaxOidField,
+                                   superiorTypeSelector, superiorTypeField, usageComboBox,
                                    singleValuedCheckbox, obsoleteCheckbox, collectiveCheckbox,
-                                   noUserModificationCheckbox, equalityMatchingRuleField,
-                                   orderingMatchingRuleField, substringMatchingRuleField)) {
+                                   noUserModificationCheckbox, 
+                                   equalityMatchingRuleSelector, equalityMatchingRuleField,
+                                   orderingMatchingRuleSelector, orderingMatchingRuleField,
+                                   substringMatchingRuleSelector, substringMatchingRuleField)) {
       dialog.close();
     }
   });
@@ -1077,8 +1284,10 @@ private void openAddAttributeTypeDialog() {
  */
 private boolean validateAndSaveObjectClass(Dialog dialog, TextField nameField, TextField oidField,
                                          TextField descriptionField, ComboBox<String> typeComboBox,
-                                         Checkbox obsoleteCheckbox, TextArea superiorClassesField,
-                                         TextArea requiredAttributesField, TextArea optionalAttributesField) {
+                                         Checkbox obsoleteCheckbox, 
+                                         MultiSelectComboBox<String> superiorClassesSelector, TextArea superiorClassesField,
+                                         MultiSelectComboBox<String> requiredAttributesSelector, TextArea requiredAttributesField,
+                                         MultiSelectComboBox<String> optionalAttributesSelector, TextArea optionalAttributesField) {
   // Validate required fields
   if (nameField.getValue() == null || nameField.getValue().trim().isEmpty()) {
     showError("Name is required");
@@ -1121,17 +1330,34 @@ private boolean validateAndSaveObjectClass(Dialog dialog, TextField nameField, T
       objectClassDef.append(" OBSOLETE");
     }
 
-    // Superior classes
-    String superiorClasses = superiorClassesField.getValue();
-    if (superiorClasses != null && !superiorClasses.trim().isEmpty()) {
-      String[] superiors = superiorClasses.split("\n");
-      if (superiors.length == 1) {
-        objectClassDef.append(" SUP ").append(superiors[0].trim());
-      } else if (superiors.length > 1) {
+    // Superior classes - combine selector and manual entry
+    Set<String> allSuperiorClasses = new HashSet<>();
+    
+    // Add from selector
+    if (superiorClassesSelector.getValue() != null && !superiorClassesSelector.getValue().isEmpty()) {
+      allSuperiorClasses.addAll(superiorClassesSelector.getValue());
+    }
+    
+    // Add from manual entry
+    String manualSuperiorClasses = superiorClassesField.getValue();
+    if (manualSuperiorClasses != null && !manualSuperiorClasses.trim().isEmpty()) {
+      String[] manualSuperiors = manualSuperiorClasses.split("\n");
+      for (String superior : manualSuperiors) {
+        if (superior.trim().length() > 0) {
+          allSuperiorClasses.add(superior.trim());
+        }
+      }
+    }
+    
+    if (!allSuperiorClasses.isEmpty()) {
+      List<String> superiorList = new ArrayList<>(allSuperiorClasses);
+      if (superiorList.size() == 1) {
+        objectClassDef.append(" SUP ").append(superiorList.get(0));
+      } else if (superiorList.size() > 1) {
         objectClassDef.append(" SUP ( ");
-        for (int i = 0; i < superiors.length; i++) {
+        for (int i = 0; i < superiorList.size(); i++) {
           if (i > 0) objectClassDef.append(" $ ");
-          objectClassDef.append(superiors[i].trim());
+          objectClassDef.append(superiorList.get(i));
         }
         objectClassDef.append(" )");
       }
@@ -1142,33 +1368,67 @@ private boolean validateAndSaveObjectClass(Dialog dialog, TextField nameField, T
       objectClassDef.append(" ").append(typeComboBox.getValue());
     }
 
-    // Required attributes
-    String requiredAttributes = requiredAttributesField.getValue();
-    if (requiredAttributes != null && !requiredAttributes.trim().isEmpty()) {
-      String[] musts = requiredAttributes.split("\n");
-      if (musts.length == 1) {
-        objectClassDef.append(" MUST ").append(musts[0].trim());
-      } else if (musts.length > 1) {
+    // Required attributes - combine selector and manual entry
+    Set<String> allRequiredAttributes = new HashSet<>();
+    
+    // Add from selector
+    if (requiredAttributesSelector.getValue() != null && !requiredAttributesSelector.getValue().isEmpty()) {
+      allRequiredAttributes.addAll(requiredAttributesSelector.getValue());
+    }
+    
+    // Add from manual entry
+    String manualRequiredAttributes = requiredAttributesField.getValue();
+    if (manualRequiredAttributes != null && !manualRequiredAttributes.trim().isEmpty()) {
+      String[] manualMusts = manualRequiredAttributes.split("\n");
+      for (String must : manualMusts) {
+        if (must.trim().length() > 0) {
+          allRequiredAttributes.add(must.trim());
+        }
+      }
+    }
+    
+    if (!allRequiredAttributes.isEmpty()) {
+      List<String> mustList = new ArrayList<>(allRequiredAttributes);
+      if (mustList.size() == 1) {
+        objectClassDef.append(" MUST ").append(mustList.get(0));
+      } else if (mustList.size() > 1) {
         objectClassDef.append(" MUST ( ");
-        for (int i = 0; i < musts.length; i++) {
+        for (int i = 0; i < mustList.size(); i++) {
           if (i > 0) objectClassDef.append(" $ ");
-          objectClassDef.append(musts[i].trim());
+          objectClassDef.append(mustList.get(i));
         }
         objectClassDef.append(" )");
       }
     }
 
-    // Optional attributes
-    String optionalAttributes = optionalAttributesField.getValue();
-    if (optionalAttributes != null && !optionalAttributes.trim().isEmpty()) {
-      String[] mays = optionalAttributes.split("\n");
-      if (mays.length == 1) {
-        objectClassDef.append(" MAY ").append(mays[0].trim());
-      } else if (mays.length > 1) {
+    // Optional attributes - combine selector and manual entry
+    Set<String> allOptionalAttributes = new HashSet<>();
+    
+    // Add from selector
+    if (optionalAttributesSelector.getValue() != null && !optionalAttributesSelector.getValue().isEmpty()) {
+      allOptionalAttributes.addAll(optionalAttributesSelector.getValue());
+    }
+    
+    // Add from manual entry
+    String manualOptionalAttributes = optionalAttributesField.getValue();
+    if (manualOptionalAttributes != null && !manualOptionalAttributes.trim().isEmpty()) {
+      String[] manualMays = manualOptionalAttributes.split("\n");
+      for (String may : manualMays) {
+        if (may.trim().length() > 0) {
+          allOptionalAttributes.add(may.trim());
+        }
+      }
+    }
+    
+    if (!allOptionalAttributes.isEmpty()) {
+      List<String> mayList = new ArrayList<>(allOptionalAttributes);
+      if (mayList.size() == 1) {
+        objectClassDef.append(" MAY ").append(mayList.get(0));
+      } else if (mayList.size() > 1) {
         objectClassDef.append(" MAY ( ");
-        for (int i = 0; i < mays.length; i++) {
+        for (int i = 0; i < mayList.size(); i++) {
           if (i > 0) objectClassDef.append(" $ ");
-          objectClassDef.append(mays[i].trim());
+          objectClassDef.append(mayList.get(i));
         }
         objectClassDef.append(" )");
       }
@@ -1201,12 +1461,15 @@ private boolean validateAndSaveObjectClass(Dialog dialog, TextField nameField, T
  * Validate and save new attribute type
  */
 private boolean validateAndSaveAttributeType(Dialog dialog, TextField nameField, TextField oidField,
-                                           TextField descriptionField, TextField syntaxOidField,
-                                           TextField superiorTypeField, ComboBox<String> usageComboBox,
+                                           TextField descriptionField, 
+                                           ComboBox<String> syntaxOidSelector, TextField syntaxOidField,
+                                           ComboBox<String> superiorTypeSelector, TextField superiorTypeField, 
+                                           ComboBox<String> usageComboBox,
                                            Checkbox singleValuedCheckbox, Checkbox obsoleteCheckbox,
                                            Checkbox collectiveCheckbox, Checkbox noUserModificationCheckbox,
-                                           TextField equalityMatchingRuleField, TextField orderingMatchingRuleField,
-                                           TextField substringMatchingRuleField) {
+                                           ComboBox<String> equalityMatchingRuleSelector, TextField equalityMatchingRuleField,
+                                           ComboBox<String> orderingMatchingRuleSelector, TextField orderingMatchingRuleField,
+                                           ComboBox<String> substringMatchingRuleSelector, TextField substringMatchingRuleField) {
   // Validate required fields
   if (nameField.getValue() == null || nameField.getValue().trim().isEmpty()) {
     showError("Name is required");
@@ -1220,9 +1483,15 @@ private boolean validateAndSaveAttributeType(Dialog dialog, TextField nameField,
     return false;
   }
 
-  if (syntaxOidField.getValue() == null || syntaxOidField.getValue().trim().isEmpty()) {
+  // Get syntax OID from selector or manual field
+  String syntaxOid = syntaxOidSelector.getValue();
+  if (syntaxOid == null || syntaxOid.trim().isEmpty()) {
+    syntaxOid = syntaxOidField.getValue();
+  }
+  
+  if (syntaxOid == null || syntaxOid.trim().isEmpty()) {
     showError("Syntax OID is required");
-    syntaxOidField.focus();
+    syntaxOidSelector.focus();
     return false;
   }
 
@@ -1255,23 +1524,43 @@ private boolean validateAndSaveAttributeType(Dialog dialog, TextField nameField,
       attributeDef.append(" OBSOLETE");
     }
 
-    if (superiorTypeField.getValue() != null && !superiorTypeField.getValue().trim().isEmpty()) {
-      attributeDef.append(" SUP ").append(superiorTypeField.getValue().trim());
+    // Superior type - combine selector and manual entry
+    String superiorType = superiorTypeSelector.getValue();
+    if (superiorType == null || superiorType.trim().isEmpty()) {
+      superiorType = superiorTypeField.getValue();
+    }
+    if (superiorType != null && !superiorType.trim().isEmpty()) {
+      attributeDef.append(" SUP ").append(superiorType.trim());
     }
 
-    if (equalityMatchingRuleField.getValue() != null && !equalityMatchingRuleField.getValue().trim().isEmpty()) {
-      attributeDef.append(" EQUALITY ").append(equalityMatchingRuleField.getValue().trim());
+    // Equality matching rule - combine selector and manual entry
+    String equalityMatchingRule = equalityMatchingRuleSelector.getValue();
+    if (equalityMatchingRule == null || equalityMatchingRule.trim().isEmpty()) {
+      equalityMatchingRule = equalityMatchingRuleField.getValue();
+    }
+    if (equalityMatchingRule != null && !equalityMatchingRule.trim().isEmpty()) {
+      attributeDef.append(" EQUALITY ").append(equalityMatchingRule.trim());
     }
 
-    if (orderingMatchingRuleField.getValue() != null && !orderingMatchingRuleField.getValue().trim().isEmpty()) {
-      attributeDef.append(" ORDERING ").append(orderingMatchingRuleField.getValue().trim());
+    // Ordering matching rule - combine selector and manual entry
+    String orderingMatchingRule = orderingMatchingRuleSelector.getValue();
+    if (orderingMatchingRule == null || orderingMatchingRule.trim().isEmpty()) {
+      orderingMatchingRule = orderingMatchingRuleField.getValue();
+    }
+    if (orderingMatchingRule != null && !orderingMatchingRule.trim().isEmpty()) {
+      attributeDef.append(" ORDERING ").append(orderingMatchingRule.trim());
     }
 
-    if (substringMatchingRuleField.getValue() != null && !substringMatchingRuleField.getValue().trim().isEmpty()) {
-      attributeDef.append(" SUBSTR ").append(substringMatchingRuleField.getValue().trim());
+    // Substring matching rule - combine selector and manual entry
+    String substringMatchingRule = substringMatchingRuleSelector.getValue();
+    if (substringMatchingRule == null || substringMatchingRule.trim().isEmpty()) {
+      substringMatchingRule = substringMatchingRuleField.getValue();
+    }
+    if (substringMatchingRule != null && !substringMatchingRule.trim().isEmpty()) {
+      attributeDef.append(" SUBSTR ").append(substringMatchingRule.trim());
     }
 
-    attributeDef.append(" SYNTAX ").append(syntaxOidField.getValue().trim());
+    attributeDef.append(" SYNTAX ").append(syntaxOid.trim());
 
     if (singleValuedCheckbox.getValue()) {
       attributeDef.append(" SINGLE-VALUE");

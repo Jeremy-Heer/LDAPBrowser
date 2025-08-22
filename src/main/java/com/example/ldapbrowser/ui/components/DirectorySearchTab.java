@@ -32,10 +32,12 @@ public class DirectorySearchTab extends VerticalLayout {
   // Sub-tabs
   private TabSheet tabSheet;
   private Tab searchTab;
+  private Tab resultsTab;
   private Tab entryComparisonTab;
 
   // Components
   private DirectorySearchSubTab searchTabContent;
+  private SearchResultsTab resultsTabContent;
   private EntryComparisonTab entryComparisonTabContent;
 
   public DirectorySearchTab(LdapService ldapService, ConfigurationService configurationService,
@@ -69,15 +71,24 @@ public class DirectorySearchTab extends VerticalLayout {
       searchTabContent.updateSearchButton();
     });
 
-    // Set up comparison callback to switch to comparison tab
-    searchTabContent.setComparisonCallback(this::showComparison);
-
     tabSheet.add(searchTab, searchTabContent);
 
-    // Entry Comparison tab (new functionality)
+    // Results tab (new functionality for displaying search results)
+    resultsTab = new Tab("Results");
+    resultsTabContent = new SearchResultsTab(ldapService);
+    
+    // Set up comparison callback from results tab to switch to comparison tab
+    resultsTabContent.setComparisonCallback(this::showComparison);
+    
+    tabSheet.add(resultsTab, resultsTabContent);
+
+    // Entry Comparison tab (existing functionality)
     entryComparisonTab = new Tab("Entry Comparison");
     entryComparisonTabContent = new EntryComparisonTab();
     tabSheet.add(entryComparisonTab, entryComparisonTabContent);
+
+    // Set up search result callback to switch to results tab
+    searchTabContent.setSearchResultsCallback(this::showSearchResults);
 
     // Set Search as the default selected tab
     tabSheet.setSelectedTab(searchTab);
@@ -128,6 +139,7 @@ public class DirectorySearchTab extends VerticalLayout {
   */
   public void clear() {
     searchTabContent.clear();
+    resultsTabContent.clear();
     entryComparisonTabContent.clear();
   }
 
@@ -137,6 +149,17 @@ public class DirectorySearchTab extends VerticalLayout {
   public void refreshEnvironments() {
     environmentDropdown.refreshEnvironments();
     searchTabContent.refreshEnvironments();
+  }
+
+  /**
+  * Show search results and switch to results tab
+  */
+  private void showSearchResults(List<SearchResultEntry> results, String searchDescription) {
+    // Set the results in the results tab
+    resultsTabContent.displayResults(results, searchDescription);
+
+    // Switch to the results tab
+    tabSheet.setSelectedTab(resultsTab);
   }
 
   /**

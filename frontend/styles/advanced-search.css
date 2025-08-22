@@ -1,0 +1,104 @@
+/* Advanced Search Builder Styles */
+
+.advanced-search-builder {
+    background: #fafafa;
+    border: 1px solid var(--lumo-contrast-20pct);
+    border-radius: var(--lumo-border-radius-m);
+    padding: var(--lumo-space-m);
+    margin: var(--lumo-space-xs) 0;
+}
+
+.search-criteria-container {
+    background: white;
+    border: 1px solid var(--lumo-contrast-10pct);
+    border-radius: var(--lumo-border-radius-s);
+    padding: var(--lumo-space-s);
+    margin: var(--lumo-space-s) 0;
+    min-height: 100px;
+}
+
+/* Make the criteria rows look more connected */
+.search-criteria-container > div:not(:last-child) {
+    border-bottom: 1px dashed var(--lumo-contrast-20pct);
+    padding-bottom: var(--lumo-space-s);
+    margin-bottom: var(--lumo-space-s);
+}
+
+/* Style the generated filter text area */
+.advanced-search-builder textarea[readonly] {
+    background-color: #f5f5f5;
+    border: 1px solid var(--lumo-contrast-30pct);
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 13px;
+    color: #2563eb;
+}
+
+/* Improve the spacing of the logical operator dropdowns */
+.advanced-search-builder .logical-operator {
+    margin-right: var(--lumo-space-s);
+}
+
+/* Add some visual hierarchy to the search tabs */
+.directory-search-sub-tab vaadin-tab-sheet {
+    border: 1px solid var(--lumo-contrast-20pct);
+    border-radius: var(--lumo-border-radius-m);
+    background: white;
+}
+
+/* Style the basic and advanced tab content differently */
+.basic-search-layout {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: var(--lumo-border-radius-s);
+}
+
+.advanced-search-layout {
+    background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
+    border-radius: var(--lumo-border-radius-s);
+    border-left: 4px solid #f59e0b;
+}
+
+/* Enhance the instructions text */
+.advanced-search-builder .instructions {
+    background: #e0f2fe;
+    border-left: 4px solid #0ea5e9;
+    padding: var(--lumo-space-s);
+    margin-bottom: var(--lumo-space-m);
+    border-radius: 0 var(--lumo-border-radius-s) var(--lumo-border-radius-s) 0;
+    font-style: italic;
+    color: #0c4a6e;
+}
+
+/* Add hover effects to remove buttons */
+.advanced-search-builder vaadin-button[theme~="error"] {
+    transition: all 0.2s ease;
+}
+
+.advanced-search-builder vaadin-button[theme~="error"]:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+/* Style the add criteria button */
+.advanced-search-builder vaadin-button[theme~="small"] {
+    border: 2px dashed var(--lumo-primary-color);
+    background: transparent;
+    color: var(--lumo-primary-color);
+    transition: all 0.2s ease;
+}
+
+.advanced-search-builder vaadin-button[theme~="small"]:hover {
+    background: var(--lumo-primary-color-10pct);
+    border-style: solid;
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+    .search-criteria-container .horizontal-layout {
+        flex-direction: column;
+    }
+    
+    .search-criteria-container .horizontal-layout > * {
+        width: 100% !important;
+        margin-bottom: var(--lumo-space-xs);
+    }
+}

@@ -12,7 +12,6 @@ import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.html.Hr;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -20,6 +19,8 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.tabs.Tab;
+import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.component.textfield.TextField;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.SearchScope;
@@ -44,10 +45,21 @@ public class DirectorySearchSubTab extends VerticalLayout {
   // Parent tab reference for environment dropdown
   private DirectorySearchTab parentTab;
 
-  // Search components
+  // Sub-tabs for basic and advanced search
+  private TabSheet searchTabSheet;
+  private Tab basicTab;
+  private Tab advancedTab;
+
+  // Basic search components
+  private VerticalLayout basicSearchLayout;
   private TextField nameField;
   private ComboBox<SearchType> typeComboBox;
   private Button searchButton;
+
+  // Advanced search components
+  private VerticalLayout advancedSearchLayout;
+  private AdvancedSearchBuilder advancedSearchBuilder;
+  private Button advancedSearchButton;
 
   // Results components
   private Grid<SearchResultEntry> resultsGrid;
@@ -62,6 +74,7 @@ public class DirectorySearchSubTab extends VerticalLayout {
   private Button compareButton;
   private Span comparisonCountLabel;
   private Consumer<List<SearchResultEntry>> comparisonCallback;
+  private java.util.function.BiConsumer<List<SearchResultEntry>, String> searchResultsCallback;
 
   // Pagination
   private static final int RESULTS_PER_PAGE = 100;
@@ -109,6 +122,33 @@ public class DirectorySearchSubTab extends VerticalLayout {
   }
 
   private void initializeComponents() {
+    // Create the search tab sheet
+    searchTabSheet = new TabSheet();
+    searchTabSheet.setSizeFull();
+
+    // Basic search tab
+    basicTab = new Tab("Basic");
+    basicSearchLayout = createBasicSearchLayout();
+    searchTabSheet.add(basicTab, basicSearchLayout);
+
+    // Advanced search tab
+    advancedTab = new Tab("Advanced");
+    advancedSearchLayout = createAdvancedSearchLayout();
+    searchTabSheet.add(advancedTab, advancedSearchLayout);
+
+    // Set Basic as the default selected tab
+    searchTabSheet.setSelectedTab(basicTab);
+
+    // Initialize results grid and other common components
+    initializeResultsComponents();
+  }
+
+  private VerticalLayout createBasicSearchLayout() {
+    VerticalLayout layout = new VerticalLayout();
+    layout.setPadding(true);
+    layout.setSpacing(true);
+    layout.addClassName("basic-search-layout");
+
     // Search field
     nameField = new TextField("Name");
     nameField.setPlaceholder("Enter search term...");
@@ -126,8 +166,60 @@ public class DirectorySearchSubTab extends VerticalLayout {
     searchButton = new Button("Search", new Icon(VaadinIcon.SEARCH));
     searchButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
     searchButton.setEnabled(false);
-    searchButton.addClickListener(e -> performSearch());
+    searchButton.addClickListener(e -> performBasicSearch());
 
+    // Search form layout
+    HorizontalLayout searchForm = new HorizontalLayout();
+    searchForm.setDefaultVerticalComponentAlignment(Alignment.END);
+    searchForm.setSpacing(true);
+    searchForm.setWidthFull();
+
+    VerticalLayout nameFieldContainer = new VerticalLayout();
+    nameFieldContainer.setPadding(false);
+    nameFieldContainer.setSpacing(false);
+    nameFieldContainer.add(nameField);
+    nameFieldContainer.setFlexGrow(1, nameField);
+
+    VerticalLayout typeFieldContainer = new VerticalLayout();
+    typeFieldContainer.setPadding(false);
+    typeFieldContainer.setSpacing(false);
+    typeFieldContainer.add(typeComboBox);
+    typeFieldContainer.setWidth("150px");
+
+    searchForm.add(nameFieldContainer, typeFieldContainer, searchButton);
+    searchForm.setFlexGrow(1, nameFieldContainer);
+
+    layout.add(searchForm);
+    return layout;
+  }
+
+  private VerticalLayout createAdvancedSearchLayout() {
+    VerticalLayout layout = new VerticalLayout();
+    layout.setPadding(true);
+    layout.setSpacing(true);
+    layout.addClassName("advanced-search-layout");
+
+    // Advanced search builder
+    advancedSearchBuilder = new AdvancedSearchBuilder();
+    
+    // Listen for filter changes to update search button
+    advancedSearchBuilder.getElement().addEventListener("filter-changed", e -> updateAdvancedSearchButton());
+
+    // Advanced search button
+    advancedSearchButton = new Button("Search", new Icon(VaadinIcon.SEARCH));
+    advancedSearchButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+    advancedSearchButton.addClickListener(e -> performAdvancedSearch());
+
+    HorizontalLayout buttonLayout = new HorizontalLayout();
+    buttonLayout.setJustifyContentMode(JustifyContentMode.END);
+    buttonLayout.add(advancedSearchButton);
+
+    layout.add(advancedSearchBuilder, buttonLayout);
+    layout.setFlexGrow(1, advancedSearchBuilder);
+    return layout;
+  }
+
+  private void initializeResultsComponents() {
     // Results grid
     resultsGrid = new Grid<>(SearchResultEntry.class, false);
 
@@ -147,225 +239,313 @@ public class DirectorySearchSubTab extends VerticalLayout {
           showError("You can select up to 10 entries for comparison. Selected first 10 entries.");
         }
       } else {
-      selectedForComparison.clear();
-    }
-    updateAllCheckboxes();
-    updateComparisonControls();
-  });
+        selectedForComparison.clear();
+      }
+      updateAllCheckboxes();
+      updateComparisonControls();
+    });
 
-  // Compare column with checkbox
-  resultsGrid.addComponentColumn(entry -> {
-    Checkbox checkbox = new Checkbox();
-    checkbox.setValue(selectedForComparison.contains(entry));
-    checkbox.addValueChangeListener(event -> {
-      if (event.getValue()) {
-        if (selectedForComparison.size() < 10) {
-          selectedForComparison.add(entry);
+    // Compare column with checkbox
+    resultsGrid.addComponentColumn(entry -> {
+      Checkbox checkbox = new Checkbox();
+      checkbox.setValue(selectedForComparison.contains(entry));
+      checkbox.addValueChangeListener(event -> {
+        if (event.getValue()) {
+          if (selectedForComparison.size() < 10) {
+            selectedForComparison.add(entry);
+          } else {
+            checkbox.setValue(false);
+            showError("You can select up to 10 entries for comparison");
+            return;
+          }
         } else {
-        checkbox.setValue(false);
-        showError("You can select up to 10 entries for comparison");
-        return;
+          selectedForComparison.remove(entry);
+        }
+        comparisonCheckboxes.put(entry, checkbox);
+        updateComparisonControls();
+        updateSelectAllCheckbox();
+      });
+      comparisonCheckboxes.put(entry, checkbox);
+      return checkbox;
+    }).setHeader(selectAllCheckbox).setWidth("80px").setFlexGrow(0);
+
+    resultsGrid.addColumn(entry -> {
+      // Determine icon based on object classes
+      List<String> objectClasses = entry.getAttributeValues("objectClass");
+      if (objectClasses.contains("person") || objectClasses.contains("inetOrgPerson")) {
+        return "👤"; // User icon
+      } else if (objectClasses.contains("groupOfUniqueNames") ||
+          objectClasses.contains("groupofURLs") ||
+          objectClasses.contains("groupOfNames")) {
+        return "👥"; // Group icon
+      } else if (objectClasses.contains("organizationalUnit")) {
+        return "📁"; // Folder icon
+      } else {
+        return "📄"; // Generic entry icon
       }
-    } else {
-    selectedForComparison.remove(entry);
-  }
-  comparisonCheckboxes.put(entry, checkbox);
-  updateComparisonControls();
-  updateSelectAllCheckbox();
-});
-comparisonCheckboxes.put(entry, checkbox);
-return checkbox;
-}).setHeader(selectAllCheckbox).setWidth("80px").setFlexGrow(0);
+    }).setWidth("60px").setFlexGrow(0);
 
-resultsGrid.addColumn(entry -> {
-  // Determine icon based on object classes
-  List<String> objectClasses = entry.getAttributeValues("objectClass");
-  if (objectClasses.contains("person") || objectClasses.contains("inetOrgPerson")) {
-    return "👤"; // User icon
-  } else if (objectClasses.contains("groupOfUniqueNames") ||
-  objectClasses.contains("groupofURLs") ||
-  objectClasses.contains("groupOfNames")) {
-    return "👥"; // Group icon
-  } else if (objectClasses.contains("organizationalUnit")) {
-  return "📁"; // Folder icon
-} else {
-return "📄"; // Generic entry icon
-}
-}).setWidth("60px").setFlexGrow(0);
+    resultsGrid.addColumn(SearchResultEntry::getDisplayName)
+        .setHeader("Name")
+        .setSortable(true);
 
-resultsGrid.addColumn(SearchResultEntry::getDisplayName)
-.setHeader("Name")
-.setSortable(true);
+    resultsGrid.addColumn(SearchResultEntry::getDn)
+        .setHeader("Distinguished Name")
+        .setSortable(true);
 
-resultsGrid.addColumn(SearchResultEntry::getDn)
-.setHeader("Distinguished Name")
-.setSortable(true);
+    resultsGrid.addColumn(entry -> String.join(", ", entry.getAttributeValues("objectClass")))
+        .setHeader("Object Classes")
+        .setSortable(true);
 
-resultsGrid.addColumn(entry -> String.join(", ", entry.getAttributeValues("objectClass")))
-.setHeader("Object Classes")
-.setSortable(true);
+    // Add environment column
+    resultsGrid.addColumn(SearchResultEntry::getEnvironmentName)
+        .setHeader("Environment")
+        .setSortable(true);
 
-// Add environment column
-resultsGrid.addColumn(SearchResultEntry::getEnvironmentName)
-.setHeader("Environment")
-.setSortable(true);
+    resultsGrid.setSizeFull();
+    resultsGrid.setVisible(false);
 
-resultsGrid.setSizeFull();
-resultsGrid.setVisible(false);
-
-// Add click listener for entry details popup
-resultsGrid.addItemClickListener(event -> {
-  SearchResultEntry selectedEntry = event.getItem();
-  if (selectedEntry != null) {
-    showEntryDetailsDialog(selectedEntry.getEntry(), selectedEntry.getEnvironment());
-  }
-});
-
-// Result count label
-resultCountLabel = new Span();
-resultCountLabel.getStyle().set("font-style", "italic");
-resultCountLabel.setVisible(false);
-
-// Pagination controls
-prevPageButton = new Button("Previous", new Icon(VaadinIcon.ARROW_LEFT));
-prevPageButton.addThemeVariants(ButtonVariant.LUMO_SMALL);
-prevPageButton.setEnabled(false);
-prevPageButton.addClickListener(e -> navigateToPage(currentPage - 1));
-
-nextPageButton = new Button("Next", new Icon(VaadinIcon.ARROW_RIGHT));
-nextPageButton.addThemeVariants(ButtonVariant.LUMO_SMALL);
-nextPageButton.setEnabled(false);
-nextPageButton.addClickListener(e -> navigateToPage(currentPage + 1));
-
-pageInfoLabel = new Span();
-pageInfoLabel.getStyle().set("font-style", "italic").set("color", "#666");
-
-paginationLayout = new HorizontalLayout();
-paginationLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
-paginationLayout.setSpacing(true);
-paginationLayout.add(prevPageButton, pageInfoLabel, nextPageButton);
-paginationLayout.setVisible(false);
-
-// Comparison controls
-comparisonCountLabel = new Span("0 entries selected for comparison");
-comparisonCountLabel.getStyle().set("font-style", "italic").set("color", "#666");
-
-compareButton = new Button("Compare Selected", new Icon(VaadinIcon.TWIN_COL_SELECT));
-compareButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-compareButton.setEnabled(false);
-compareButton.addClickListener(e -> performComparison());
-
-HorizontalLayout comparisonControls = new HorizontalLayout();
-comparisonControls.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
-comparisonControls.setSpacing(true);
-comparisonControls.add(comparisonCountLabel, compareButton);
-comparisonControls.setVisible(false);
-comparisonControls.addClassName("comparison-controls");
-
-// Results container
-resultsContainer = new VerticalLayout();
-resultsContainer.setPadding(false);
-resultsContainer.setSpacing(true);
-resultsContainer.add(resultCountLabel, resultsGrid, paginationLayout, comparisonControls);
-resultsContainer.setFlexGrow(1, resultsGrid);
-resultsContainer.setSizeFull();
-}
-
-private void setupLayout() {
-  setSizeFull();
-  setPadding(true);
-  setSpacing(true);
-  addClassName("directory-search-sub-tab");
-
-  // Search form
-  HorizontalLayout searchForm = new HorizontalLayout();
-  searchForm.setDefaultVerticalComponentAlignment(Alignment.END);
-  searchForm.setSpacing(true);
-  searchForm.setWidthFull();
-
-  // Create a container for the form fields to control their flex behavior
-  VerticalLayout nameFieldContainer = new VerticalLayout();
-  nameFieldContainer.setPadding(false);
-  nameFieldContainer.setSpacing(false);
-  nameFieldContainer.add(nameField);
-  nameFieldContainer.setFlexGrow(1, nameField);
-
-  VerticalLayout typeFieldContainer = new VerticalLayout();
-  typeFieldContainer.setPadding(false);
-  typeFieldContainer.setSpacing(false);
-  typeFieldContainer.add(typeComboBox);
-  typeFieldContainer.setWidth("150px");
-
-  searchForm.add(nameFieldContainer, typeFieldContainer, searchButton);
-  searchForm.setFlexGrow(1, nameFieldContainer);
-
-  // Add components to layout
-  add(searchForm, new Hr(), resultsContainer);
-  setFlexGrow(1, resultsContainer);
-}
-
-public void updateSearchButton() {
-  String searchTerm = nameField.getValue();
-  Set<LdapServerConfig> selectedEnvironments = parentTab != null ? 
-    parentTab.getSelectedEnvironments() : new HashSet<>();
-  searchButton.setEnabled(searchTerm != null && !searchTerm.trim().isEmpty() && !selectedEnvironments.isEmpty());
-}
-
-private void performSearch() {
-  String searchTerm = nameField.getValue();
-  SearchType searchType = typeComboBox.getValue();
-  Set<LdapServerConfig> selectedEnvironments = parentTab != null ? 
-    parentTab.getSelectedEnvironments() : new HashSet<>();
-
-  if (searchTerm == null || searchTerm.trim().isEmpty()) {
-    showError("Please enter a search term");
-    return;
-  }
-
-  if (selectedEnvironments.isEmpty()) {
-    showError("Please select at least one environment");
-    return;
-  }
-
-  try {
-    // Build the search filter based on the selected type
-    String filter = buildSearchFilter(searchTerm.trim(), searchType);
-
-    List<SearchResultEntry> allResults = new ArrayList<>();
-
-    // Search across all selected environments
-    for (LdapServerConfig environment : selectedEnvironments) {
-      if (environment.getBaseDn() == null || environment.getBaseDn().trim().isEmpty()) {
-        showError("No base DN configured for environment: " + environment.getName());
-        continue;
+    // Add click listener for entry details popup
+    resultsGrid.addItemClickListener(event -> {
+      SearchResultEntry selectedEntry = event.getItem();
+      if (selectedEntry != null) {
+        showEntryDetailsDialog(selectedEntry.getEntry(), selectedEntry.getEnvironment());
       }
+    });
 
-      try {
-        // Perform the search
-        List<LdapEntry> results = ldapService.searchEntries(
-        environment.getId(),
-        environment.getBaseDn(),
-        filter,
-        SearchScope.SUB // Search entire subtree
-        );
+    // Result count label
+    resultCountLabel = new Span();
+    resultCountLabel.getStyle().set("font-style", "italic");
+    resultCountLabel.setVisible(false);
 
-        // Convert to SearchResultEntry objects
-        for (LdapEntry entry : results) {
-          allResults.add(new SearchResultEntry(entry, environment));
+    // Pagination controls
+    prevPageButton = new Button("Previous", new Icon(VaadinIcon.ARROW_LEFT));
+    prevPageButton.addThemeVariants(ButtonVariant.LUMO_SMALL);
+    prevPageButton.setEnabled(false);
+    prevPageButton.addClickListener(e -> navigateToPage(currentPage - 1));
+
+    nextPageButton = new Button("Next", new Icon(VaadinIcon.ARROW_RIGHT));
+    nextPageButton.addThemeVariants(ButtonVariant.LUMO_SMALL);
+    nextPageButton.setEnabled(false);
+    nextPageButton.addClickListener(e -> navigateToPage(currentPage + 1));
+
+    pageInfoLabel = new Span();
+    pageInfoLabel.getStyle().set("font-style", "italic").set("color", "#666");
+
+    paginationLayout = new HorizontalLayout();
+    paginationLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+    paginationLayout.setSpacing(true);
+    paginationLayout.add(prevPageButton, pageInfoLabel, nextPageButton);
+    paginationLayout.setVisible(false);
+
+    // Comparison controls
+    comparisonCountLabel = new Span("0 entries selected for comparison");
+    comparisonCountLabel.getStyle().set("font-style", "italic").set("color", "#666");
+
+    compareButton = new Button("Compare Selected", new Icon(VaadinIcon.TWIN_COL_SELECT));
+    compareButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+    compareButton.setEnabled(false);
+    compareButton.addClickListener(e -> performComparison());
+
+    HorizontalLayout comparisonControls = new HorizontalLayout();
+    comparisonControls.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+    comparisonControls.setSpacing(true);
+    comparisonControls.add(comparisonCountLabel, compareButton);
+    comparisonControls.setVisible(false);
+    comparisonControls.addClassName("comparison-controls");
+
+    // Results container
+    resultsContainer = new VerticalLayout();
+    resultsContainer.setPadding(false);
+    resultsContainer.setSpacing(true);
+    resultsContainer.add(resultCountLabel, resultsGrid, paginationLayout, comparisonControls);
+    resultsContainer.setFlexGrow(1, resultsGrid);
+    resultsContainer.setSizeFull();
+  }
+
+  private void setupLayout() {
+    setSizeFull();
+    setPadding(true);
+    setSpacing(true);
+    addClassName("directory-search-sub-tab");
+
+    // Add only the search tab sheet (results will be displayed in dedicated tab)
+    add(searchTabSheet);
+    setFlexGrow(1, searchTabSheet);
+  }
+
+  public void updateSearchButton() {
+    // Update both basic and advanced search buttons
+    updateBasicSearchButton();
+    updateAdvancedSearchButton();
+  }
+
+  private void updateBasicSearchButton() {
+    String searchTerm = nameField != null ? nameField.getValue() : "";
+    Set<LdapServerConfig> selectedEnvironments = parentTab != null ? 
+      parentTab.getSelectedEnvironments() : new HashSet<>();
+    if (searchButton != null) {
+      searchButton.setEnabled(searchTerm != null && !searchTerm.trim().isEmpty() && !selectedEnvironments.isEmpty());
+    }
+  }
+
+  private void updateAdvancedSearchButton() {
+    Set<LdapServerConfig> selectedEnvironments = parentTab != null ? 
+      parentTab.getSelectedEnvironments() : new HashSet<>();
+    String filter = advancedSearchBuilder != null ? advancedSearchBuilder.getGeneratedFilter() : "";
+    if (advancedSearchButton != null) {
+      advancedSearchButton.setEnabled(!selectedEnvironments.isEmpty() && !filter.trim().isEmpty());
+    }
+  }
+
+  private void performBasicSearch() {
+    String searchTerm = nameField.getValue();
+    SearchType searchType = typeComboBox.getValue();
+    performSearch(searchTerm, searchType, null);
+  }
+
+  private void performAdvancedSearch() {
+    // Get the manually edited filter or the generated one
+    String customFilter = advancedSearchBuilder.getEditedFilter();
+    String customSearchBase = advancedSearchBuilder.getSearchBase();
+    
+    performAdvancedSearchWithResults(customFilter, customSearchBase);
+  }
+  
+  private void performAdvancedSearchWithResults(String customFilter, String customSearchBase) {
+    Set<LdapServerConfig> selectedEnvironments = parentTab != null ? 
+      parentTab.getSelectedEnvironments() : new HashSet<>();
+
+    if (selectedEnvironments.isEmpty()) {
+      showError("Please select at least one environment");
+      return;
+    }
+
+    if (customFilter == null || customFilter.trim().isEmpty()) {
+      showError("Please configure your search criteria");
+      return;
+    }
+
+    try {
+      List<SearchResultEntry> allResults = new ArrayList<>();
+      String filter = customFilter.trim();
+
+      // Search across all selected environments
+      for (LdapServerConfig environment : selectedEnvironments) {
+        String searchBase;
+        
+        if (customSearchBase != null && !customSearchBase.trim().isEmpty()) {
+          searchBase = customSearchBase.trim();
+        } else {
+          searchBase = environment.getBaseDn();
         }
 
-      } catch (LDAPException e) {
-      showError("Search failed for environment " + environment.getName() + ": " + e.getMessage());
+        try {
+          // Use searchEntries method with correct parameters
+          List<LdapEntry> environmentResults = ldapService.searchEntries(
+            environment.getId(), searchBase, filter, SearchScope.SUB
+          );
+
+          // Convert to SearchResultEntry objects
+          for (LdapEntry entry : environmentResults) {
+            allResults.add(new SearchResultEntry(entry, environment));
+          }
+        } catch (LDAPException ex) {
+          String errorMsg = "Search failed for environment '" + environment.getName() + 
+            "': " + ex.getMessage();
+          System.err.println(errorMsg);
+          showError(errorMsg);
+        }
+      }
+
+      // Use the existing displayResults method for main grid
+      String searchDescription = "advanced search: " + filter;
+      displayResults(allResults, searchDescription);
+
+    } catch (Exception ex) {
+      String errorMsg = "Search failed: " + ex.getMessage();
+      showError(errorMsg);
+      System.err.println(errorMsg);
+      ex.printStackTrace();
     }
   }
 
-  // Display results
-  displayResults(allResults, searchTerm, searchType);
+  private void performSearch(String searchTerm, SearchType searchType, String customFilter) {
+    performSearch(searchTerm, searchType, customFilter, null);
+  }
 
-} catch (Exception e) {
-showError("Search failed: " + e.getMessage());
-}
-}
+  private void performSearch(String searchTerm, SearchType searchType, String customFilter, String customSearchBase) {
+    Set<LdapServerConfig> selectedEnvironments = parentTab != null ? 
+      parentTab.getSelectedEnvironments() : new HashSet<>();
+
+    if (selectedEnvironments.isEmpty()) {
+      showError("Please select at least one environment");
+      return;
+    }
+
+    String filter;
+    String searchDescription;
+
+    // Determine if this is basic or advanced search
+    if (customFilter != null && !customFilter.trim().isEmpty()) {
+      // Advanced search
+      filter = customFilter.trim();
+      searchDescription = "custom filter: " + filter;
+    } else {
+      // Basic search
+      if (searchTerm == null || searchTerm.trim().isEmpty()) {
+        showError("Please enter a search term");
+        return;
+      }
+      filter = buildSearchFilter(searchTerm.trim(), searchType);
+      searchDescription = searchType.getLabel().toLowerCase() + " matching '" + searchTerm + "'";
+    }
+
+    try {
+      List<SearchResultEntry> allResults = new ArrayList<>();
+
+      // Search across all selected environments
+      for (LdapServerConfig environment : selectedEnvironments) {
+        String searchBase;
+        
+        // Determine search base
+        if (customSearchBase != null && !customSearchBase.trim().isEmpty()) {
+          searchBase = customSearchBase.trim();
+        } else {
+          searchBase = environment.getBaseDn();
+        }
+        
+        if (searchBase == null || searchBase.trim().isEmpty()) {
+          showError("No base DN configured for environment: " + environment.getName());
+          continue;
+        }
+
+        try {
+          // Perform the search
+          List<LdapEntry> results = ldapService.searchEntries(
+            environment.getId(),
+            searchBase,
+            filter,
+            SearchScope.SUB // Search entire subtree
+          );
+
+          // Convert to SearchResultEntry objects
+          for (LdapEntry entry : results) {
+            allResults.add(new SearchResultEntry(entry, environment));
+          }
+
+        } catch (LDAPException e) {
+          showError("Search failed for environment " + environment.getName() + ": " + e.getMessage());
+        }
+      }
+
+      // Display results
+      displayResults(allResults, searchDescription);
+
+    } catch (Exception e) {
+      showError("Search failed: " + e.getMessage());
+    }
+  }
 
 private String buildSearchFilter(String searchTerm, SearchType searchType) {
   switch (searchType) {
@@ -381,7 +561,21 @@ private String buildSearchFilter(String searchTerm, SearchType searchType) {
   }
 }
 
-private void displayResults(List<SearchResultEntry> results, String searchTerm, SearchType searchType) {
+private void displayResults(List<SearchResultEntry> results, String searchDescription) {
+  // If we have a search results callback, use it to display results in the dedicated tab
+  if (searchResultsCallback != null) {
+    searchResultsCallback.accept(results, searchDescription);
+    
+    // Still show notifications for user feedback
+    if (results.isEmpty()) {
+      showInfo("No entries found matching your search criteria");
+    } else {
+      showSuccess(String.format("Found %d %s", results.size(), results.size() == 1 ? "entry" : "entries"));
+    }
+    return;
+  }
+
+  // Fallback to local display if no callback is set (backward compatibility)
   this.allResults = new ArrayList<>(results);
   currentPage = 0;
 
@@ -390,10 +584,10 @@ private void displayResults(List<SearchResultEntry> results, String searchTerm, 
   resultsGrid.setVisible(true);
 
   // Update result count
-  String countText = String.format("Found %d %s matching '%s'",
-  results.size(),
-  results.size() == 1 ? "entry" : "entries",
-  searchTerm);
+  String countText = String.format("Found %d %s for %s",
+    results.size(),
+    results.size() == 1 ? "entry" : "entries",
+    searchDescription);
   resultCountLabel.setText(countText);
   resultCountLabel.setVisible(true);
 
@@ -403,8 +597,8 @@ private void displayResults(List<SearchResultEntry> results, String searchTerm, 
   if (results.isEmpty()) {
     showInfo("No entries found matching your search criteria");
   } else {
-  showSuccess(String.format("Found %d %s", results.size(), results.size() == 1 ? "entry" : "entries"));
-}
+    showSuccess(String.format("Found %d %s", results.size(), results.size() == 1 ? "entry" : "entries"));
+  }
 }
 
 public void clear() {
@@ -413,6 +607,9 @@ public void clear() {
   }
   if (typeComboBox != null) {
     typeComboBox.setValue(SearchType.ALL);
+  }
+  if (advancedSearchBuilder != null) {
+    advancedSearchBuilder.clear();
   }
   if (resultsGrid != null) {
     resultsGrid.setItems(new ArrayList<>());
@@ -541,6 +738,13 @@ private void showEntryDetailsDialog(LdapEntry entry, LdapServerConfig environmen
 */
 public void setComparisonCallback(Consumer<List<SearchResultEntry>> callback) {
   this.comparisonCallback = callback;
+}
+
+/**
+* Set the callback for when search results are ready to be displayed
+*/
+public void setSearchResultsCallback(java.util.function.BiConsumer<List<SearchResultEntry>, String> callback) {
+  this.searchResultsCallback = callback;
 }
 
 /**
