@@ -100,25 +100,50 @@ public class MainLayout extends AppLayout {
     private void populateServers(SideNavItem root) {
         root.removeAll();
         serverItemIndex.clear();
-        // External servers from configuration
+
+        // Unified groups map (external + internal)
+        Map<String, SideNavItem> groups = new HashMap<>();
+        SideNavItem ungrouped = new SideNavItem("Ungrouped", (String) null);
+        ungrouped.setPrefixComponent(new Icon(VaadinIcon.FOLDER));
+
+        // External servers
         for (LdapServerConfig cfg : configurationService.getAllConfigurations()) {
+            String group = cfg.getGroup() != null && !cfg.getGroup().isBlank() ? cfg.getGroup().trim() : null;
+            SideNavItem parent = group == null ? ungrouped : groups.computeIfAbsent(group, g -> {
+                SideNavItem grp = new SideNavItem(g, (String) null);
+                grp.setPrefixComponent(new Icon(VaadinIcon.FOLDER_OPEN));
+                return grp;
+            });
+
             String name = cfg.getName() != null ? cfg.getName() : cfg.getHost();
-            // Navigate to ServersView with sid parameter; ServersView will pick it up
             SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
             item.setPrefixComponent(new Icon(VaadinIcon.DATABASE));
-            root.addItem(item);
+            parent.addItem(item);
             serverItemIndex.put(cfg.getId(), item);
         }
 
         // Internal running servers
         for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
             if (inMemoryLdapService.isServerRunning(cfg.getId())) {
+                String group = cfg.getGroup() != null && !cfg.getGroup().isBlank() ? cfg.getGroup().trim() : null;
+                SideNavItem parent = group == null ? ungrouped : groups.computeIfAbsent(group, g -> {
+                    SideNavItem grp = new SideNavItem(g, (String) null);
+                    grp.setPrefixComponent(new Icon(VaadinIcon.FOLDER_OPEN));
+                    return grp;
+                });
+
                 String name = (cfg.getName() != null ? cfg.getName() : cfg.getHost()) + " (internal)";
                 SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
                 item.setPrefixComponent(new Icon(VaadinIcon.CUBE));
-                root.addItem(item);
+                parent.addItem(item);
                 serverItemIndex.put(cfg.getId(), item);
             }
+        }
+
+        // Add groups sorted by name, then ungrouped if any
+        groups.keySet().stream().sorted().forEach(k -> root.addItem(groups.get(k)));
+        if (!ungrouped.getItems().isEmpty()) {
+            root.addItem(ungrouped);
         }
     }
 

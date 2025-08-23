@@ -65,6 +65,12 @@ public class InternalServersTab extends VerticalLayout {
     .setFlexGrow(1)
     .setSortable(true);
 
+  serverGrid.addColumn(cfg -> cfg.getGroup() != null ? cfg.getGroup() : "")
+  .setHeader("Group")
+  .setFlexGrow(0)
+  .setWidth("140px")
+  .setSortable(true);
+
     serverGrid.addColumn(config -> config.getHost() + ":" + config.getPort())
     .setHeader("Host:Port")
     .setFlexGrow(1)
@@ -250,6 +256,9 @@ private void openServerDialog(LdapServerConfig config) {
   dialog.addSaveListener(savedConfig -> {
     inMemoryLdapService.saveInMemoryServer(savedConfig);
     refreshServerList();
+      if (environmentRefreshListener != null) {
+        environmentRefreshListener.onEnvironmentChange();
+      }
     showSuccess(config == null ? "In-Memory server configuration added." : "In-Memory server configuration updated.");
     dialog.close();
   });
