@@ -20,15 +20,12 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.Tabs;
-import com.vaadin.flow.router.PageTitle;
-import com.vaadin.flow.router.Route;
 import com.unboundid.ldap.sdk.LDAPException;
 
 /**
 * Main LDAP Browser UI with tabbed interface - Apache Directory Studio inspired layout
 */
-@Route("")
-@PageTitle("LDAP Browser")
+// Deprecated: kept for reference during migration. Not exposed as a route.
 public class MainView extends AppLayout implements EnvironmentRefreshListener {
 
   private final LdapService ldapService;
