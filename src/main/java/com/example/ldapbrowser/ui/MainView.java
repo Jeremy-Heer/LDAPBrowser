@@ -13,6 +13,7 @@ import com.example.ldapbrowser.ui.components.LogsTab;
 import com.example.ldapbrowser.ui.components.DirectorySearchTab;
 import com.example.ldapbrowser.ui.components.EnvironmentRefreshListener;
 import com.example.ldapbrowser.service.LoggingService;
+import com.example.ldapbrowser.service.ServerSelectionService;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
@@ -32,6 +33,7 @@ public class MainView extends AppLayout implements EnvironmentRefreshListener {
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
   private final LoggingService loggingService;
+  private final ServerSelectionService selectionService;
 
   // Main content components
   private Tabs mainTabs;
@@ -45,11 +47,12 @@ public class MainView extends AppLayout implements EnvironmentRefreshListener {
   private VerticalLayout contentContainer;
 
   public MainView(LdapService ldapService, ConfigurationService configurationService,
-  InMemoryLdapService inMemoryLdapService, LoggingService loggingService) {
+  InMemoryLdapService inMemoryLdapService, LoggingService loggingService, ServerSelectionService selectionService) {
     this.ldapService = ldapService;
     this.configurationService = configurationService;
     this.inMemoryLdapService = inMemoryLdapService;
     this.loggingService = loggingService;
+    this.selectionService = selectionService;
 
     initializeComponents();
     setupLayout();
@@ -92,9 +95,9 @@ serversTab = new ServersTab(ldapService, configurationService, this, inMemoryLda
 serversTab.setConnectionListener(this::connectToServer);
 serversTab.setDisconnectionListener(this::disconnectFromServer);
 
-dashboardTab = new DashboardTab(ldapService, configurationService, inMemoryLdapService);
-directorySearchTab = new DirectorySearchTab(ldapService, configurationService, inMemoryLdapService);
-schemaBrowser = new SchemaBrowser(ldapService, configurationService, inMemoryLdapService);
+dashboardTab = new DashboardTab(ldapService, configurationService, inMemoryLdapService, selectionService);
+directorySearchTab = new DirectorySearchTab(ldapService, configurationService, inMemoryLdapService, selectionService);
+schemaBrowser = new SchemaBrowser(ldapService, configurationService, inMemoryLdapService, selectionService);
 reportsTab = new ExportTab(ldapService, loggingService, configurationService, inMemoryLdapService);
 bulkOperationsTab = new BulkOperationsTab(ldapService, loggingService, configurationService, inMemoryLdapService);
 logsTab = new LogsTab(loggingService);
@@ -169,11 +172,7 @@ private void showLogs() {
 
 @Override
 public void onEnvironmentChange() {
-  refreshEnvironmentDropdowns();
-}
-
-public void refreshEnvironmentDropdowns() {
-  // Refresh environment dropdowns in all tabs that have them
+  // Refresh tabs that depend on environment/server changes
   if (dashboardTab != null) {
     dashboardTab.refreshEnvironments();
   }

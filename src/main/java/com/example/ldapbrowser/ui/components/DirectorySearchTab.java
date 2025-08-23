@@ -16,6 +16,9 @@ import com.vaadin.flow.theme.lumo.LumoUtility;
 
 import java.util.List;
 import java.util.Set;
+import java.util.Collections;
+
+import com.example.ldapbrowser.service.ServerSelectionService;
 
 /**
 * Directory Search tab containing Search and Entry Comparison sub-tabs
@@ -25,9 +28,10 @@ public class DirectorySearchTab extends VerticalLayout {
   private final LdapService ldapService;
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
+  private final ServerSelectionService selectionService;
 
   // Environment dropdown
-  private EnvironmentDropdown environmentDropdown;
+  // Removed: environment dropdown UI; selection is driven by drawer via ServerSelectionService
 
   // Sub-tabs
   private TabSheet tabSheet;
@@ -41,19 +45,19 @@ public class DirectorySearchTab extends VerticalLayout {
   private EntryComparisonTab entryComparisonTabContent;
 
   public DirectorySearchTab(LdapService ldapService, ConfigurationService configurationService,
-  InMemoryLdapService inMemoryLdapService) {
+  InMemoryLdapService inMemoryLdapService, ServerSelectionService selectionService) {
     this.ldapService = ldapService;
     this.configurationService = configurationService;
     this.inMemoryLdapService = inMemoryLdapService;
+    this.selectionService = selectionService;
 
     initializeComponents();
     setupLayout();
+    // When server selection changes, update search button state
+    this.selectionService.addListener(cfg -> searchTabContent.updateSearchButton());
   }
 
   private void initializeComponents() {
-    // Initialize environment dropdown
-    environmentDropdown = new EnvironmentDropdown(ldapService, configurationService, inMemoryLdapService, true);
-    
     // Create sub-tabs
     tabSheet = new TabSheet();
     tabSheet.setSizeFull();
@@ -64,12 +68,6 @@ public class DirectorySearchTab extends VerticalLayout {
 
     // Set parent tab reference for environment dropdown access
     searchTabContent.setParentTab(this);
-
-    // Add listener to environment dropdown to update search button
-    environmentDropdown.addMultiSelectionListener(environments -> {
-      // Notify search tab that environments changed
-      searchTabContent.updateSearchButton();
-    });
 
     tabSheet.add(searchTab, searchTabContent);
 
@@ -121,14 +119,10 @@ public class DirectorySearchTab extends VerticalLayout {
 
     leftSide.add(searchIcon, title);
 
-    // Right side: environment dropdown
-    HorizontalLayout rightSide = new HorizontalLayout();
-    rightSide.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-    rightSide.add(environmentDropdown.getMultiSelectComponentWithIcon());
+  // Right side removed (environment dropdown)
 
-    titleLayout.add(leftSide, rightSide);
-    titleLayout.setFlexGrow(1, leftSide);
-    titleLayout.setFlexGrow(0, rightSide);
+  titleLayout.add(leftSide);
+  titleLayout.setFlexGrow(1, leftSide);
 
     add(titleLayout, tabSheet);
     setFlexGrow(1, tabSheet);
@@ -147,7 +141,6 @@ public class DirectorySearchTab extends VerticalLayout {
   * Refresh environments in the dropdown and search tab
   */
   public void refreshEnvironments() {
-    environmentDropdown.refreshEnvironments();
     searchTabContent.refreshEnvironments();
   }
 
@@ -177,6 +170,7 @@ public class DirectorySearchTab extends VerticalLayout {
   * Get the selected environments from the environment dropdown
   */
   public Set<LdapServerConfig> getSelectedEnvironments() {
-    return environmentDropdown.getSelectedEnvironments();
+  LdapServerConfig cfg = selectionService.getSelected();
+  return cfg != null ? Set.of(cfg) : Collections.emptySet();
   }
 }

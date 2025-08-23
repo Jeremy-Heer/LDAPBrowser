@@ -24,8 +24,7 @@ public class BulkOperationsTab extends VerticalLayout {
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
 
-  // Environment selection
-  private EnvironmentDropdown environmentDropdown;
+  // Environment selection removed; server is provided by container view
 
   // Sub-tabs
   private TabSheet tabSheet;
@@ -50,9 +49,7 @@ public class BulkOperationsTab extends VerticalLayout {
   }
 
   private void initializeComponents() {
-    // Initialize environment dropdown
-    environmentDropdown = new EnvironmentDropdown(ldapService, configurationService, inMemoryLdapService, false);
-    environmentDropdown.addSingleSelectionListener(this::setServerConfig);
+  // Environment dropdown removed
 
     // Create sub-tabs
     tabSheet = new TabSheet();
@@ -83,11 +80,7 @@ public class BulkOperationsTab extends VerticalLayout {
     setSpacing(true);
     addClassName("bulk-operations-tab");
 
-    // Environment selection at the top
-    HorizontalLayout environmentSection = new HorizontalLayout();
-    environmentSection.setSpacing(true);
-    environmentSection.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-    environmentSection.add(environmentDropdown.getSingleSelectComponent());
+  // No environment selection UI at the top
 
     // Title with icon
     HorizontalLayout titleLayout = new HorizontalLayout();
@@ -104,7 +97,7 @@ public class BulkOperationsTab extends VerticalLayout {
 
     titleLayout.add(bulkIcon, title);
 
-    add(environmentSection, titleLayout, tabSheet);
+  add(titleLayout, tabSheet);
     setFlexGrow(1, tabSheet);
   }
 
@@ -118,9 +111,7 @@ public class BulkOperationsTab extends VerticalLayout {
   * Refresh the environment dropdown when environments change
   */
   public void refreshEnvironments() {
-    if (environmentDropdown != null) {
-      environmentDropdown.refreshEnvironments();
-    }
+    // No environment dropdown to refresh
   }
 
   public void clear() {

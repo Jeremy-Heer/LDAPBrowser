@@ -61,7 +61,7 @@ public class ExportTab extends VerticalLayout {
   private final InMemoryLdapService inMemoryLdapService;
 
   // Environment selection
-  private EnvironmentDropdown environmentDropdown;
+  // Removed environment dropdown; server is provided by container view
 
   // Server configuration
   private LdapServerConfig serverConfig;
@@ -111,8 +111,7 @@ public class ExportTab extends VerticalLayout {
     this.csvColumnOrder = new ArrayList<>();
 
     // Initialize environment dropdown
-    environmentDropdown = new EnvironmentDropdown(ldapService, configurationService, inMemoryLdapService, false);
-    environmentDropdown.addSingleSelectionListener(this::setServerConfig);
+  // Environment dropdown removed
 
     initializeComponents();
     setupLayout();
@@ -303,7 +302,7 @@ private void setupLayout() {
   HorizontalLayout environmentSection = new HorizontalLayout();
   environmentSection.setSpacing(true);
   environmentSection.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-  environmentSection.add(environmentDropdown.getSingleSelectComponent());
+  // Environment selection UI removed
   add(environmentSection);
 
   // Title with icon
@@ -903,8 +902,6 @@ private void showError(String message) {
 * Refresh the environment dropdown when environments change
 */
 public void refreshEnvironments() {
-  if (environmentDropdown != null) {
-    environmentDropdown.refreshEnvironments();
-  }
+  // No environment dropdown to refresh here
 }
 }

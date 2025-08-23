@@ -1,14 +1,28 @@
 package com.example.ldapbrowser.ui;
 
+import com.example.ldapbrowser.model.LdapServerConfig;
+import com.example.ldapbrowser.service.ConfigurationService;
+import com.example.ldapbrowser.service.InMemoryLdapService;
+import com.example.ldapbrowser.service.LdapService;
+import com.example.ldapbrowser.service.ServerSelectionService;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.Scroller;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 import com.vaadin.flow.theme.lumo.LumoUtility;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Root application layout with a side drawer and a top navbar used as view header.
@@ -17,18 +31,49 @@ import com.vaadin.flow.theme.lumo.LumoUtility;
 public class MainLayout extends AppLayout {
 
     private final H1 viewTitle = new H1();
+    private final H1 contextTitle = new H1();
+    private final HorizontalLayout connectionChip = new HorizontalLayout();
 
-    public MainLayout() {
+    private final ConfigurationService configurationService;
+    private final InMemoryLdapService inMemoryLdapService;
+    private final ServerSelectionService selectionService;
+    private final LdapService ldapService;
+
+    private final Map<String, SideNavItem> serverItemIndex = new HashMap<>();
+    private final SideNav nav;
+    private final SideNavItem serversRoot;
+
+    public MainLayout(ConfigurationService configurationService,
+                      InMemoryLdapService inMemoryLdapService,
+                      ServerSelectionService selectionService,
+                      LdapService ldapService) {
+        this.configurationService = configurationService;
+        this.inMemoryLdapService = inMemoryLdapService;
+        this.selectionService = selectionService;
+        this.ldapService = ldapService;
         // Navbar content (to the side of the drawer toggle)
         DrawerToggle toggle = new DrawerToggle();
-        viewTitle.getStyle().set("font-size", "var(--lumo-font-size-l)")
-                .set("margin", "0");
+    viewTitle.getStyle().set("font-size", "var(--lumo-font-size-l)")
+        .set("margin", "0");
+    contextTitle.getStyle().set("font-size", "var(--lumo-font-size-m)")
+        .set("margin", "0 0 0 var(--lumo-space-m)")
+        .set("color", "var(--lumo-secondary-text-color)");
 
-        addToNavbar(toggle, viewTitle);
+        setupConnectionChip();
+        addToNavbar(toggle, viewTitle, contextTitle, connectionChip);
 
         // Drawer content
-        SideNav nav = new SideNav();
-        nav.addItem(new SideNavItem("Legacy", LegacyView.class));
+    nav = new SideNav();
+    // Servers accordion-like group
+    serversRoot = new SideNavItem("Servers", ServersView.class);
+        serversRoot.setPrefixComponent(new Icon(VaadinIcon.SERVER));
+        populateServers(serversRoot);
+        nav.addItem(serversRoot);
+
+        // Settings link
+        SideNavItem settingsItem = new SideNavItem("Settings", SettingsView.class);
+        settingsItem.setPrefixComponent(new Icon(VaadinIcon.COG));
+        nav.addItem(settingsItem);
 
         Scroller scroller = new Scroller(nav);
         scroller.addClassName(LumoUtility.Padding.SMALL);
@@ -50,5 +95,89 @@ public class MainLayout extends AppLayout {
         }
         PageTitle title = getContent().getClass().getAnnotation(PageTitle.class);
         return title != null ? title.value() : "";
+    }
+
+    private void populateServers(SideNavItem root) {
+        root.removeAll();
+        serverItemIndex.clear();
+        // External servers from configuration
+        for (LdapServerConfig cfg : configurationService.getAllConfigurations()) {
+            String name = cfg.getName() != null ? cfg.getName() : cfg.getHost();
+            // Navigate to ServersView with sid parameter; ServersView will pick it up
+            SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
+            item.setPrefixComponent(new Icon(VaadinIcon.DATABASE));
+            root.addItem(item);
+            serverItemIndex.put(cfg.getId(), item);
+        }
+
+        // Internal running servers
+        for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
+            if (inMemoryLdapService.isServerRunning(cfg.getId())) {
+                String name = (cfg.getName() != null ? cfg.getName() : cfg.getHost()) + " (internal)";
+                SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
+                item.setPrefixComponent(new Icon(VaadinIcon.CUBE));
+                root.addItem(item);
+                serverItemIndex.put(cfg.getId(), item);
+            }
+        }
+    }
+
+    @Override
+    protected void onAttach(AttachEvent attachEvent) {
+        super.onAttach(attachEvent);
+        // Show current server selection in the navbar context area
+        LdapServerConfig selected = selectionService.getSelected();
+        updateSelectionUI(selected);
+        selectionService.addListener(this::updateSelectionUI);
+    }
+
+    private void updateSelectionUI(LdapServerConfig cfg) {
+        String suffix = cfg != null ? (cfg.getName() != null ? cfg.getName() : cfg.getHost()) : "None";
+        contextTitle.setText("Server: " + suffix);
+        updateConnectionChip(cfg);
+        updateDrawerHighlight(cfg);
+    }
+
+    private void setupConnectionChip() {
+        connectionChip.setSpacing(true);
+        connectionChip.setPadding(false);
+        connectionChip.getStyle().set("margin-left", "var(--lumo-space-m)");
+    connectionChip.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
+        connectionChip.setVisible(true);
+        // Initial content
+        updateConnectionChip(null);
+    }
+
+    private void updateConnectionChip(LdapServerConfig cfg) {
+        connectionChip.removeAll();
+        Icon dot = new Icon(VaadinIcon.CIRCLE);
+        dot.setSize("10px");
+        boolean connected = cfg != null && ldapService.isConnected(cfg.getId());
+        dot.getStyle().set("color", connected ? "var(--lumo-success-color)" : "var(--lumo-error-color)");
+        Span text = new Span(connected ? "Connected" : "Disconnected");
+        text.getStyle().set("font-size", "var(--lumo-font-size-s)").set("color", "var(--lumo-secondary-text-color)");
+        connectionChip.add(dot, text);
+    }
+
+    private void updateDrawerHighlight(LdapServerConfig cfg) {
+        // Clear previous highlights
+        for (SideNavItem item : serverItemIndex.values()) {
+            item.setSuffixComponent(null);
+        }
+        if (cfg != null) {
+            SideNavItem selectedItem = serverItemIndex.get(cfg.getId());
+            if (selectedItem != null) {
+                Icon check = new Icon(VaadinIcon.CHECK);
+                check.setSize("16px");
+                check.getStyle().set("color", "var(--lumo-success-color)");
+                selectedItem.setSuffixComponent(check);
+            }
+        }
+    }
+
+    public void refreshServerListInDrawer() {
+        populateServers(serversRoot);
+        // Re-apply highlight and connection chip based on current selection
+        updateSelectionUI(selectionService.getSelected());
     }
 }

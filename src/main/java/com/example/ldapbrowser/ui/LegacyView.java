@@ -5,6 +5,7 @@ import com.example.ldapbrowser.service.ConfigurationService;
 import com.example.ldapbrowser.service.InMemoryLdapService;
 import com.example.ldapbrowser.service.LdapService;
 import com.example.ldapbrowser.service.LoggingService;
+import com.example.ldapbrowser.service.ServerSelectionService;
 import com.example.ldapbrowser.ui.components.BulkOperationsTab;
 import com.example.ldapbrowser.ui.components.DashboardTab;
 import com.example.ldapbrowser.ui.components.DirectorySearchTab;
@@ -20,14 +21,13 @@ import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.Tabs;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.router.RouteAlias;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.unboundid.ldap.sdk.LDAPException;
 
 @Route(value = "legacy", layout = MainLayout.class)
-@RouteAlias(value = "", layout = MainLayout.class)
+// Root now points to ServersView; keep legacy accessible at /legacy
 @PageTitle("Legacy")
 @AnonymousAllowed
 public class LegacyView extends VerticalLayout implements EnvironmentRefreshListener {
@@ -36,6 +36,7 @@ public class LegacyView extends VerticalLayout implements EnvironmentRefreshList
     private final ConfigurationService configurationService;
     private final InMemoryLdapService inMemoryLdapService;
     private final LoggingService loggingService;
+    private final ServerSelectionService selectionService;
 
     private Tabs mainTabs;
     private ServersTab serversTab;
@@ -48,11 +49,13 @@ public class LegacyView extends VerticalLayout implements EnvironmentRefreshList
     private VerticalLayout contentContainer;
 
     public LegacyView(LdapService ldapService, ConfigurationService configurationService,
-                      InMemoryLdapService inMemoryLdapService, LoggingService loggingService) {
+                      InMemoryLdapService inMemoryLdapService, LoggingService loggingService,
+                      ServerSelectionService selectionService) {
         this.ldapService = ldapService;
         this.configurationService = configurationService;
         this.inMemoryLdapService = inMemoryLdapService;
         this.loggingService = loggingService;
+        this.selectionService = selectionService;
 
         setSizeFull();
         setPadding(false);
@@ -99,9 +102,9 @@ public class LegacyView extends VerticalLayout implements EnvironmentRefreshList
         serversTab.setConnectionListener(this::connectToServer);
         serversTab.setDisconnectionListener(this::disconnectFromServer);
 
-        dashboardTab = new DashboardTab(ldapService, configurationService, inMemoryLdapService);
-        directorySearchTab = new DirectorySearchTab(ldapService, configurationService, inMemoryLdapService);
-        schemaBrowser = new SchemaBrowser(ldapService, configurationService, inMemoryLdapService);
+    dashboardTab = new DashboardTab(ldapService, configurationService, inMemoryLdapService, selectionService);
+    directorySearchTab = new DirectorySearchTab(ldapService, configurationService, inMemoryLdapService, selectionService);
+    schemaBrowser = new SchemaBrowser(ldapService, configurationService, inMemoryLdapService, selectionService);
         reportsTab = new ExportTab(ldapService, loggingService, configurationService, inMemoryLdapService);
         bulkOperationsTab = new BulkOperationsTab(ldapService, loggingService, configurationService, inMemoryLdapService);
         logsTab = new LogsTab(loggingService);
@@ -169,10 +172,6 @@ public class LegacyView extends VerticalLayout implements EnvironmentRefreshList
 
     @Override
     public void onEnvironmentChange() {
-        refreshEnvironmentDropdowns();
-    }
-
-    public void refreshEnvironmentDropdowns() {
         if (dashboardTab != null) {
             dashboardTab.refreshEnvironments();
         }

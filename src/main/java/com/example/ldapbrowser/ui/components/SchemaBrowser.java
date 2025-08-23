@@ -4,6 +4,7 @@ import com.example.ldapbrowser.model.LdapServerConfig;
 import com.example.ldapbrowser.service.LdapService;
 import com.example.ldapbrowser.service.ConfigurationService;
 import com.example.ldapbrowser.service.InMemoryLdapService;
+import com.example.ldapbrowser.service.ServerSelectionService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
@@ -55,8 +56,7 @@ public class SchemaBrowser extends VerticalLayout {
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
 
-  // Environment selection
-  private EnvironmentDropdown environmentDropdown;
+  // Environment selection removed; driven by ServerSelectionService
 
   // Server configuration
   private LdapServerConfig serverConfig;
@@ -87,18 +87,17 @@ public class SchemaBrowser extends VerticalLayout {
   private String currentFilter = "";
 
   public SchemaBrowser(LdapService ldapService, ConfigurationService configurationService,
-  InMemoryLdapService inMemoryLdapService) {
+  InMemoryLdapService inMemoryLdapService, ServerSelectionService selectionService) {
     this.ldapService = ldapService;
     this.configurationService = configurationService;
     this.inMemoryLdapService = inMemoryLdapService;
     initializeComponents();
     setupLayout();
+    selectionService.addListener(this::onEnvironmentSelected);
   }
 
   private void initializeComponents() {
-    // Environment dropdown for single-select
-    environmentDropdown = new EnvironmentDropdown(ldapService, configurationService, inMemoryLdapService, false);
-    environmentDropdown.addSingleSelectionListener(this::onEnvironmentSelected);
+  // Environment dropdown removed
 
     // Search controls
     searchField = new TextField();
@@ -415,7 +414,7 @@ private void initializeSyntaxGrid() {
     
     // Add spacer to push environment dropdown to the right
     Span spacer = new Span();
-    environmentLayout.add(spacer, environmentDropdown.getSingleSelectComponent());
+  // environment selection UI removed
     environmentLayout.setFlexGrow(1, spacer);
 
     // Details container
@@ -877,9 +876,7 @@ private void showError(String message) {
 }
 
 public void refreshEnvironments() {
-  if (environmentDropdown != null) {
-    environmentDropdown.refreshEnvironments();
-  }
+  // No environment dropdown to refresh
 }
 
   /**
