@@ -432,6 +432,18 @@ public class DirectorySearchSubTab extends VerticalLayout {
 
       // Search across all selected environments
       for (LdapServerConfig environment : selectedEnvironments) {
+        // Ensure connection to each environment before searching
+        try {
+          if (!ldapService.isConnected(environment.getId())) {
+            ldapService.connect(environment);
+          }
+        } catch (LDAPException ex) {
+          String msg = "Failed to connect to environment '" + environment.getName() + "': " + ex.getMessage();
+          System.err.println(msg);
+          showError(msg);
+          continue; // Skip this environment
+        }
+
         String searchBase;
         
         if (customSearchBase != null && !customSearchBase.trim().isEmpty()) {
@@ -450,7 +462,7 @@ public class DirectorySearchSubTab extends VerticalLayout {
           for (LdapEntry entry : environmentResults) {
             allResults.add(new SearchResultEntry(entry, environment));
           }
-        } catch (LDAPException ex) {
+  } catch (LDAPException ex) {
           String errorMsg = "Search failed for environment '" + environment.getName() + 
             "': " + ex.getMessage();
           System.err.println(errorMsg);
@@ -506,6 +518,16 @@ public class DirectorySearchSubTab extends VerticalLayout {
 
       // Search across all selected environments
       for (LdapServerConfig environment : selectedEnvironments) {
+        // Ensure connection to each environment before searching
+        try {
+          if (!ldapService.isConnected(environment.getId())) {
+            ldapService.connect(environment);
+          }
+        } catch (LDAPException ex) {
+          showError("Failed to connect to environment " + environment.getName() + ": " + ex.getMessage());
+          continue; // Skip this environment
+        }
+
         String searchBase;
         
         // Determine search base

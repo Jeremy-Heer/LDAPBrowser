@@ -23,6 +23,10 @@ import com.vaadin.flow.theme.lumo.LumoUtility;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Root application layout with a side drawer and a top navbar used as view header.
@@ -42,6 +46,7 @@ public class MainLayout extends AppLayout {
     private final Map<String, SideNavItem> serverItemIndex = new HashMap<>();
     private final SideNav nav;
     private final SideNavItem serversRoot;
+    private final SideNavItem groupSearchRoot;
 
     public MainLayout(ConfigurationService configurationService,
                       InMemoryLdapService inMemoryLdapService,
@@ -62,13 +67,19 @@ public class MainLayout extends AppLayout {
         setupConnectionChip();
         addToNavbar(toggle, viewTitle, contextTitle, connectionChip);
 
-        // Drawer content
+    // Drawer content
     nav = new SideNav();
     // Servers accordion-like group
     serversRoot = new SideNavItem("Servers", ServersView.class);
         serversRoot.setPrefixComponent(new Icon(VaadinIcon.SERVER));
         populateServers(serversRoot);
         nav.addItem(serversRoot);
+
+    // Group Search - shows only groups, clicking goes to group search view
+    groupSearchRoot = new SideNavItem("Group Search", (String) null);
+    groupSearchRoot.setPrefixComponent(new Icon(VaadinIcon.SEARCH));
+    populateGroups(groupSearchRoot);
+    nav.addItem(groupSearchRoot);
 
         // Settings link
         SideNavItem settingsItem = new SideNavItem("Settings", SettingsView.class);
@@ -87,6 +98,15 @@ public class MainLayout extends AppLayout {
     protected void afterNavigation() {
         super.afterNavigation();
         viewTitle.setText(getCurrentPageTitle());
+        // Update context title depending on current view
+        if (getContent() instanceof GroupSearchView gsv) {
+            String grp = gsv.getGroupName();
+            contextTitle.setText(grp != null && !grp.isBlank() ? ("Group: " + grp) : "Group Search");
+            // In group mode, hide single-server connection chip to avoid confusion
+            connectionChip.setVisible(false);
+        } else {
+            connectionChip.setVisible(true);
+        }
     }
 
     private String getCurrentPageTitle() {
@@ -147,6 +167,32 @@ public class MainLayout extends AppLayout {
         }
     }
 
+    private void populateGroups(SideNavItem root) {
+        root.removeAll();
+        // Collect groups from external and running internal servers
+        Set<String> groups = new TreeSet<>();
+        for (LdapServerConfig cfg : configurationService.getAllConfigurations()) {
+            if (cfg.getGroup() != null && !cfg.getGroup().isBlank()) {
+                groups.add(cfg.getGroup().trim());
+            }
+        }
+        for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
+            if (inMemoryLdapService.isServerRunning(cfg.getId())) {
+                if (cfg.getGroup() != null && !cfg.getGroup().isBlank()) {
+                    groups.add(cfg.getGroup().trim());
+                }
+            }
+        }
+
+        // Add a nav item for each group; route to GroupSearchView
+        for (String group : groups) {
+            String encoded = URLEncoder.encode(group, StandardCharsets.UTF_8);
+            SideNavItem item = new SideNavItem(group, "/group-search/" + encoded);
+            item.setPrefixComponent(new Icon(VaadinIcon.FOLDER_OPEN));
+            root.addItem(item);
+        }
+    }
+
     @Override
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent);
@@ -202,6 +248,7 @@ public class MainLayout extends AppLayout {
 
     public void refreshServerListInDrawer() {
         populateServers(serversRoot);
+    populateGroups(groupSearchRoot);
         // Re-apply highlight and connection chip based on current selection
         updateSelectionUI(selectionService.getSelected());
     }

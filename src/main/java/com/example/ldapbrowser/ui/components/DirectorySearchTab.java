@@ -29,6 +29,8 @@ public class DirectorySearchTab extends VerticalLayout {
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
   private final ServerSelectionService selectionService;
+  // Optional supplier for environments (e.g., group search). If set, overrides selectionService.
+  private java.util.function.Supplier<java.util.Set<LdapServerConfig>> environmentSupplier;
 
   // Environment dropdown
   // Removed: environment dropdown UI; selection is driven by drawer via ServerSelectionService
@@ -170,7 +172,25 @@ public class DirectorySearchTab extends VerticalLayout {
   * Get the selected environments from the environment dropdown
   */
   public Set<LdapServerConfig> getSelectedEnvironments() {
+  if (environmentSupplier != null) {
+    try {
+      java.util.Set<LdapServerConfig> envs = environmentSupplier.get();
+      return envs != null ? envs : java.util.Collections.emptySet();
+    } catch (Exception e) {
+      return java.util.Collections.emptySet();
+    }
+  }
   LdapServerConfig cfg = selectionService.getSelected();
   return cfg != null ? Set.of(cfg) : Collections.emptySet();
+  }
+
+  /**
+   * Override the environments provider. When set, searches will run against these environments
+   * instead of the single selection from ServerSelectionService.
+   */
+  public void setEnvironmentSupplier(java.util.function.Supplier<java.util.Set<LdapServerConfig>> supplier) {
+    this.environmentSupplier = supplier;
+    // Trigger UI enable/disable updates
+    searchTabContent.updateSearchButton();
   }
 }
