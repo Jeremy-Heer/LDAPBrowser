@@ -23,6 +23,7 @@ public class ServerConfigDialogTest {
     LdapServerConfig config = new LdapServerConfig();
     config.setId("test-id");
     config.setName("Test Server");
+  config.setGroup("Test Group");
     config.setHost("localhost");
     config.setPort(389);
 

@@ -24,6 +24,7 @@ public class ServerConfigDialog extends Dialog {
   private final boolean isNew;
 
   private TextField nameField;
+  private TextField groupField;
   private TextField hostField;
   private IntegerField portField;
   private TextField bindDnField;
@@ -55,6 +56,10 @@ public class ServerConfigDialog extends Dialog {
     nameField = new TextField("Name");
     nameField.setRequiredIndicatorVisible(true);
     nameField.setWidthFull();
+
+  groupField = new TextField("Group");
+  groupField.setPlaceholder("Optional: Servers menu group");
+  groupField.setWidthFull();
 
     hostField = new TextField("Host");
     hostField.setRequiredIndicatorVisible(true);
@@ -103,6 +108,7 @@ private void setupLayout() {
 
   formLayout.add(
   nameField,
+  groupField,
   hostField,
   portField,
   bindDnField,
@@ -136,6 +142,7 @@ private void setupLayout() {
 private void populateFields() {
   if (!isNew) {
     nameField.setValue(config.getName() != null ? config.getName() : "");
+  groupField.setValue(config.getGroup() != null ? config.getGroup() : "");
     hostField.setValue(config.getHost() != null ? config.getHost() : "");
     portField.setValue(config.getPort());
     bindDnField.setValue(config.getBindDn() != null ? config.getBindDn() : "");
@@ -166,6 +173,7 @@ private void save() {
 
   // Update config
   config.setName(nameField.getValue().trim());
+  config.setGroup(groupField.getValue() != null ? groupField.getValue().trim() : null);
   config.setHost(hostField.getValue().trim());
   config.setPort(portField.getValue());
   config.setBindDn(bindDnField.getValue());

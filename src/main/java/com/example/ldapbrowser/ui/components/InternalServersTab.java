@@ -1,7 +1,6 @@
 package com.example.ldapbrowser.ui.components;
 
 import com.example.ldapbrowser.model.LdapServerConfig;
-import com.example.ldapbrowser.service.ConfigurationService;
 import com.example.ldapbrowser.service.LdapService;
 import com.example.ldapbrowser.service.InMemoryLdapService;
 import com.vaadin.flow.component.button.Button;
@@ -28,7 +27,6 @@ import java.util.function.Consumer;
 public class InternalServersTab extends VerticalLayout {
 
   private final LdapService ldapService;
-  private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
   private final EnvironmentRefreshListener environmentRefreshListener;
 
@@ -43,11 +41,10 @@ public class InternalServersTab extends VerticalLayout {
   private Consumer<LdapServerConfig> connectionListener;
   private Runnable disconnectionListener;
 
-  public InternalServersTab(LdapService ldapService, ConfigurationService configurationService,
+  public InternalServersTab(LdapService ldapService,
   EnvironmentRefreshListener environmentRefreshListener,
   InMemoryLdapService inMemoryLdapService) {
     this.ldapService = ldapService;
-    this.configurationService = configurationService;
     this.inMemoryLdapService = inMemoryLdapService;
     this.environmentRefreshListener = environmentRefreshListener;
 
@@ -67,6 +64,12 @@ public class InternalServersTab extends VerticalLayout {
     .setHeader("Name")
     .setFlexGrow(1)
     .setSortable(true);
+
+  serverGrid.addColumn(cfg -> cfg.getGroup() != null ? cfg.getGroup() : "")
+  .setHeader("Group")
+  .setFlexGrow(0)
+  .setWidth("140px")
+  .setSortable(true);
 
     serverGrid.addColumn(config -> config.getHost() + ":" + config.getPort())
     .setHeader("Host:Port")
@@ -253,6 +256,9 @@ private void openServerDialog(LdapServerConfig config) {
   dialog.addSaveListener(savedConfig -> {
     inMemoryLdapService.saveInMemoryServer(savedConfig);
     refreshServerList();
+      if (environmentRefreshListener != null) {
+        environmentRefreshListener.onEnvironmentChange();
+      }
     showSuccess(config == null ? "In-Memory server configuration added." : "In-Memory server configuration updated.");
     dialog.close();
   });

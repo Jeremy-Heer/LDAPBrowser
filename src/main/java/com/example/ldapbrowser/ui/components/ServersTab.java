@@ -55,7 +55,7 @@ public class ServersTab extends VerticalLayout {
 
     // Internal servers tab (UnboundID in-memory servers)
     internalTab = new Tab("Internal");
-    internalServersTab = new InternalServersTab(ldapService, configurationService, environmentRefreshListener, inMemoryLdapService);
+  internalServersTab = new InternalServersTab(ldapService, environmentRefreshListener, inMemoryLdapService);
     tabSheet.add(internalTab, internalServersTab);
 
     // Set External as the default selected tab

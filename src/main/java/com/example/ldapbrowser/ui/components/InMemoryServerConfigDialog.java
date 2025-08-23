@@ -28,6 +28,7 @@ public class InMemoryServerConfigDialog extends Dialog {
 
   private TextField nameField;
   private IntegerField portField;
+  private TextField groupField;
   private TextField baseDnField;
   private TextField bindDnField;
   private PasswordField passwordField;
@@ -70,6 +71,10 @@ public class InMemoryServerConfigDialog extends Dialog {
     portField.setMax(65535);
     portField.setWidthFull();
     portField.setHelperText("Port for the in-memory LDAP server");
+
+  groupField = new TextField("Group");
+  groupField.setPlaceholder("Optional: Servers menu group");
+  groupField.setWidthFull();
 
     baseDnField = new TextField("Base DN");
     baseDnField.setRequiredIndicatorVisible(true);
@@ -120,6 +125,7 @@ public class InMemoryServerConfigDialog extends Dialog {
     formLayout.add(
     nameField,
     portField,
+  groupField,
     baseDnField,
     bindDnField,
     passwordField,
@@ -156,6 +162,7 @@ public class InMemoryServerConfigDialog extends Dialog {
     if (!isNew) {
       nameField.setValue(config.getName() != null ? config.getName() : "");
       portField.setValue(config.getPort());
+  groupField.setValue(config.getGroup() != null ? config.getGroup() : "");
       baseDnField.setValue(config.getBaseDn() != null ? config.getBaseDn() : "");
       bindDnField.setValue(config.getBindDn() != null ? config.getBindDn() : "");
       passwordField.setValue(config.getPassword() != null ? config.getPassword() : "");
@@ -190,6 +197,7 @@ private void save() {
   config.setName(nameField.getValue().trim());
   config.setHost("localhost"); // Always localhost for in-memory servers
   config.setPort(portField.getValue());
+  config.setGroup(groupField.getValue() != null ? groupField.getValue().trim() : null);
   config.setBaseDn(baseDnField.getValue().trim());
   config.setBindDn(bindDnField.getValue());
   config.setPassword(passwordField.getValue());

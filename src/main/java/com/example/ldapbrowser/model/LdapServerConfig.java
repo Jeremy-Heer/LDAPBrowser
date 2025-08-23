@@ -10,6 +10,7 @@ public class LdapServerConfig {
 
   private String id;
   private String name;
+  private String group;
   private String host;
   private int port;
   private String bindDn;
@@ -52,6 +53,14 @@ public class LdapServerConfig {
 
   public void setName(String name) {
     this.name = name;
+  }
+
+  public String getGroup() {
+    return group;
+  }
+
+  public void setGroup(String group) {
+    this.group = group;
   }
 
   public String getHost() {

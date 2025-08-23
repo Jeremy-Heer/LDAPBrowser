@@ -28,6 +28,8 @@ A comprehensive LDAP Browser application built with Vaadin and the UnboundID LDA
 - **Spring Boot 3.2.0**
 - **Vaadin 24.3.0** - Modern web UI framework
 - **UnboundID LDAP SDK 6.0.11** - Java LDAP client library
+### Server Groups
+External and Internal server configurations now support an optional Group value. Servers with the same group appear under a collapsible group in the drawer's Servers section. To assign a group, edit or add a server and fill the Group field.
 - **Maven** - Build and dependency management
 
 ## Getting Started

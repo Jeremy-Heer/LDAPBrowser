@@ -5,6 +5,7 @@ import com.example.ldapbrowser.model.LdapServerConfig;
 import com.example.ldapbrowser.service.LdapService;
 import com.example.ldapbrowser.service.ConfigurationService;
 import com.example.ldapbrowser.service.InMemoryLdapService;
+import com.example.ldapbrowser.service.ServerSelectionService;
 import com.example.ldapbrowser.ui.components.SearchPanel.SearchResult;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -35,7 +36,7 @@ public class DashboardTab extends VerticalLayout {
   private LdapServerConfig serverConfig;
 
   // Environment selection
-  private EnvironmentDropdown environmentDropdown;
+  // Removed environment dropdown; selection driven by ServerSelectionService
 
   // Main content components
   private LdapTreeGrid treeGrid;
@@ -53,18 +54,17 @@ public class DashboardTab extends VerticalLayout {
   private ContextMenu settingsContextMenu;
 
   public DashboardTab(LdapService ldapService, ConfigurationService configurationService,
-  InMemoryLdapService inMemoryLdapService) {
+  InMemoryLdapService inMemoryLdapService, ServerSelectionService selectionService) {
     this.ldapService = ldapService;
     this.configurationService = configurationService;
     this.inMemoryLdapService = inMemoryLdapService;
     initializeComponents();
     setupLayout();
+    selectionService.addListener(this::onEnvironmentSelected);
   }
 
   private void initializeComponents() {
-    // Environment dropdown for single-select
-    environmentDropdown = new EnvironmentDropdown(ldapService, configurationService, inMemoryLdapService, false);
-    environmentDropdown.addSingleSelectionListener(this::onEnvironmentSelected);
+  // Environment dropdown removed
 
     // Main content components
     treeGrid = new LdapTreeGrid(ldapService);
@@ -171,23 +171,8 @@ private void setupLayout() {
   rightPanel.setPadding(false);
   rightPanel.setSpacing(false);
 
-  // Environment dropdown layout - positioned at the top right
-  HorizontalLayout environmentLayout = new HorizontalLayout();
-  environmentLayout.setWidthFull();
-  environmentLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
-  environmentLayout.setPadding(false);
-  environmentLayout.getStyle().set("padding-left", "var(--lumo-space-m)");
-  environmentLayout.getStyle().set("padding-right", "var(--lumo-space-m)");
-  environmentLayout.getStyle().set("padding-top", "var(--lumo-space-xs)");
-  environmentLayout.getStyle().set("padding-bottom", "var(--lumo-space-xs)");
-  
-  // Add spacer to push environment dropdown to the right
-  Span spacer = new Span();
-  environmentLayout.add(spacer, environmentDropdown.getSingleSelectComponent());
-  environmentLayout.setFlexGrow(1, spacer);
-
-  // Add environment layout and tabsheet to right panel
-  rightPanel.add(environmentLayout, tabSheet);
+  // Add tabsheet to right panel (no environment header)
+  rightPanel.add(tabSheet);
   rightPanel.setFlexGrow(1, tabSheet);
 
   // Entry Details Tab
@@ -231,15 +216,15 @@ private void onEnvironmentSelected(LdapServerConfig environment) {
     // Auto-refresh the tree grid for the newly selected environment
     // Schedule the refresh to happen after potential connection establishment
     getUI().ifPresent(ui -> {
-      // Use a small delay to allow the connection from EnvironmentDropdown to complete
+      // Use a small delay to allow the connection to establish
       ui.getElement().executeJs(
         "setTimeout(() => { $0.$server.loadRootDSEForNewEnvironment(); }, 300)",
         getElement()
       );
     });
   } else {
-  clear();
-}
+    clear();
+  }
 }
 
 /**
@@ -545,9 +530,7 @@ public void clear() {
 }
 
 public void refreshEnvironments() {
-  if (environmentDropdown != null) {
-    environmentDropdown.refreshEnvironments();
-  }
+  // No environment dropdown; server selection is handled via ServerSelectionService listeners
 }
 
 /**

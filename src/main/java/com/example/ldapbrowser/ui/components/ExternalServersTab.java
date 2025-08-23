@@ -65,6 +65,12 @@ public class ExternalServersTab extends VerticalLayout {
     .setFlexGrow(1)
     .setSortable(true);
 
+  serverGrid.addColumn(cfg -> cfg.getGroup() != null ? cfg.getGroup() : "")
+  .setHeader("Group")
+  .setFlexGrow(0)
+  .setWidth("140px")
+  .setSortable(true);
+
     serverGrid.addColumn(config -> config.getHost() + ":" + config.getPort())
     .setHeader("Host:Port")
     .setFlexGrow(1)
@@ -288,6 +294,7 @@ private void copyServerConfiguration(LdapServerConfig originalConfig) {
   copyConfig.setName(originalConfig.getName() + " (Copy)");
   copyConfig.setHost(originalConfig.getHost());
   copyConfig.setPort(originalConfig.getPort());
+  copyConfig.setGroup(originalConfig.getGroup());
   copyConfig.setBindDn(originalConfig.getBindDn());
   copyConfig.setPassword(originalConfig.getPassword());
   copyConfig.setUseSSL(originalConfig.isUseSSL());
