@@ -75,8 +75,8 @@ public class MainLayout extends AppLayout {
         populateServers(serversRoot);
         nav.addItem(serversRoot);
 
-    // Group Search - shows only groups, clicking goes to group search view
-    groupSearchRoot = new SideNavItem("Group Search", (String) null);
+    // Group Operations - shows only groups, clicking goes to group search view
+    groupSearchRoot = new SideNavItem("Group Operations", (String) null);
     groupSearchRoot.setPrefixComponent(new Icon(VaadinIcon.SEARCH));
     populateGroups(groupSearchRoot);
     nav.addItem(groupSearchRoot);
@@ -101,7 +101,7 @@ public class MainLayout extends AppLayout {
         // Update context title depending on current view
         if (getContent() instanceof GroupSearchView gsv) {
             String grp = gsv.getGroupName();
-            contextTitle.setText(grp != null && !grp.isBlank() ? ("Group: " + grp) : "Group Search");
+            contextTitle.setText(grp != null && !grp.isBlank() ? ("Group: " + grp) : "Group Operations");
             // In group mode, hide single-server connection chip to avoid confusion
             connectionChip.setVisible(false);
         } else {
