@@ -53,6 +53,7 @@ import java.util.stream.Collectors;
 public class SchemaBrowser extends VerticalLayout {
 
   private final LdapService ldapService;
+  @SuppressWarnings("unused")
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
 
@@ -204,6 +205,27 @@ private void initializeObjectClassGrid() {
   .setResizable(true)
   .setSortable(true);
 
+  // Schema File column from X-Schema-file extension (when available)
+  objectClassGrid.addColumn(oc -> {
+    try {
+      Map<String, String[]> ext = oc.getExtensions();
+      if (ext != null) {
+        String[] vals = ext.get("X-SCHEMA-FILE");
+        if (vals == null) vals = ext.get("X-Schema-File");
+        if (vals == null) vals = ext.get("X-Schema-file");
+        if (vals == null) vals = ext.get("x-schema-file");
+        if (vals != null && vals.length > 0) {
+          return String.join(", ", vals);
+        }
+      }
+    } catch (Exception ignored) {}
+    return "";
+  })
+  .setHeader("Schema File")
+  .setFlexGrow(2)
+  .setResizable(true)
+  .setSortable(true);
+
   objectClassGrid.asSingleSelect().addValueChangeListener(e -> {
     if (e.getValue() != null) {
       showObjectClassDetails(e.getValue());
@@ -237,6 +259,27 @@ private void initializeAttributeTypeGrid() {
   attributeTypeGrid.addColumn(at -> at.isObsolete() ? "Yes" : "No")
   .setHeader("Obsolete")
   .setFlexGrow(1)
+  .setResizable(true)
+  .setSortable(true);
+
+  // Schema File column from X-Schema-file extension (when available)
+  attributeTypeGrid.addColumn(at -> {
+    try {
+      Map<String, String[]> ext = at.getExtensions();
+      if (ext != null) {
+        String[] vals = ext.get("X-SCHEMA-FILE");
+        if (vals == null) vals = ext.get("X-Schema-File");
+        if (vals == null) vals = ext.get("X-Schema-file");
+        if (vals == null) vals = ext.get("x-schema-file");
+        if (vals != null && vals.length > 0) {
+          return String.join(", ", vals);
+        }
+      }
+    } catch (Exception ignored) {}
+    return "";
+  })
+  .setHeader("Schema File")
+  .setFlexGrow(2)
   .setResizable(true)
   .setSortable(true);
 
