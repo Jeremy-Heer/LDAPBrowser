@@ -723,6 +723,9 @@ private void showObjectClassDetails(ObjectClassDefinition objectClass) {
   addDetailRow(details, "Names", objectClass.getNames() != null ?
   String.join(", ", Arrays.asList(objectClass.getNames())) : "");
   addDetailRow(details, "Description", objectClass.getDescription());
+  // Schema file (extension)
+  String ocSchemaFile = getSchemaFileFromExtensions(objectClass.getExtensions());
+  addDetailRow(details, "Schema File", ocSchemaFile);
   addDetailRow(details, "Type", objectClass.getObjectClassType() != null ?
   objectClass.getObjectClassType().getName() : "");
   addDetailRow(details, "Obsolete", objectClass.isObsolete() ? "Yes" : "No");
@@ -772,6 +775,9 @@ private void showAttributeTypeDetails(AttributeTypeDefinition attributeType) {
   addDetailRow(details, "Names", attributeType.getNames() != null ?
   String.join(", ", Arrays.asList(attributeType.getNames())) : "");
   addDetailRow(details, "Description", attributeType.getDescription());
+  // Schema file (extension)
+  String atSchemaFile = getSchemaFileFromExtensions(attributeType.getExtensions());
+  addDetailRow(details, "Schema File", atSchemaFile);
   addDetailRow(details, "Syntax OID", attributeType.getSyntaxOID());
   addDetailRow(details, "Obsolete", attributeType.isObsolete() ? "Yes" : "No");
   addDetailRow(details, "Single Value", attributeType.isSingleValued() ? "Yes" : "No");
@@ -804,6 +810,21 @@ private void showAttributeTypeDetails(AttributeTypeDefinition attributeType) {
   }
 
   detailsPanel.add(details);
+}
+
+// Helper to read the X-Schema-file extension (supports common casings)
+private String getSchemaFileFromExtensions(Map<String, String[]> extensions) {
+  if (extensions == null || extensions.isEmpty()) return null;
+  String[] keys = new String[] {
+    "X-SCHEMA-FILE", "X-Schema-File", "X-Schema-file", "x-schema-file"
+  };
+  for (String k : keys) {
+    String[] vals = extensions.get(k);
+    if (vals != null && vals.length > 0) {
+      return String.join(", ", vals);
+    }
+  }
+  return null;
 }
 
 private void showMatchingRuleDetails(MatchingRuleDefinition matchingRule) {
