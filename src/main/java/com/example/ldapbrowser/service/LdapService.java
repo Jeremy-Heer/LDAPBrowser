@@ -500,8 +500,8 @@ public EntryWithSchema getEntryWithSchema(String serverId, String dn) throws LDA
   
   LdapEntry ldapEntry = new LdapEntry(searchResult.getSearchEntries().get(0));
   
-  // Get schema information in the same connection context
-  Schema schema = connection.getSchema();
+  // Get schema information (may include extended info when supported)
+  Schema schema = getSchema(serverId);
   
   return new EntryWithSchema(ldapEntry, schema);
 }
@@ -654,7 +654,51 @@ public void deleteEntry(String serverId, String dn) throws LDAPException {
 * Get LDAP schema information
 */
 public Schema getSchema(String serverId) throws LDAPException {
+    // Default behavior: prefer extended schema info when available per-server
+    return getSchema(serverId, true);
+  }
+
+  /**
+   * Get LDAP schema information with optional extended schema info control.
+   * When useExtended is false, the request will not include the extended schema
+   * info request control even if the server supports it.
+   */
+  public Schema getSchema(String serverId, boolean useExtended) throws LDAPException {
   LDAPConnection connection = getConnection(serverId);
+  // Try to request extended schema info (e.g., X-Schema-file) when the server supports it
+  final String EXTENDED_SCHEMA_INFO_OID = "1.3.6.1.4.1.30221.2.5.12";
+  try {
+    String schemaDN = getSchemaSubentryDN(serverId);
+    if (schemaDN != null && !schemaDN.isEmpty()) {
+      SearchRequest req = new SearchRequest(
+        schemaDN,
+        SearchScope.BASE,
+        Filter.createPresenceFilter("objectClass"),
+        // Request all common schema attributes
+        "attributeTypes", "objectClasses", "ldapSyntaxes", "matchingRules",
+        "matchingRuleUse", "dITContentRules", "nameForms", "dITStructureRules"
+      );
+        try {
+          if (useExtended && isControlSupported(serverId, EXTENDED_SCHEMA_INFO_OID)) {
+            // Non-critical control: server may ignore if unsupported
+            req.addControl(new Control(EXTENDED_SCHEMA_INFO_OID, false));
+          }
+        } catch (Exception ignored) {}
+
+      SearchResult sr = connection.search(req);
+      if (sr.getEntryCount() > 0) {
+        SearchResultEntry entry = sr.getSearchEntries().get(0);
+        try {
+          // Build Schema directly from the schema subentry
+          return new Schema(entry);
+        } catch (Throwable t) {
+          // Last resort fallback below
+        }
+      }
+    }
+  } catch (LDAPException e) {
+    // Fall back to standard retrieval on error
+  }
   return connection.getSchema();
 }
 

@@ -53,6 +53,7 @@ import java.util.stream.Collectors;
 public class SchemaBrowser extends VerticalLayout {
 
   private final LdapService ldapService;
+  @SuppressWarnings("unused")
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
 
@@ -204,6 +205,27 @@ private void initializeObjectClassGrid() {
   .setResizable(true)
   .setSortable(true);
 
+  // Schema File column from X-Schema-file extension (when available)
+  objectClassGrid.addColumn(oc -> {
+    try {
+      Map<String, String[]> ext = oc.getExtensions();
+      if (ext != null) {
+        String[] vals = ext.get("X-SCHEMA-FILE");
+        if (vals == null) vals = ext.get("X-Schema-File");
+        if (vals == null) vals = ext.get("X-Schema-file");
+        if (vals == null) vals = ext.get("x-schema-file");
+        if (vals != null && vals.length > 0) {
+          return String.join(", ", vals);
+        }
+      }
+    } catch (Exception ignored) {}
+    return "";
+  })
+  .setHeader("Schema File")
+  .setFlexGrow(2)
+  .setResizable(true)
+  .setSortable(true);
+
   objectClassGrid.asSingleSelect().addValueChangeListener(e -> {
     if (e.getValue() != null) {
       showObjectClassDetails(e.getValue());
@@ -237,6 +259,27 @@ private void initializeAttributeTypeGrid() {
   attributeTypeGrid.addColumn(at -> at.isObsolete() ? "Yes" : "No")
   .setHeader("Obsolete")
   .setFlexGrow(1)
+  .setResizable(true)
+  .setSortable(true);
+
+  // Schema File column from X-Schema-file extension (when available)
+  attributeTypeGrid.addColumn(at -> {
+    try {
+      Map<String, String[]> ext = at.getExtensions();
+      if (ext != null) {
+        String[] vals = ext.get("X-SCHEMA-FILE");
+        if (vals == null) vals = ext.get("X-Schema-File");
+        if (vals == null) vals = ext.get("X-Schema-file");
+        if (vals == null) vals = ext.get("x-schema-file");
+        if (vals != null && vals.length > 0) {
+          return String.join(", ", vals);
+        }
+      }
+    } catch (Exception ignored) {}
+    return "";
+  })
+  .setHeader("Schema File")
+  .setFlexGrow(2)
   .setResizable(true)
   .setSortable(true);
 
@@ -680,6 +723,9 @@ private void showObjectClassDetails(ObjectClassDefinition objectClass) {
   addDetailRow(details, "Names", objectClass.getNames() != null ?
   String.join(", ", Arrays.asList(objectClass.getNames())) : "");
   addDetailRow(details, "Description", objectClass.getDescription());
+  // Schema file (extension)
+  String ocSchemaFile = getSchemaFileFromExtensions(objectClass.getExtensions());
+  addDetailRow(details, "Schema File", ocSchemaFile);
   addDetailRow(details, "Type", objectClass.getObjectClassType() != null ?
   objectClass.getObjectClassType().getName() : "");
   addDetailRow(details, "Obsolete", objectClass.isObsolete() ? "Yes" : "No");
@@ -729,6 +775,9 @@ private void showAttributeTypeDetails(AttributeTypeDefinition attributeType) {
   addDetailRow(details, "Names", attributeType.getNames() != null ?
   String.join(", ", Arrays.asList(attributeType.getNames())) : "");
   addDetailRow(details, "Description", attributeType.getDescription());
+  // Schema file (extension)
+  String atSchemaFile = getSchemaFileFromExtensions(attributeType.getExtensions());
+  addDetailRow(details, "Schema File", atSchemaFile);
   addDetailRow(details, "Syntax OID", attributeType.getSyntaxOID());
   addDetailRow(details, "Obsolete", attributeType.isObsolete() ? "Yes" : "No");
   addDetailRow(details, "Single Value", attributeType.isSingleValued() ? "Yes" : "No");
@@ -761,6 +810,21 @@ private void showAttributeTypeDetails(AttributeTypeDefinition attributeType) {
   }
 
   detailsPanel.add(details);
+}
+
+// Helper to read the X-Schema-file extension (supports common casings)
+private String getSchemaFileFromExtensions(Map<String, String[]> extensions) {
+  if (extensions == null || extensions.isEmpty()) return null;
+  String[] keys = new String[] {
+    "X-SCHEMA-FILE", "X-Schema-File", "X-Schema-file", "x-schema-file"
+  };
+  for (String k : keys) {
+    String[] vals = extensions.get(k);
+    if (vals != null && vals.length > 0) {
+      return String.join(", ", vals);
+    }
+  }
+  return null;
 }
 
 private void showMatchingRuleDetails(MatchingRuleDefinition matchingRule) {

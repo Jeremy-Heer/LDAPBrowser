@@ -7,6 +7,7 @@ import com.example.ldapbrowser.service.LdapService;
 import com.example.ldapbrowser.service.LoggingService;
 import com.example.ldapbrowser.service.ServerSelectionService;
 import com.example.ldapbrowser.ui.components.DirectorySearchTab;
+import com.example.ldapbrowser.ui.components.GroupSchemaTab;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.tabs.Tab;
@@ -23,7 +24,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Route(value = "group-search/:group", layout = MainLayout.class)
-@PageTitle("Group Search")
+@PageTitle("Group Operations")
 @AnonymousAllowed
 public class GroupSearchView extends VerticalLayout implements BeforeEnterObserver {
 
@@ -34,6 +35,7 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
 
     private TabSheet tabSheet;
     private DirectorySearchTab directorySearchTab;
+    private GroupSchemaTab schemaTabContent;
     private String groupName;
 
     public GroupSearchView(LdapService ldapService,
@@ -57,9 +59,14 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
         tabSheet = new TabSheet();
         tabSheet.setSizeFull();
 
-        Tab directorySearchTabComponent = new Tab("Directory Search");
+    Tab directorySearchTabComponent = new Tab("Directory Search");
         directorySearchTab = new DirectorySearchTab(ldapService, configurationService, inMemoryLdapService, selectionService);
         tabSheet.add(directorySearchTabComponent, directorySearchTab);
+
+    // Schema tab for group-wide schema comparison
+    Tab schemaTab = new Tab("Schema");
+    schemaTabContent = new GroupSchemaTab(ldapService);
+    tabSheet.add(schemaTab, schemaTabContent);
 
         add(tabSheet);
         setFlexGrow(1, tabSheet);
@@ -87,9 +94,10 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
             }
         }
 
-        // Provide the environments to the DirectorySearchTab and refresh UI state
+    // Provide the environments to the tabs and refresh UI state
         directorySearchTab.setEnvironmentSupplier(() -> groupServers);
         directorySearchTab.refreshEnvironments();
+    schemaTabContent.setEnvironments(groupServers);
     }
 
     private String safe(String s) {
