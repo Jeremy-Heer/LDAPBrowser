@@ -55,201 +55,201 @@ import java.util.stream.Collectors;
 */
 public class ExportTab extends VerticalLayout {
 
-  private final LdapService ldapService;
-  private final LoggingService loggingService;
-  private final ConfigurationService configurationService;
-  private final InMemoryLdapService inMemoryLdapService;
+private final LdapService ldapService;
+private final LoggingService loggingService;
+private final ConfigurationService configurationService;
+private final InMemoryLdapService inMemoryLdapService;
 
-  // Environment selection
-  // Removed environment dropdown; server is provided by container view
+// Environment selection
+// Removed environment dropdown; server is provided by container view
 
-  // Server configuration
-  private LdapServerConfig serverConfig;
+// Server configuration
+private LdapServerConfig serverConfig;
 
-  // UI Components
-  private ComboBox<String> itemSelectionMode;
-  private VerticalLayout modeContainer;
+// UI Components
+private ComboBox<String> itemSelectionMode;
+private VerticalLayout modeContainer;
 
-  // Search Mode Components
-  private VerticalLayout searchModeLayout;
-  private TextField searchBaseField;
-  private TextArea searchFilterField;
-  private TextField returnAttributesField;
-  private ComboBox<String> outputFormatCombo;
-  private Button exportButton;
+// Search Mode Components
+private VerticalLayout searchModeLayout;
+private TextField searchBaseField;
+private TextArea searchFilterField;
+private TextField returnAttributesField;
+private ComboBox<String> outputFormatCombo;
+private Button exportButton;
 
-  // Input CSV Mode Components
-  private VerticalLayout csvModeLayout;
-  private TextField csvSearchBaseField;
-  private TextArea csvSearchFilterField;
-  private TextField csvReturnAttributesField;
-  private ComboBox<String> csvOutputFormatCombo;
-  private Checkbox excludeHeaderCheckbox;
-  private Checkbox quotedValuesCheckbox;
-  private Upload csvUpload;
-  private MemoryBuffer csvBuffer;
-  private VerticalLayout csvPreviewContainer;
-  private Grid<Map<String, String>> csvPreviewGrid;
-  // CSV data and settings
-  private List<Map<String, String>> csvData;
-  private String rawCsvContent; // Store the raw CSV content for reprocessing
-  private List<String> csvColumnOrder; // Maintain original CSV column order
-  private Button csvExportButton;
+// Input CSV Mode Components
+private VerticalLayout csvModeLayout;
+private TextField csvSearchBaseField;
+private TextArea csvSearchFilterField;
+private TextField csvReturnAttributesField;
+private ComboBox<String> csvOutputFormatCombo;
+private Checkbox excludeHeaderCheckbox;
+private Checkbox quotedValuesCheckbox;
+private Upload csvUpload;
+private MemoryBuffer csvBuffer;
+private VerticalLayout csvPreviewContainer;
+private Grid<Map<String, String>> csvPreviewGrid;
+// CSV data and settings
+private List<Map<String, String>> csvData;
+private String rawCsvContent; // Store the raw CSV content for reprocessing
+private List<String> csvColumnOrder; // Maintain original CSV column order
+private Button csvExportButton;
 
-  // Progress and download
-  private ProgressBar progressBar;
-  private VerticalLayout progressContainer;
-  private Anchor downloadLink;
+// Progress and download
+private ProgressBar progressBar;
+private VerticalLayout progressContainer;
+private Anchor downloadLink;
 
-  public ExportTab(LdapService ldapService, LoggingService loggingService,
-  ConfigurationService configurationService, InMemoryLdapService inMemoryLdapService) {
-    this.ldapService = ldapService;
-    this.loggingService = loggingService;
-    this.configurationService = configurationService;
-    this.inMemoryLdapService = inMemoryLdapService;
-    this.csvData = new ArrayList<>();
-    this.csvColumnOrder = new ArrayList<>();
+public ExportTab(LdapService ldapService, LoggingService loggingService,
+ConfigurationService configurationService, InMemoryLdapService inMemoryLdapService) {
+this.ldapService = ldapService;
+this.loggingService = loggingService;
+this.configurationService = configurationService;
+this.inMemoryLdapService = inMemoryLdapService;
+this.csvData = new ArrayList<>();
+this.csvColumnOrder = new ArrayList<>();
 
-    // Initialize environment dropdown
-  // Environment dropdown removed
+// Initialize environment dropdown
+// Environment dropdown removed
 
-    initializeComponents();
-    setupLayout();
-  }
+initializeComponents();
+setupLayout();
+}
 
-  private void initializeComponents() {
-    // Item Selection Mode
-    itemSelectionMode = new ComboBox<>("Item Selection Mode");
-    itemSelectionMode.setItems("Search", "Input CSV");
-    itemSelectionMode.setValue("Search");
-    itemSelectionMode.addValueChangeListener(e -> switchMode(e.getValue()));
+private void initializeComponents() {
+// Item Selection Mode
+itemSelectionMode = new ComboBox<>("Item Selection Mode");
+itemSelectionMode.setItems("Search", "Input CSV");
+itemSelectionMode.setValue("Search");
+itemSelectionMode.addValueChangeListener(e -> switchMode(e.getValue()));
 
-    // Progress components
-    progressBar = new ProgressBar();
-    progressBar.setVisible(false);
-    progressContainer = new VerticalLayout();
-    progressContainer.setVisible(false);
-    progressContainer.addClassName("export-progress");
-    progressContainer.add(new Span("Processing export..."), progressBar);
+// Progress components
+progressBar = new ProgressBar();
+progressBar.setVisible(false);
+progressContainer = new VerticalLayout();
+progressContainer.setVisible(false);
+progressContainer.addClassName("export-progress");
+progressContainer.add(new Span("Processing export..."), progressBar);
 
-    // Initialize search mode components
-    initializeSearchModeComponents();
+// Initialize search mode components
+initializeSearchModeComponents();
 
-    // Initialize CSV mode components
-    initializeCsvModeComponents();
+// Initialize CSV mode components
+initializeCsvModeComponents();
 
-    // Mode container
-    modeContainer = new VerticalLayout();
-    modeContainer.setPadding(false);
-    modeContainer.setSpacing(false);
-    modeContainer.add(searchModeLayout);
-  }
+// Mode container
+modeContainer = new VerticalLayout();
+modeContainer.setPadding(false);
+modeContainer.setSpacing(false);
+modeContainer.add(searchModeLayout);
+}
 
-  private void initializeSearchModeComponents() {
-    searchModeLayout = new VerticalLayout();
-    searchModeLayout.setPadding(true);
-    searchModeLayout.setSpacing(true);
-    searchModeLayout.addClassName("export-field-group");
+private void initializeSearchModeComponents() {
+searchModeLayout = new VerticalLayout();
+searchModeLayout.setPadding(true);
+searchModeLayout.setSpacing(true);
+searchModeLayout.addClassName("export-field-group");
 
-    // Search fields
-    searchBaseField = new TextField("Search Base");
-    searchBaseField.setWidthFull();
-    searchBaseField.setPlaceholder("dc=example,dc=com");
+// Search fields
+searchBaseField = new TextField("Search Base");
+searchBaseField.setWidthFull();
+searchBaseField.setPlaceholder("dc=example,dc=com");
 
-    searchFilterField = new TextArea("Search Filter");
-    searchFilterField.setWidthFull();
-    searchFilterField.setHeight("100px");
-    searchFilterField.setPlaceholder("(objectClass=person)");
+searchFilterField = new TextArea("Search Filter");
+searchFilterField.setWidthFull();
+searchFilterField.setHeight("100px");
+searchFilterField.setPlaceholder("(objectClass=person)");
 
-    returnAttributesField = new TextField("Return Attributes");
-    returnAttributesField.setWidthFull();
-    returnAttributesField.setPlaceholder("cn,mail,telephoneNumber (comma-separated, leave empty for all)");
+returnAttributesField = new TextField("Return Attributes");
+returnAttributesField.setWidthFull();
+returnAttributesField.setPlaceholder("cn,mail,telephoneNumber (comma-separated, leave empty for all)");
 
-    outputFormatCombo = new ComboBox<>("Output Format");
-    outputFormatCombo.setItems("CSV", "JSON", "LDIF", "DN List");
-    outputFormatCombo.setValue("CSV");
+outputFormatCombo = new ComboBox<>("Output Format");
+outputFormatCombo.setItems("CSV", "JSON", "LDIF", "DN List");
+outputFormatCombo.setValue("CSV");
 
-    exportButton = new Button("Export", new Icon(VaadinIcon.DOWNLOAD));
-    exportButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-    exportButton.addClickListener(e -> performSearchExport());
+exportButton = new Button("Export", new Icon(VaadinIcon.DOWNLOAD));
+exportButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+exportButton.addClickListener(e -> performSearchExport());
 
-    HorizontalLayout formatLayout = new HorizontalLayout();
-    formatLayout.setDefaultVerticalComponentAlignment(Alignment.END);
-    formatLayout.add(outputFormatCombo, exportButton);
+HorizontalLayout formatLayout = new HorizontalLayout();
+formatLayout.setDefaultVerticalComponentAlignment(Alignment.END);
+formatLayout.add(outputFormatCombo, exportButton);
 
-    searchModeLayout.add(
-    new H4("Search Export"),
-    searchBaseField,
-    searchFilterField,
-    returnAttributesField,
-    formatLayout
-    );
-  }
+searchModeLayout.add(
+new H4("Search Export"),
+searchBaseField,
+searchFilterField,
+returnAttributesField,
+formatLayout
+);
+}
 
-  private void initializeCsvModeComponents() {
-    csvModeLayout = new VerticalLayout();
-    csvModeLayout.setPadding(true);
-    csvModeLayout.setSpacing(true);
-    csvModeLayout.addClassName("export-field-group");
+private void initializeCsvModeComponents() {
+csvModeLayout = new VerticalLayout();
+csvModeLayout.setPadding(true);
+csvModeLayout.setSpacing(true);
+csvModeLayout.addClassName("export-field-group");
 
-    // CSV Upload
-    csvBuffer = new MemoryBuffer();
-    csvUpload = new Upload(csvBuffer);
-    csvUpload.setAcceptedFileTypes("text/csv", ".csv");
-    csvUpload.setMaxFiles(1);
-    csvUpload.setWidthFull();
-    csvUpload.setDropLabel(new Span("Drop CSV file here or click to browse"));
+// CSV Upload
+csvBuffer = new MemoryBuffer();
+csvUpload = new Upload(csvBuffer);
+csvUpload.setAcceptedFileTypes("text/csv", ".csv");
+csvUpload.setMaxFiles(1);
+csvUpload.setWidthFull();
+csvUpload.setDropLabel(new Span("Drop CSV file here or click to browse"));
 
-    csvUpload.addSucceededListener(event -> {
-      try {
-        processCsvFile();
-      } catch (Exception ex) {
-      showError("Error processing CSV file: " + ex.getMessage());
-    }
-  });
+csvUpload.addSucceededListener(event -> {
+try {
+ processCsvFile();
+} catch (Exception ex) {
+showError("Error processing CSV file: " + ex.getMessage());
+}
+});
 
-  // CSV Search fields
-  csvSearchBaseField = new TextField("Search Base");
-  csvSearchBaseField.setWidthFull();
-  csvSearchBaseField.setPlaceholder("dc=example,dc=com");
+// CSV Search fields
+csvSearchBaseField = new TextField("Search Base");
+csvSearchBaseField.setWidthFull();
+csvSearchBaseField.setPlaceholder("dc=example,dc=com");
 
-  csvSearchFilterField = new TextArea("Search Filter");
-  csvSearchFilterField.setWidthFull();
-  csvSearchFilterField.setHeight("100px");
-  csvSearchFilterField.setPlaceholder("(&(objectClass=person)(uid={C1})(sn={C2}))");
-  csvSearchFilterField.setHelperText("Use {C1}, {C2}, {C3}, etc. to reference CSV columns");
+csvSearchFilterField = new TextArea("Search Filter");
+csvSearchFilterField.setWidthFull();
+csvSearchFilterField.setHeight("100px");
+csvSearchFilterField.setPlaceholder("(&(objectClass=person)(uid={C1})(sn={C2}))");
+csvSearchFilterField.setHelperText("Use {C1}, {C2}, {C3}, etc. to reference CSV columns");
 
-  csvReturnAttributesField = new TextField("Return Attributes");
-  csvReturnAttributesField.setWidthFull();
-  csvReturnAttributesField.setPlaceholder("cn,mail,telephoneNumber (comma-separated, leave empty for all)");
+csvReturnAttributesField = new TextField("Return Attributes");
+csvReturnAttributesField.setWidthFull();
+csvReturnAttributesField.setPlaceholder("cn,mail,telephoneNumber (comma-separated, leave empty for all)");
 
-  csvOutputFormatCombo = new ComboBox<>("Output Format");
-  csvOutputFormatCombo.setItems("CSV", "JSON", "LDIF", "DN List");
-  csvOutputFormatCombo.setValue("CSV");
+csvOutputFormatCombo = new ComboBox<>("Output Format");
+csvOutputFormatCombo.setItems("CSV", "JSON", "LDIF", "DN List");
+csvOutputFormatCombo.setValue("CSV");
 
-  excludeHeaderCheckbox = new Checkbox("Exclude first row (header row)");
-  excludeHeaderCheckbox.setValue(false);
-  excludeHeaderCheckbox.getStyle().set("margin-top", "8px");
-  excludeHeaderCheckbox.addValueChangeListener(e -> {
-    if (csvData != null && !csvData.isEmpty()) {
-      try {
-        processCsvFile(); // Reprocess the file with new settings
-      } catch (Exception ex) {
-      showError("Error reprocessing CSV file: " + ex.getMessage());
-    }
-  }
+excludeHeaderCheckbox = new Checkbox("Exclude first row (header row)");
+excludeHeaderCheckbox.setValue(false);
+excludeHeaderCheckbox.getStyle().set("margin-top", "8px");
+excludeHeaderCheckbox.addValueChangeListener(e -> {
+if (csvData != null && !csvData.isEmpty()) {
+try {
+ processCsvFile(); // Reprocess the file with new settings
+} catch (Exception ex) {
+showError("Error reprocessing CSV file: " + ex.getMessage());
+}
+}
 });
 
 quotedValuesCheckbox = new Checkbox("Values are surrounded by quotes");
 quotedValuesCheckbox.setValue(true);
 quotedValuesCheckbox.getStyle().set("margin-bottom", "8px");
 quotedValuesCheckbox.addValueChangeListener(e -> {
-  if (csvData != null && !csvData.isEmpty()) {
-    try {
-      processCsvFile(); // Reprocess the file with new settings
-    } catch (Exception ex) {
-    showError("Error reprocessing CSV file: " + ex.getMessage());
-  }
+if (csvData != null && !csvData.isEmpty()) {
+try {
+processCsvFile(); // Reprocess the file with new settings
+} catch (Exception ex) {
+showError("Error reprocessing CSV file: " + ex.getMessage());
+}
 }
 });
 
@@ -293,67 +293,67 @@ formatAndExportLayout
 }
 
 private void setupLayout() {
-  setSizeFull();
-  setPadding(true);
-  setSpacing(true);
-  addClassName("export-container");
+setSizeFull();
+setPadding(true);
+setSpacing(true);
+addClassName("export-container");
 
-  // Environment selection at the top
-  HorizontalLayout environmentSection = new HorizontalLayout();
-  environmentSection.setSpacing(true);
-  environmentSection.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-  // Environment selection UI removed
-  add(environmentSection);
+// Environment selection at the top
+HorizontalLayout environmentSection = new HorizontalLayout();
+environmentSection.setSpacing(true);
+environmentSection.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+// Environment selection UI removed
+add(environmentSection);
 
-  // Title with icon
-  HorizontalLayout titleLayout = new HorizontalLayout();
-  titleLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-  titleLayout.setSpacing(true);
+// Title with icon
+HorizontalLayout titleLayout = new HorizontalLayout();
+titleLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+titleLayout.setSpacing(true);
 
-  Icon exportIcon = new Icon(VaadinIcon.DOWNLOAD);
-  exportIcon.setSize("20px");
-  exportIcon.getStyle().set("color", "#4a90e2");
+Icon exportIcon = new Icon(VaadinIcon.DOWNLOAD);
+exportIcon.setSize("20px");
+exportIcon.getStyle().set("color", "#4a90e2");
 
-  H3 title = new H3("Export");
-  title.addClassNames(LumoUtility.Margin.NONE);
-  title.getStyle().set("color", "#333");
+H3 title = new H3("Export");
+title.addClassNames(LumoUtility.Margin.NONE);
+title.getStyle().set("color", "#333");
 
-  titleLayout.add(exportIcon, title);
+titleLayout.add(exportIcon, title);
 
-  // Mode selector with styling
-  itemSelectionMode.addClassName("export-mode-selector");
+// Mode selector with styling
+itemSelectionMode.addClassName("export-mode-selector");
 
-  // Add section styling to mode containers
-  modeContainer.addClassName("export-section");
+// Add section styling to mode containers
+modeContainer.addClassName("export-section");
 
-  add(titleLayout, itemSelectionMode, modeContainer, progressContainer);
+add(titleLayout, itemSelectionMode, modeContainer, progressContainer);
 
-  // Download link (initially hidden)
-  downloadLink = new Anchor();
-  downloadLink.setVisible(false);
-  downloadLink.addClassName("export-download");
-  add(downloadLink);
+// Download link (initially hidden)
+downloadLink = new Anchor();
+downloadLink.setVisible(false);
+downloadLink.addClassName("export-download");
+add(downloadLink);
 }
 
 private void switchMode(String mode) {
-  modeContainer.removeAll();
-  if ("Search".equals(mode)) {
-    modeContainer.add(searchModeLayout);
-  } else if ("Input CSV".equals(mode)) {
-  modeContainer.add(csvModeLayout);
+modeContainer.removeAll();
+if ("Search".equals(mode)) {
+modeContainer.add(searchModeLayout);
+} else if ("Input CSV".equals(mode)) {
+modeContainer.add(csvModeLayout);
 }
 }
 
 private void processCsvFile() throws Exception {
-  String content;
+String content;
 
-  // If this is the first time processing, read from the input stream
-  if (rawCsvContent == null) {
-    content = new String(csvBuffer.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    rawCsvContent = content; // Store for future reprocessing
-  } else {
-  // Use stored content for reprocessing
-  content = rawCsvContent;
+// If this is the first time processing, read from the input stream
+if (rawCsvContent == null) {
+content = new String(csvBuffer.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+rawCsvContent = content; // Store for future reprocessing
+} else {
+// Use stored content for reprocessing
+content = rawCsvContent;
 }
 
 String[] lines = content.split("\n");
@@ -363,8 +363,8 @@ csvColumnOrder.clear();
 csvPreviewGrid.removeAllColumns();
 
 if (lines.length == 0) {
-  showError("CSV file is empty");
-  return;
+showError("CSV file is empty");
+return;
 }
 
 // Skip header row if checkbox is checked
@@ -374,48 +374,48 @@ boolean removeQuotes = quotedValuesCheckbox.getValue();
 // Parse CSV data
 boolean isFirstRow = true;
 for (int i = startIndex; i < lines.length; i++) {
-  String line = lines[i].trim();
-  if (line.isEmpty()) continue;
+String line = lines[i].trim();
+if (line.isEmpty()) continue;
 
-  List<String> values = parseCSVLine(line, removeQuotes);
-  Map<String, String> row = new LinkedHashMap<>();
+List<String> values = parseCSVLine(line, removeQuotes);
+Map<String, String> row = new LinkedHashMap<>();
 
-  // On the first row, establish the column order
-  if (isFirstRow) {
-    for (int j = 0; j < values.size(); j++) {
-      String columnName = "C" + (j + 1);
-      csvColumnOrder.add(columnName);
-    }
-    isFirstRow = false;
-  }
+// On the first row, establish the column order
+if (isFirstRow) {
+for (int j = 0; j < values.size(); j++) {
+String columnName = "C" + (j + 1);
+csvColumnOrder.add(columnName);
+}
+isFirstRow = false;
+}
 
-  for (int j = 0; j < values.size(); j++) {
-    String columnName = "C" + (j + 1);
-    String value = values.get(j);
-    row.put(columnName, value);
-  }
-  csvData.add(row);
+for (int j = 0; j < values.size(); j++) {
+String columnName = "C" + (j + 1);
+String value = values.get(j);
+row.put(columnName, value);
+}
+csvData.add(row);
 }
 
 if (csvData.isEmpty()) {
-  showError("No valid data found in CSV file");
-  return;
+showError("No valid data found in CSV file");
+return;
 }
 
 // Set up preview grid columns using the stored column order
 for (String columnName : csvColumnOrder) {
-  csvPreviewGrid.addColumn(row -> row.get(columnName))
-  .setHeader(columnName)
-  .setFlexGrow(1)
-  .setResizable(true)
-  .setSortable(true)
-  .setComparator((row1, row2) -> {
-    String value1 = row1.get(columnName);
-    String value2 = row2.get(columnName);
-    if (value1 == null) value1 = "";
-    if (value2 == null) value2 = "";
-    return value1.compareToIgnoreCase(value2);
-  });
+csvPreviewGrid.addColumn(row -> row.get(columnName))
+.setHeader(columnName)
+.setFlexGrow(1)
+.setResizable(true)
+.setSortable(true)
+.setComparator((row1, row2) -> {
+String value1 = row1.get(columnName);
+String value2 = row2.get(columnName);
+if (value1 == null) value1 = "";
+if (value2 == null) value2 = "";
+return value1.compareToIgnoreCase(value2);
+});
 }
 
 csvPreviewGrid.setItems(csvData);
@@ -428,48 +428,48 @@ showSuccess("CSV file processed successfully. " + csvData.size() + " rows loaded
 }
 
 private void performSearchExport() {
-  if (serverConfig == null) {
-    showError("Please connect to an LDAP server first");
-    return;
-  }
+if (serverConfig == null) {
+showError("Please connect to an LDAP server first");
+return;
+}
 
-  String searchBase = searchBaseField.getValue();
-  String searchFilter = searchFilterField.getValue();
-  String returnAttrs = returnAttributesField.getValue();
-  String format = outputFormatCombo.getValue();
+String searchBase = searchBaseField.getValue();
+String searchFilter = searchFilterField.getValue();
+String returnAttrs = returnAttributesField.getValue();
+String format = outputFormatCombo.getValue();
 
-  if (searchBase == null || searchBase.trim().isEmpty()) {
-    showError("Search Base is required");
-    return;
-  }
+if (searchBase == null || searchBase.trim().isEmpty()) {
+showError("Search Base is required");
+return;
+}
 
-  if (searchFilter == null || searchFilter.trim().isEmpty()) {
-    showError("Search Filter is required");
-    return;
-  }
+if (searchFilter == null || searchFilter.trim().isEmpty()) {
+showError("Search Filter is required");
+return;
+}
 
-  loggingService.logInfo("EXPORT", "Starting search export - Server: " + serverConfig.getName() + ", Base: " + searchBase + ", Filter: " + searchFilter + ", Format: " + format);
+loggingService.logInfo("EXPORT", "Starting search export - Server: " + serverConfig.getName() + ", Base: " + searchBase + ", Filter: " + searchFilter + ", Format: " + format);
 
-  showProgress();
+showProgress();
 
-  try {
-    List<LdapEntry> ldapEntries = null;
-    List<String> dnList = null;
+try {
+List<LdapEntry> ldapEntries = null;
+List<String> dnList = null;
 
-    // Use optimized DN-only search for DN List format
-    if ("DN List".equals(format)) {
-      dnList = ldapService.getDNsOnly(serverConfig.getId(), searchBase.trim(), searchFilter.trim(), SearchScope.SUB);
-    } else {
-    // Use regular search for other formats
-    if (returnAttrs != null && !returnAttrs.trim().isEmpty()) {
-      String[] attrs = returnAttrs.split(",");
-      for (int i = 0; i < attrs.length; i++) {
-        attrs[i] = attrs[i].trim();
-      }
-      ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter.trim(), SearchScope.SUB, attrs);
-    } else {
-    ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter.trim(), SearchScope.SUB);
-  }
+// Use optimized DN-only search for DN List format
+if ("DN List".equals(format)) {
+dnList = ldapService.getDNsOnly(serverConfig.getId(), searchBase.trim(), searchFilter.trim(), SearchScope.SUB);
+} else {
+// Use regular search for other formats
+if (returnAttrs != null && !returnAttrs.trim().isEmpty()) {
+String[] attrs = returnAttrs.split(",");
+for (int i = 0; i < attrs.length; i++) {
+ attrs[i] = attrs[i].trim();
+}
+ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter.trim(), SearchScope.SUB, attrs);
+} else {
+ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter.trim(), SearchScope.SUB);
+}
 }
 
 String exportData;
@@ -477,23 +477,23 @@ String fileName;
 int entryCount;
 
 if ("DN List".equals(format)) {
-  // Generate DN list export
-  exportData = generateDNListExport(dnList);
-  fileName = generateFileName(format);
-  entryCount = dnList != null ? dnList.size() : 0;
+// Generate DN list export
+exportData = generateDNListExport(dnList);
+fileName = generateFileName(format);
+entryCount = dnList != null ? dnList.size() : 0;
 } else {
 // Convert LdapEntry to SearchResultEntry for export generation
 List<SearchResultEntry> entries = new ArrayList<>();
 if (ldapEntries != null) {
-  for (LdapEntry ldapEntry : ldapEntries) {
-    // Create a SearchResultEntry from LdapEntry
-    Collection<Attribute> attributes = new ArrayList<>();
-    for (Map.Entry<String, List<String>> attr : ldapEntry.getAttributes().entrySet()) {
-      attributes.add(new Attribute(attr.getKey(), attr.getValue()));
-    }
-    SearchResultEntry entry = new SearchResultEntry(ldapEntry.getDn(), attributes);
-    entries.add(entry);
-  }
+for (LdapEntry ldapEntry : ldapEntries) {
+// Create a SearchResultEntry from LdapEntry
+Collection<Attribute> attributes = new ArrayList<>();
+for (Map.Entry<String, List<String>> attr : ldapEntry.getAttributes().entrySet()) {
+attributes.add(new Attribute(attr.getKey(), attr.getValue()));
+}
+SearchResultEntry entry = new SearchResultEntry(ldapEntry.getDn(), attributes);
+entries.add(entry);
+}
 }
 
 exportData = generateExportData(entries, format, getReturnAttributesList(returnAttrs));
@@ -514,71 +514,71 @@ showError("Search failed: " + e.getMessage());
 }
 
 private void performCsvExport() {
-  if (serverConfig == null) {
-    showError("Please connect to an LDAP server first");
-    return;
-  }
+if (serverConfig == null) {
+showError("Please connect to an LDAP server first");
+return;
+}
 
-  if (csvData.isEmpty()) {
-    showError("Please upload a CSV file first");
-    return;
-  }
+if (csvData.isEmpty()) {
+showError("Please upload a CSV file first");
+return;
+}
 
-  String searchBase = csvSearchBaseField.getValue();
-  String searchFilterTemplate = csvSearchFilterField.getValue();
-  String returnAttrs = csvReturnAttributesField.getValue();
-  String format = csvOutputFormatCombo.getValue();
+String searchBase = csvSearchBaseField.getValue();
+String searchFilterTemplate = csvSearchFilterField.getValue();
+String returnAttrs = csvReturnAttributesField.getValue();
+String format = csvOutputFormatCombo.getValue();
 
-  if (searchBase == null || searchBase.trim().isEmpty()) {
-    showError("Search Base is required");
-    return;
-  }
+if (searchBase == null || searchBase.trim().isEmpty()) {
+showError("Search Base is required");
+return;
+}
 
-  if (searchFilterTemplate == null || searchFilterTemplate.trim().isEmpty()) {
-    showError("Search Filter is required");
-    return;
-  }
+if (searchFilterTemplate == null || searchFilterTemplate.trim().isEmpty()) {
+showError("Search Filter is required");
+return;
+}
 
-  loggingService.logInfo("EXPORT", "Starting CSV export - Server: " + serverConfig.getName() + ", CSV rows: " + csvData.size() + ", Format: " + format);
+loggingService.logInfo("EXPORT", "Starting CSV export - Server: " + serverConfig.getName() + ", CSV rows: " + csvData.size() + ", Format: " + format);
 
-  showProgress();
+showProgress();
 
-  try {
-    List<SearchResultEntry> allEntries = new ArrayList<>();
+try {
+List<SearchResultEntry> allEntries = new ArrayList<>();
 
-    // Process each row in CSV data
-    for (Map<String, String> row : csvData) {
-      String searchFilter = substituteVariables(searchFilterTemplate, row);
+// Process each row in CSV data
+for (Map<String, String> row : csvData) {
+String searchFilter = substituteVariables(searchFilterTemplate, row);
 
-      List<LdapEntry> ldapEntries;
-      if (returnAttrs != null && !returnAttrs.trim().isEmpty()) {
-        String[] attrs = returnAttrs.split(",");
-        for (int i = 0; i < attrs.length; i++) {
-          attrs[i] = attrs[i].trim();
-        }
-        ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter, SearchScope.SUB, attrs);
-      } else {
-      ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter, SearchScope.SUB);
-    }
+List<LdapEntry> ldapEntries;
+if (returnAttrs != null && !returnAttrs.trim().isEmpty()) {
+ String[] attrs = returnAttrs.split(",");
+ for (int i = 0; i < attrs.length; i++) {
+ attrs[i] = attrs[i].trim();
+ }
+ ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter, SearchScope.SUB, attrs);
+} else {
+ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter, SearchScope.SUB);
+}
 
-    // Convert LdapEntry to SearchResultEntry for export generation
-    for (LdapEntry ldapEntry : ldapEntries) {
-      Collection<Attribute> attributes = new ArrayList<>();
-      for (Map.Entry<String, List<String>> attr : ldapEntry.getAttributes().entrySet()) {
-        attributes.add(new Attribute(attr.getKey(), attr.getValue()));
-      }
-      SearchResultEntry entry = new SearchResultEntry(ldapEntry.getDn(), attributes);
-      allEntries.add(entry);
-    }
-  }
+// Convert LdapEntry to SearchResultEntry for export generation
+for (LdapEntry ldapEntry : ldapEntries) {
+Collection<Attribute> attributes = new ArrayList<>();
+for (Map.Entry<String, List<String>> attr : ldapEntry.getAttributes().entrySet()) {
+ attributes.add(new Attribute(attr.getKey(), attr.getValue()));
+}
+SearchResultEntry entry = new SearchResultEntry(ldapEntry.getDn(), attributes);
+allEntries.add(entry);
+}
+}
 
-  String exportData = generateExportData(allEntries, format, getReturnAttributesList(returnAttrs));
-  String fileName = generateFileName(format);
+String exportData = generateExportData(allEntries, format, getReturnAttributesList(returnAttrs));
+String fileName = generateFileName(format);
 
-  createDownloadLink(exportData, fileName, format);
-  hideProgress();
-  loggingService.logExport(serverConfig.getName(), fileName, allEntries.size());
-  showSuccess("Export completed successfully. " + allEntries.size() + " entries exported from " + csvData.size() + " searches.");
+createDownloadLink(exportData, fileName, format);
+hideProgress();
+loggingService.logExport(serverConfig.getName(), fileName, allEntries.size());
+showSuccess("Export completed successfully. " + allEntries.size() + " entries exported from " + csvData.size() + " searches.");
 
 } catch (LDAPException e) {
 hideProgress();
@@ -588,48 +588,48 @@ showError("Search failed: " + e.getMessage());
 }
 
 private String substituteVariables(String template, Map<String, String> variables) {
-  String result = template;
-  Pattern pattern = Pattern.compile("\\{(C\\d+)\\}");
-  Matcher matcher = pattern.matcher(template);
+String result = template;
+Pattern pattern = Pattern.compile("\\{(C\\d+)\\}");
+Matcher matcher = pattern.matcher(template);
 
-  while (matcher.find()) {
-    String variable = matcher.group(1);
-    String value = variables.get(variable);
-    if (value != null) {
-      result = result.replace("{" + variable + "}", value);
-    }
-  }
+while (matcher.find()) {
+String variable = matcher.group(1);
+String value = variables.get(variable);
+if (value != null) {
+result = result.replace("{" + variable + "}", value);
+}
+}
 
-  return result;
+return result;
 }
 
 /**
 * Parse a CSV line properly handling quoted values that may contain commas
 */
 private List<String> parseCSVLine(String line, boolean removeQuotes) {
-  List<String> values = new ArrayList<>();
-  boolean inQuotes = false;
-  StringBuilder currentValue = new StringBuilder();
+List<String> values = new ArrayList<>();
+boolean inQuotes = false;
+StringBuilder currentValue = new StringBuilder();
 
-  for (int i = 0; i < line.length(); i++) {
-    char ch = line.charAt(i);
+for (int i = 0; i < line.length(); i++) {
+char ch = line.charAt(i);
 
-    if (ch == '"') {
-      if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
-        // Handle escaped quotes ("")
-        currentValue.append('"');
-        i++; // Skip the next quote
-      } else {
-      // Toggle quote state
-      inQuotes = !inQuotes;
-      if (!removeQuotes) {
-        currentValue.append(ch);
-      }
-    }
-  } else if (ch == ',' && !inQuotes) {
-  // End of field
-  values.add(currentValue.toString().trim());
-  currentValue = new StringBuilder();
+if (ch == '"') {
+if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+ // Handle escaped quotes ("")
+ currentValue.append('"');
+ i++; // Skip the next quote
+} else {
+// Toggle quote state
+inQuotes = !inQuotes;
+if (!removeQuotes) {
+ currentValue.append(ch);
+}
+}
+} else if (ch == ',' && !inQuotes) {
+// End of field
+values.add(currentValue.toString().trim());
+currentValue = new StringBuilder();
 } else {
 currentValue.append(ch);
 }
@@ -642,58 +642,58 @@ return values;
 }
 
 private List<String> getReturnAttributesList(String returnAttrs) {
-  if (returnAttrs == null || returnAttrs.trim().isEmpty()) {
-    return new ArrayList<>();
-  }
+if (returnAttrs == null || returnAttrs.trim().isEmpty()) {
+return new ArrayList<>();
+}
 
-  return Arrays.stream(returnAttrs.split(","))
-  .map(String::trim)
-  .filter(s -> !s.isEmpty())
-  .collect(Collectors.toList());
+return Arrays.stream(returnAttrs.split(","))
+.map(String::trim)
+.filter(s -> !s.isEmpty())
+.collect(Collectors.toList());
 }
 
 private String generateExportData(List<SearchResultEntry> entries, String format, List<String> requestedAttrs) {
-  switch (format.toUpperCase()) {
-    case "CSV":
-    return generateCsvData(entries, requestedAttrs);
-    case "JSON":
-    return generateJsonData(entries, requestedAttrs);
-    case "LDIF":
-    return generateLdifData(entries, requestedAttrs);
-    default:
-    return generateCsvData(entries, requestedAttrs);
-  }
+switch (format.toUpperCase()) {
+case "CSV":
+return generateCsvData(entries, requestedAttrs);
+case "JSON":
+return generateJsonData(entries, requestedAttrs);
+case "LDIF":
+return generateLdifData(entries, requestedAttrs);
+default:
+return generateCsvData(entries, requestedAttrs);
+}
 }
 
 /**
 * Generate DN-only export - optimized for bulk operations
 */
 private String generateDNListExport(List<String> dnList) {
-  StringBuilder sb = new StringBuilder();
-  for (String dn : dnList) {
-    sb.append(dn).append("\n");
-  }
-  return sb.toString();
+StringBuilder sb = new StringBuilder();
+for (String dn : dnList) {
+sb.append(dn).append("\n");
+}
+return sb.toString();
 }
 
 private String generateCsvData(List<SearchResultEntry> entries, List<String> requestedAttrs) {
-  StringWriter writer = new StringWriter();
+StringWriter writer = new StringWriter();
 
-  if (entries.isEmpty()) {
-    return writer.toString();
-  }
+if (entries.isEmpty()) {
+return writer.toString();
+}
 
-  // Determine attributes to export
-  Set<String> attributesToExport = new LinkedHashSet<>();
-  attributesToExport.add("dn"); // Always include DN
+// Determine attributes to export
+Set<String> attributesToExport = new LinkedHashSet<>();
+attributesToExport.add("dn"); // Always include DN
 
-  if (requestedAttrs.isEmpty()) {
-    // If no specific attributes requested, collect all unique attributes
-    for (SearchResultEntry entry : entries) {
-      entry.getAttributes().forEach(attr -> attributesToExport.add(attr.getName()));
-    }
-  } else {
-  attributesToExport.addAll(requestedAttrs);
+if (requestedAttrs.isEmpty()) {
+// If no specific attributes requested, collect all unique attributes
+for (SearchResultEntry entry : entries) {
+entry.getAttributes().forEach(attr -> attributesToExport.add(attr.getName()));
+}
+} else {
+attributesToExport.addAll(requestedAttrs);
 }
 
 // Write header
@@ -701,20 +701,20 @@ writer.write(String.join(",", attributesToExport) + "\n");
 
 // Write data
 for (SearchResultEntry entry : entries) {
-  List<String> values = new ArrayList<>();
-  for (String attrName : attributesToExport) {
-    if ("dn".equals(attrName)) {
-      values.add("\"" + entry.getDN() + "\"");
-    } else {
-    String[] attrValues = entry.getAttributeValues(attrName);
-    if (attrValues != null && attrValues.length > 0) {
-      if (attrValues.length == 1) {
-        values.add("\"" + attrValues[0] + "\"");
-      } else {
-      values.add("\"" + String.join("; ", attrValues) + "\"");
-    }
-  } else {
-  values.add("\"\"");
+List<String> values = new ArrayList<>();
+for (String attrName : attributesToExport) {
+if ("dn".equals(attrName)) {
+values.add("\"" + entry.getDN() + "\"");
+} else {
+String[] attrValues = entry.getAttributeValues(attrName);
+if (attrValues != null && attrValues.length > 0) {
+if (attrValues.length == 1) {
+ values.add("\"" + attrValues[0] + "\"");
+} else {
+values.add("\"" + String.join("; ", attrValues) + "\"");
+}
+} else {
+values.add("\"\"");
 }
 }
 }
@@ -725,48 +725,48 @@ return writer.toString();
 }
 
 private String generateJsonData(List<SearchResultEntry> entries, List<String> requestedAttrs) {
-  StringWriter writer = new StringWriter();
-  writer.write("[\n");
+StringWriter writer = new StringWriter();
+writer.write("[\n");
 
-  for (int i = 0; i < entries.size(); i++) {
-    SearchResultEntry entry = entries.get(i);
-    writer.write("  {\n");
-      writer.write("    \"dn\": \"" + entry.getDN() + "\"");
+for (int i = 0; i < entries.size(); i++) {
+SearchResultEntry entry = entries.get(i);
+writer.write("  {\n");
+writer.write("    \"dn\": \"" + entry.getDN() + "\"");
 
-      if (requestedAttrs.isEmpty()) {
-        // Export all attributes
-        entry.getAttributes().forEach(attr -> {
-          String[] values = attr.getValues();
-          writer.write(",\n    \"" + attr.getName() + "\": ");
-          if (values.length == 1) {
-            writer.write("\"" + values[0] + "\"");
-          } else {
-          writer.write("[");
-          for (int j = 0; j < values.length; j++) {
-            if (j > 0) writer.write(", ");
-            writer.write("\"" + values[j] + "\"");
-          }
-          writer.write("]");
-        }
-      });
-    } else {
-    // Export only requested attributes
-    for (String attrName : requestedAttrs) {
-      String[] values = entry.getAttributeValues(attrName);
-      if (values != null && values.length > 0) {
-        writer.write(",\n    \"" + attrName + "\": ");
-        if (values.length == 1) {
-          writer.write("\"" + values[0] + "\"");
-        } else {
-        writer.write("[");
-        for (int j = 0; j < values.length; j++) {
-          if (j > 0) writer.write(", ");
-          writer.write("\"" + values[j] + "\"");
-        }
-        writer.write("]");
-      }
-    }
-  }
+if (requestedAttrs.isEmpty()) {
+ // Export all attributes
+ entry.getAttributes().forEach(attr -> {
+ String[] values = attr.getValues();
+ writer.write(",\n    \"" + attr.getName() + "\": ");
+ if (values.length == 1) {
+ writer.write("\"" + values[0] + "\"");
+ } else {
+ writer.write("[");
+ for (int j = 0; j < values.length; j++) {
+ if (j > 0) writer.write(", ");
+ writer.write("\"" + values[j] + "\"");
+ }
+ writer.write("]");
+ }
+});
+} else {
+// Export only requested attributes
+for (String attrName : requestedAttrs) {
+String[] values = entry.getAttributeValues(attrName);
+if (values != null && values.length > 0) {
+ writer.write(",\n    \"" + attrName + "\": ");
+ if (values.length == 1) {
+ writer.write("\"" + values[0] + "\"");
+ } else {
+ writer.write("[");
+ for (int j = 0; j < values.length; j++) {
+ if (j > 0) writer.write(", ");
+ writer.write("\"" + values[j] + "\"");
+ }
+ writer.write("]");
+}
+}
+}
 }
 
 writer.write("\n  }");
@@ -779,44 +779,44 @@ return writer.toString();
 }
 
 private String generateLdifData(List<SearchResultEntry> entries, List<String> requestedAttrs) {
-  StringWriter writer = new StringWriter();
+StringWriter writer = new StringWriter();
 
-  for (SearchResultEntry entry : entries) {
-    writer.write("dn: " + entry.getDN() + "\n");
+for (SearchResultEntry entry : entries) {
+writer.write("dn: " + entry.getDN() + "\n");
 
-    if (requestedAttrs.isEmpty()) {
-      // Export all attributes
-      entry.getAttributes().forEach(attr -> {
-        for (String value : attr.getValues()) {
-          writer.write(attr.getName() + ": " + value + "\n");
-        }
-      });
-    } else {
-    // Export only requested attributes
-    for (String attrName : requestedAttrs) {
-      String[] values = entry.getAttributeValues(attrName);
-      if (values != null) {
-        for (String value : values) {
-          writer.write(attrName + ": " + value + "\n");
-        }
-      }
-    }
-  }
+if (requestedAttrs.isEmpty()) {
+// Export all attributes
+entry.getAttributes().forEach(attr -> {
+ for (String value : attr.getValues()) {
+ writer.write(attr.getName() + ": " + value + "\n");
+ }
+});
+} else {
+// Export only requested attributes
+for (String attrName : requestedAttrs) {
+String[] values = entry.getAttributeValues(attrName);
+if (values != null) {
+ for (String value : values) {
+ writer.write(attrName + ": " + value + "\n");
+ }
+}
+}
+}
 
-  writer.write("\n"); // Empty line between entries
+writer.write("\n"); // Empty line between entries
 }
 
 return writer.toString();
 }
 
 private String generateFileName(String format) {
-  DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
-  String timestamp = LocalDateTime.now().format(formatter);
-  String extension = format.toLowerCase();
-  if ("ldif".equals(extension)) {
-    extension = "ldif";
-  } else if ("json".equals(extension)) {
-  extension = "json";
+DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+String timestamp = LocalDateTime.now().format(formatter);
+String extension = format.toLowerCase();
+if ("ldif".equals(extension)) {
+extension = "ldif";
+} else if ("json".equals(extension)) {
+extension = "json";
 } else if ("dn list".equals(extension)) {
 extension = "txt";
 } else {
@@ -826,82 +826,82 @@ return "ldap_export_" + timestamp + "." + extension;
 }
 
 private void createDownloadLink(String data, String fileName, String format) {
-  String mimeType;
-  switch (format.toUpperCase()) {
-    case "JSON":
-    mimeType = "application/json";
-    break;
-    case "LDIF":
-    mimeType = "text/plain";
-    break;
-    case "DN LIST":
-    mimeType = "text/plain";
-    break;
-    default:
-    mimeType = "text/csv";
-    break;
-  }
+String mimeType;
+switch (format.toUpperCase()) {
+case "JSON":
+mimeType = "application/json";
+break;
+case "LDIF":
+mimeType = "text/plain";
+break;
+case "DN LIST":
+mimeType = "text/plain";
+break;
+default:
+mimeType = "text/csv";
+break;
+}
 
-  StreamResource resource = new StreamResource(fileName, () ->
-  new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
-  resource.setContentType(mimeType);
+StreamResource resource = new StreamResource(fileName, () ->
+new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
+resource.setContentType(mimeType);
 
-  downloadLink.setHref(resource);
-  downloadLink.getElement().setAttribute("download", true);
-  downloadLink.setText("Download " + fileName);
-  downloadLink.setVisible(true);
+downloadLink.setHref(resource);
+downloadLink.getElement().setAttribute("download", true);
+downloadLink.setText("Download " + fileName);
+downloadLink.setVisible(true);
 }
 
 private void showProgress() {
-  progressBar.setIndeterminate(true);
-  progressContainer.setVisible(true);
-  exportButton.setEnabled(false);
-  csvExportButton.setEnabled(false);
-  downloadLink.setVisible(false);
+progressBar.setIndeterminate(true);
+progressContainer.setVisible(true);
+exportButton.setEnabled(false);
+csvExportButton.setEnabled(false);
+downloadLink.setVisible(false);
 }
 
 private void hideProgress() {
-  progressContainer.setVisible(false);
-  exportButton.setEnabled(true);
-  csvExportButton.setEnabled(!csvData.isEmpty());
+progressContainer.setVisible(false);
+exportButton.setEnabled(true);
+csvExportButton.setEnabled(!csvData.isEmpty());
 }
 
 public void setServerConfig(LdapServerConfig serverConfig) {
-  this.serverConfig = serverConfig;
+this.serverConfig = serverConfig;
 }
 
 public void clear() {
-  searchBaseField.clear();
-  searchFilterField.clear();
-  returnAttributesField.clear();
-  csvSearchBaseField.clear();
-  csvSearchFilterField.clear();
-  csvReturnAttributesField.clear();
-  csvData.clear();
-  csvColumnOrder.clear();
-  rawCsvContent = null;
-  excludeHeaderCheckbox.setValue(false);
-  quotedValuesCheckbox.setValue(true);
-  csvPreviewContainer.setVisible(false);
-  csvExportButton.setEnabled(false);
-  downloadLink.setVisible(false);
-  hideProgress();
+searchBaseField.clear();
+searchFilterField.clear();
+returnAttributesField.clear();
+csvSearchBaseField.clear();
+csvSearchFilterField.clear();
+csvReturnAttributesField.clear();
+csvData.clear();
+csvColumnOrder.clear();
+rawCsvContent = null;
+excludeHeaderCheckbox.setValue(false);
+quotedValuesCheckbox.setValue(true);
+csvPreviewContainer.setVisible(false);
+csvExportButton.setEnabled(false);
+downloadLink.setVisible(false);
+hideProgress();
 }
 
 private void showSuccess(String message) {
-  Notification notification = Notification.show(message, 3000, Notification.Position.TOP_END);
-  notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+Notification notification = Notification.show(message, 3000, Notification.Position.TOP_END);
+notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 }
 
 private void showError(String message) {
-  Notification notification = Notification.show(message, 5000, Notification.Position.TOP_END);
-  notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+Notification notification = Notification.show(message, 5000, Notification.Position.TOP_END);
+notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
 }
 
 /**
 * Refresh the environment dropdown when environments change
 */
 public void refreshEnvironments() {
-  // No environment dropdown to refresh here
+// No environment dropdown to refresh here
 }
 }

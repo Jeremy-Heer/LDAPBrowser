@@ -43,182 +43,182 @@ import java.util.Map;
 */
 public class ImportTab extends VerticalLayout {
 
-  // LDAP Control OIDs
-  private static final String NO_OPERATION_CONTROL_OID = "1.3.6.1.4.1.4203.1.10.2";
-  private static final String PERMISSIVE_MODIFY_CONTROL_OID = "1.2.840.113556.1.4.1413";
+// LDAP Control OIDs
+private static final String NO_OPERATION_CONTROL_OID = "1.3.6.1.4.1.4203.1.10.2";
+private static final String PERMISSIVE_MODIFY_CONTROL_OID = "1.2.840.113556.1.4.1413";
 
-  private final LdapService ldapService;
-  private final LoggingService loggingService;
+private final LdapService ldapService;
+private final LoggingService loggingService;
 
-  // Server configuration
-  private LdapServerConfig serverConfig;
+// Server configuration
+private LdapServerConfig serverConfig;
 
-  // UI Components
-  private ComboBox<String> importModeSelector;
-  private VerticalLayout modeContainer;
+// UI Components
+private ComboBox<String> importModeSelector;
+private VerticalLayout modeContainer;
 
-  // LDIF Mode Components
-  private VerticalLayout ldifModeLayout;
-  private Upload ldifUpload;
-  private MemoryBuffer ldifBuffer;
-  private Checkbox ldifContinueOnError;
-  private Checkbox ldifPermissiveModify;
-  private Checkbox ldifNoOperation;
-  private Button ldifImportButton;
+// LDIF Mode Components
+private VerticalLayout ldifModeLayout;
+private Upload ldifUpload;
+private MemoryBuffer ldifBuffer;
+private Checkbox ldifContinueOnError;
+private Checkbox ldifPermissiveModify;
+private Checkbox ldifNoOperation;
+private Button ldifImportButton;
 
-  // CSV Mode Components
-  private VerticalLayout csvModeLayout;
-  private Upload csvUpload;
-  private MemoryBuffer csvBuffer;
-  private Checkbox csvExcludeHeader;
-  private Checkbox csvQuotedValues;
-  private Checkbox csvContinueOnError;
-  private Checkbox csvPermissiveModify;
-  private Checkbox csvNoOperation;
-  private VerticalLayout csvPreviewContainer;
-  private Grid<Map<String, String>> csvPreviewGrid;
-  private ComboBox<String> dnMethodSelector;
-  private VerticalLayout dnMethodContainer;
-  private TextField searchBaseField;
-  private TextField searchFilterField;
-  private TextArea ldifTemplateArea;
-  private TextArea previewLdifArea;
-  private Button csvImportButton;
+// CSV Mode Components
+private VerticalLayout csvModeLayout;
+private Upload csvUpload;
+private MemoryBuffer csvBuffer;
+private Checkbox csvExcludeHeader;
+private Checkbox csvQuotedValues;
+private Checkbox csvContinueOnError;
+private Checkbox csvPermissiveModify;
+private Checkbox csvNoOperation;
+private VerticalLayout csvPreviewContainer;
+private Grid<Map<String, String>> csvPreviewGrid;
+private ComboBox<String> dnMethodSelector;
+private VerticalLayout dnMethodContainer;
+private TextField searchBaseField;
+private TextField searchFilterField;
+private TextArea ldifTemplateArea;
+private TextArea previewLdifArea;
+private Button csvImportButton;
 
-  // CSV data and settings
-  private List<Map<String, String>> csvData;
-  private String rawCsvContent;
-  private String rawLdifContent;
-  private List<String> csvColumnOrder; // Maintain original CSV column order
+// CSV data and settings
+private List<Map<String, String>> csvData;
+private String rawCsvContent;
+private String rawLdifContent;
+private List<String> csvColumnOrder; // Maintain original CSV column order
 
-  // Progress
-  private ProgressBar progressBar;
-  private VerticalLayout progressContainer;
+// Progress
+private ProgressBar progressBar;
+private VerticalLayout progressContainer;
 
-  public ImportTab(LdapService ldapService, LoggingService loggingService) {
-    this.ldapService = ldapService;
-    this.loggingService = loggingService;
-    this.csvData = new ArrayList<>();
-    this.csvColumnOrder = new ArrayList<>();
-    initializeComponents();
-    setupLayout();
-  }
+public ImportTab(LdapService ldapService, LoggingService loggingService) {
+this.ldapService = ldapService;
+this.loggingService = loggingService;
+this.csvData = new ArrayList<>();
+this.csvColumnOrder = new ArrayList<>();
+initializeComponents();
+setupLayout();
+}
 
-  private void initializeComponents() {
-    // Import Mode Selector
-    importModeSelector = new ComboBox<>("Import Type");
-    importModeSelector.setItems("Input LDIF", "Input CSV");
-    importModeSelector.setValue("Input LDIF");
-    importModeSelector.addValueChangeListener(e -> switchMode(e.getValue()));
+private void initializeComponents() {
+// Import Mode Selector
+importModeSelector = new ComboBox<>("Import Type");
+importModeSelector.setItems("Input LDIF", "Input CSV");
+importModeSelector.setValue("Input LDIF");
+importModeSelector.addValueChangeListener(e -> switchMode(e.getValue()));
 
-    // Initialize mode-specific components
-    initializeLdifModeComponents();
-    initializeCsvModeComponents();
+// Initialize mode-specific components
+initializeLdifModeComponents();
+initializeCsvModeComponents();
 
-    // Progress components
-    progressBar = new ProgressBar();
-    progressBar.setIndeterminate(true);
+// Progress components
+progressBar = new ProgressBar();
+progressBar.setIndeterminate(true);
 
-    progressContainer = new VerticalLayout();
-    progressContainer.setPadding(false);
-    progressContainer.setSpacing(true);
-    progressContainer.setDefaultHorizontalComponentAlignment(Alignment.CENTER);
-    progressContainer.add(new Span("Processing import..."), progressBar);
-    progressContainer.setVisible(false);
-  }
+progressContainer = new VerticalLayout();
+progressContainer.setPadding(false);
+progressContainer.setSpacing(true);
+progressContainer.setDefaultHorizontalComponentAlignment(Alignment.CENTER);
+progressContainer.add(new Span("Processing import..."), progressBar);
+progressContainer.setVisible(false);
+}
 
-  private void initializeLdifModeComponents() {
-    ldifModeLayout = new VerticalLayout();
-    ldifModeLayout.setPadding(true);
-    ldifModeLayout.setSpacing(true);
-    ldifModeLayout.addClassName("import-field-group");
+private void initializeLdifModeComponents() {
+ldifModeLayout = new VerticalLayout();
+ldifModeLayout.setPadding(true);
+ldifModeLayout.setSpacing(true);
+ldifModeLayout.addClassName("import-field-group");
 
-    // LDIF Upload
-    ldifBuffer = new MemoryBuffer();
-    ldifUpload = new Upload(ldifBuffer);
-    ldifUpload.setAcceptedFileTypes("text/ldif", ".ldif", "text/plain", ".txt");
-    ldifUpload.setMaxFiles(1);
-    ldifUpload.setWidthFull();
-    ldifUpload.setDropLabel(new Span("Drop LDIF file here or click to browse"));
+// LDIF Upload
+ldifBuffer = new MemoryBuffer();
+ldifUpload = new Upload(ldifBuffer);
+ldifUpload.setAcceptedFileTypes("text/ldif", ".ldif", "text/plain", ".txt");
+ldifUpload.setMaxFiles(1);
+ldifUpload.setWidthFull();
+ldifUpload.setDropLabel(new Span("Drop LDIF file here or click to browse"));
 
-    ldifUpload.addSucceededListener(event -> {
-      try {
-        processLdifFile();
-      } catch (Exception ex) {
-      showError("Error processing LDIF file: " + ex.getMessage());
-    }
-  });
+ldifUpload.addSucceededListener(event -> {
+try {
+ processLdifFile();
+} catch (Exception ex) {
+showError("Error processing LDIF file: " + ex.getMessage());
+}
+});
 
-  // LDIF Options
-  ldifContinueOnError = new Checkbox("Continue on error");
-  ldifContinueOnError.setValue(false);
+// LDIF Options
+ldifContinueOnError = new Checkbox("Continue on error");
+ldifContinueOnError.setValue(false);
 
-  ldifPermissiveModify = new Checkbox("Permissive modify request control");
-  ldifPermissiveModify.setValue(false);
+ldifPermissiveModify = new Checkbox("Permissive modify request control");
+ldifPermissiveModify.setValue(false);
 
-  ldifNoOperation = new Checkbox("No operation request control");
-  ldifNoOperation.setValue(false);
+ldifNoOperation = new Checkbox("No operation request control");
+ldifNoOperation.setValue(false);
 
-  ldifImportButton = new Button("Import LDIF", new Icon(VaadinIcon.UPLOAD));
-  ldifImportButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-  ldifImportButton.addClickListener(e -> performLdifImport());
-  ldifImportButton.setEnabled(false);
+ldifImportButton = new Button("Import LDIF", new Icon(VaadinIcon.UPLOAD));
+ldifImportButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+ldifImportButton.addClickListener(e -> performLdifImport());
+ldifImportButton.setEnabled(false);
 
-  ldifModeLayout.add(
-  new H4("Input LDIF Import"),
-  new Span("Upload an LDIF file to import LDAP entries"),
-  ldifUpload,
-  ldifContinueOnError,
-  ldifPermissiveModify,
-  ldifNoOperation,
-  ldifImportButton
-  );
+ldifModeLayout.add(
+new H4("Input LDIF Import"),
+new Span("Upload an LDIF file to import LDAP entries"),
+ldifUpload,
+ldifContinueOnError,
+ldifPermissiveModify,
+ldifNoOperation,
+ldifImportButton
+);
 }
 
 private void initializeCsvModeComponents() {
-  csvModeLayout = new VerticalLayout();
-  csvModeLayout.setPadding(true);
-  csvModeLayout.setSpacing(true);
-  csvModeLayout.addClassName("import-field-group");
+csvModeLayout = new VerticalLayout();
+csvModeLayout.setPadding(true);
+csvModeLayout.setSpacing(true);
+csvModeLayout.addClassName("import-field-group");
 
-  // CSV Upload
-  csvBuffer = new MemoryBuffer();
-  csvUpload = new Upload(csvBuffer);
-  csvUpload.setAcceptedFileTypes("text/csv", ".csv");
-  csvUpload.setMaxFiles(1);
-  csvUpload.setWidthFull();
-  csvUpload.setDropLabel(new Span("Drop CSV file here or click to browse"));
+// CSV Upload
+csvBuffer = new MemoryBuffer();
+csvUpload = new Upload(csvBuffer);
+csvUpload.setAcceptedFileTypes("text/csv", ".csv");
+csvUpload.setMaxFiles(1);
+csvUpload.setWidthFull();
+csvUpload.setDropLabel(new Span("Drop CSV file here or click to browse"));
 
-  csvUpload.addSucceededListener(event -> {
-    try {
-      processCsvFile();
-    } catch (Exception ex) {
-    showError("Error processing CSV file: " + ex.getMessage());
-  }
+csvUpload.addSucceededListener(event -> {
+try {
+processCsvFile();
+} catch (Exception ex) {
+showError("Error processing CSV file: " + ex.getMessage());
+}
 });
 
 // CSV Options
 csvExcludeHeader = new Checkbox("Exclude first row (header row)");
 csvExcludeHeader.setValue(false);
 csvExcludeHeader.addValueChangeListener(e -> {
-  if (csvData != null && !csvData.isEmpty()) {
-    try {
-      processCsvFile();
-    } catch (Exception ex) {
-    showError("Error reprocessing CSV file: " + ex.getMessage());
-  }
+if (csvData != null && !csvData.isEmpty()) {
+try {
+processCsvFile();
+} catch (Exception ex) {
+showError("Error reprocessing CSV file: " + ex.getMessage());
+}
 }
 });
 
 csvQuotedValues = new Checkbox("Values are surrounded by quotes");
 csvQuotedValues.setValue(true);
 csvQuotedValues.addValueChangeListener(e -> {
-  if (csvData != null && !csvData.isEmpty()) {
-    try {
-      processCsvFile();
-    } catch (Exception ex) {
-    showError("Error reprocessing CSV file: " + ex.getMessage());
-  }
+if (csvData != null && !csvData.isEmpty()) {
+try {
+processCsvFile();
+} catch (Exception ex) {
+showError("Error reprocessing CSV file: " + ex.getMessage());
+}
 }
 });
 
@@ -312,85 +312,85 @@ csvImportButton
 }
 
 private void setupLayout() {
-  setSizeFull();
-  setPadding(true);
-  setSpacing(true);
-  addClassName("import-tab");
+setSizeFull();
+setPadding(true);
+setSpacing(true);
+addClassName("import-tab");
 
-  // Title with icon
-  HorizontalLayout titleLayout = new HorizontalLayout();
-  titleLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-  titleLayout.setSpacing(true);
+// Title with icon
+HorizontalLayout titleLayout = new HorizontalLayout();
+titleLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+titleLayout.setSpacing(true);
 
-  Icon importIcon = new Icon(VaadinIcon.UPLOAD);
-  importIcon.setSize("20px");
-  importIcon.getStyle().set("color", "#28a745");
+Icon importIcon = new Icon(VaadinIcon.UPLOAD);
+importIcon.setSize("20px");
+importIcon.getStyle().set("color", "#28a745");
 
-  H3 title = new H3("LDAP Import");
-  title.addClassNames(LumoUtility.Margin.NONE);
-  title.getStyle().set("color", "#333");
+H3 title = new H3("LDAP Import");
+title.addClassNames(LumoUtility.Margin.NONE);
+title.getStyle().set("color", "#333");
 
-  titleLayout.add(importIcon, title);
+titleLayout.add(importIcon, title);
 
-  // Mode container
-  modeContainer = new VerticalLayout();
-  modeContainer.setPadding(false);
-  modeContainer.setSpacing(false);
-  modeContainer.setSizeFull();
+// Mode container
+modeContainer = new VerticalLayout();
+modeContainer.setPadding(false);
+modeContainer.setSpacing(false);
+modeContainer.setSizeFull();
 
-  // Initially show LDIF mode
-  modeContainer.add(ldifModeLayout);
+// Initially show LDIF mode
+modeContainer.add(ldifModeLayout);
 
-  add(titleLayout, importModeSelector, modeContainer, progressContainer);
-  setFlexGrow(1, modeContainer);
+add(titleLayout, importModeSelector, modeContainer, progressContainer);
+setFlexGrow(1, modeContainer);
 }
 
 private void switchMode(String mode) {
-  modeContainer.removeAll();
+modeContainer.removeAll();
 
-  if ("Input LDIF".equals(mode)) {
-    modeContainer.add(ldifModeLayout);
-  } else if ("Input CSV".equals(mode)) {
-  modeContainer.add(csvModeLayout);
+if ("Input LDIF".equals(mode)) {
+modeContainer.add(ldifModeLayout);
+} else if ("Input CSV".equals(mode)) {
+modeContainer.add(csvModeLayout);
 }
 }
 
 private void switchDnMethod(String method) {
-  boolean showSearchFields = "CSV Column and Search".equals(method);
-  searchBaseField.setVisible(showSearchFields);
-  searchFilterField.setVisible(showSearchFields);
-  updatePreviewLdif();
+boolean showSearchFields = "CSV Column and Search".equals(method);
+searchBaseField.setVisible(showSearchFields);
+searchFilterField.setVisible(showSearchFields);
+updatePreviewLdif();
 }
 
 private void processLdifFile() throws Exception {
-  String content = new String(ldifBuffer.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-  rawLdifContent = content;
+String content = new String(ldifBuffer.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+rawLdifContent = content;
 
-  // Basic LDIF validation
-  if (content.trim().isEmpty()) {
-    showError("LDIF file is empty");
-    return;
-  }
+// Basic LDIF validation
+if (content.trim().isEmpty()) {
+showError("LDIF file is empty");
+return;
+}
 
-  // Count entries for validation
-  long entryCount = content.lines()
-  .filter(line -> line.startsWith("dn:"))
-  .count();
+// Count entries for validation
+long entryCount = content.lines()
+.filter(line -> line.startsWith("dn:"))
+.count();
 
-  ldifImportButton.setEnabled(true);
-  showSuccess("LDIF file loaded successfully. Found " + entryCount + " entries.");
+ldifImportButton.setEnabled(true);
+showSuccess("LDIF file loaded successfully. Found " + entryCount + " entries.");
 }
 
 private void processCsvFile() throws Exception {
-  String content;
+String content;
 
-  // If this is the first time processing, read from the input stream
-  if (rawCsvContent == null) {
-    content = new String(csvBuffer.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    rawCsvContent = content;
-  } else {
-  // Use stored content for reprocessing
-  content = rawCsvContent;
+// If this is the first time processing, read from the input stream
+if (rawCsvContent == null) {
+content = new String(csvBuffer.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+rawCsvContent = content;
+} else {
+// Use stored content for reprocessing
+content = rawCsvContent;
 }
 
 String[] lines = content.split("\n");
@@ -400,8 +400,8 @@ csvColumnOrder.clear();
 csvPreviewGrid.removeAllColumns();
 
 if (lines.length == 0) {
-  showError("CSV file is empty");
-  return;
+showError("CSV file is empty");
+return;
 }
 
 // Skip header row if checkbox is checked
@@ -411,41 +411,41 @@ boolean removeQuotes = csvQuotedValues.getValue();
 // Parse CSV data
 boolean isFirstRow = true;
 for (int i = startIndex; i < lines.length; i++) {
-  String line = lines[i].trim();
-  if (line.isEmpty()) continue;
+String line = lines[i].trim();
+if (line.isEmpty()) continue;
 
-  List<String> values = parseCSVLine(line, removeQuotes);
-  Map<String, String> row = new LinkedHashMap<>();
+List<String> values = parseCSVLine(line, removeQuotes);
+Map<String, String> row = new LinkedHashMap<>();
 
-  // On the first row, establish the column order
-  if (isFirstRow) {
-    for (int j = 0; j < values.size(); j++) {
-      String columnName = "C" + (j + 1);
-      csvColumnOrder.add(columnName);
-    }
-    isFirstRow = false;
-  }
+// On the first row, establish the column order
+if (isFirstRow) {
+for (int j = 0; j < values.size(); j++) {
+String columnName = "C" + (j + 1);
+csvColumnOrder.add(columnName);
+}
+isFirstRow = false;
+}
 
-  for (int j = 0; j < values.size(); j++) {
-    String columnName = "C" + (j + 1);
-    String value = values.get(j);
-    row.put(columnName, value);
-  }
-  csvData.add(row);
+for (int j = 0; j < values.size(); j++) {
+String columnName = "C" + (j + 1);
+String value = values.get(j);
+row.put(columnName, value);
+}
+csvData.add(row);
 }
 
 if (csvData.isEmpty()) {
-  showError("No valid data found in CSV file");
-  return;
+showError("No valid data found in CSV file");
+return;
 }
 
 // Set up preview grid columns using the stored column order
 for (String columnName : csvColumnOrder) {
-  csvPreviewGrid.addColumn(row -> row.get(columnName))
-  .setHeader(columnName)
-  .setFlexGrow(1)
-  .setResizable(true)
-  .setSortable(true);
+csvPreviewGrid.addColumn(row -> row.get(columnName))
+.setHeader(columnName)
+.setFlexGrow(1)
+.setResizable(true)
+.setSortable(true);
 }
 
 csvPreviewGrid.setItems(csvData);
@@ -461,61 +461,61 @@ updatePreviewLdif();
 }
 
 private void updatePreviewLdif() {
-  if (csvData == null || csvData.isEmpty()) {
-    previewLdifArea.setValue("");
-    return;
-  }
+if (csvData == null || csvData.isEmpty()) {
+previewLdifArea.setValue("");
+return;
+}
 
-  // Take the first row as an example
-  Map<String, String> sampleRow = csvData.get(0);
-  String template = ldifTemplateArea.getValue();
-  String dnMethod = dnMethodSelector.getValue();
+// Take the first row as an example
+Map<String, String> sampleRow = csvData.get(0);
+String template = ldifTemplateArea.getValue();
+String dnMethod = dnMethodSelector.getValue();
 
-  try {
-    String sampleDn;
-    if ("CSV Column".equals(dnMethod)) {
-      // Assume C1 contains the DN
-      sampleDn = sampleRow.getOrDefault("C1", "cn=sample,dc=example,dc=com");
-    } else {
-    // For search method, show a placeholder
-    sampleDn = "cn=foundUser,ou=people,dc=example,dc=com";
-  }
+try {
+String sampleDn;
+if ("CSV Column".equals(dnMethod)) {
+// Assume C1 contains the DN
+sampleDn = sampleRow.getOrDefault("C1", "cn=sample,dc=example,dc=com");
+} else {
+// For search method, show a placeholder
+sampleDn = "cn=foundUser,ou=people,dc=example,dc=com";
+}
 
-  // Replace variables in template
-  Map<String, String> variables = new HashMap<>(sampleRow);
-  variables.put("DN", sampleDn);
+// Replace variables in template
+Map<String, String> variables = new HashMap<>(sampleRow);
+variables.put("DN", sampleDn);
 
-  String previewLdif = substituteVariables(template, variables);
-  previewLdifArea.setValue(previewLdif);
+String previewLdif = substituteVariables(template, variables);
+previewLdifArea.setValue(previewLdif);
 } catch (Exception e) {
 previewLdifArea.setValue("Error generating preview: " + e.getMessage());
 }
 }
 
 private List<String> parseCSVLine(String line, boolean removeQuotes) {
-  List<String> values = new ArrayList<>();
-  boolean inQuotes = false;
-  StringBuilder currentValue = new StringBuilder();
+List<String> values = new ArrayList<>();
+boolean inQuotes = false;
+StringBuilder currentValue = new StringBuilder();
 
-  for (int i = 0; i < line.length(); i++) {
-    char ch = line.charAt(i);
+for (int i = 0; i < line.length(); i++) {
+char ch = line.charAt(i);
 
-    if (ch == '"') {
-      if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
-        // Handle escaped quotes ("")
-        currentValue.append('"');
-        i++; // Skip the next quote
-      } else {
-      // Toggle quote state
-      inQuotes = !inQuotes;
-      if (!removeQuotes) {
-        currentValue.append(ch);
-      }
-    }
-  } else if (ch == ',' && !inQuotes) {
-  // End of field
-  values.add(currentValue.toString().trim());
-  currentValue = new StringBuilder();
+if (ch == '"') {
+if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+ // Handle escaped quotes ("")
+ currentValue.append('"');
+ i++; // Skip the next quote
+} else {
+// Toggle quote state
+inQuotes = !inQuotes;
+if (!removeQuotes) {
+ currentValue.append(ch);
+}
+}
+} else if (ch == ',' && !inQuotes) {
+// End of field
+values.add(currentValue.toString().trim());
+currentValue = new StringBuilder();
 } else {
 currentValue.append(ch);
 }
@@ -528,129 +528,129 @@ return values;
 }
 
 private String substituteVariables(String template, Map<String, String> variables) {
-  String result = template;
-  for (Map.Entry<String, String> entry : variables.entrySet()) {
-    String placeholder = "{" + entry.getKey() + "}";
-    String value = entry.getValue() != null ? entry.getValue() : "";
-    result = result.replace(placeholder, value);
-  }
-  return result;
+String result = template;
+for (Map.Entry<String, String> entry : variables.entrySet()) {
+String placeholder = "{" + entry.getKey() + "}";
+String value = entry.getValue() != null ? entry.getValue() : "";
+result = result.replace(placeholder, value);
+}
+return result;
 }
 
 private void performLdifImport() {
-  if (serverConfig == null) {
-    showError("Please connect to an LDAP server first");
-    return;
+if (serverConfig == null) {
+showError("Please connect to an LDAP server first");
+return;
+}
+
+if (rawLdifContent == null || rawLdifContent.trim().isEmpty()) {
+showError("Please upload an LDIF file first");
+return;
+}
+
+loggingService.logInfo("IMPORT", "Starting LDIF import - Server: " + serverConfig.getName());
+showProgress();
+
+try {
+// Parse LDIF content using UnboundID SDK with InputStream
+byte[] contentBytes = rawLdifContent.getBytes(StandardCharsets.UTF_8);
+LDIFReader ldifReader = new LDIFReader(new java.io.ByteArrayInputStream(contentBytes));
+
+int successCount = 0;
+int errorCount = 0;
+
+try {
+while (true) {
+ LDIFChangeRecord changeRecord = ldifReader.readChangeRecord();
+ if (changeRecord == null) {
+ break; // End of file
+ }
+
+ try {
+ // Process the change record
+ switch (changeRecord.getChangeType()) {
+ case ADD:
+ // Convert to LdapEntry and add
+ LdapEntry entry = new LdapEntry();
+ entry.setDn(changeRecord.getDN());
+
+ // Get attributes from the add change record
+ if (changeRecord instanceof com.unboundid.ldif.LDIFAddChangeRecord) {
+ com.unboundid.ldif.LDIFAddChangeRecord addRecord =
+ (com.unboundid.ldif.LDIFAddChangeRecord) changeRecord;
+
+ for (com.unboundid.ldap.sdk.Attribute attr : addRecord.getAttributes()) {
+  for (String value : attr.getValues()) {
+  entry.addAttribute(attr.getName(), value);
   }
+ }
+ }
 
-  if (rawLdifContent == null || rawLdifContent.trim().isEmpty()) {
-    showError("Please upload an LDIF file first");
-    return;
-  }
+ ldapService.addEntry(serverConfig.getId(), entry);
+ break;
 
-  loggingService.logInfo("IMPORT", "Starting LDIF import - Server: " + serverConfig.getName());
-  showProgress();
+ case MODIFY:
+ if (changeRecord instanceof com.unboundid.ldif.LDIFModifyChangeRecord) {
+ com.unboundid.ldif.LDIFModifyChangeRecord modifyRecord =
+ (com.unboundid.ldif.LDIFModifyChangeRecord) changeRecord;
 
+ // Prepare controls based on checkbox selections
+ List<Control> controls = new ArrayList<>();
+
+ // Check and add No Operation control if requested
+ if (ldifNoOperation.getValue()) {
   try {
-    // Parse LDIF content using UnboundID SDK with InputStream
-    byte[] contentBytes = rawLdifContent.getBytes(StandardCharsets.UTF_8);
-    LDIFReader ldifReader = new LDIFReader(new java.io.ByteArrayInputStream(contentBytes));
-
-    int successCount = 0;
-    int errorCount = 0;
-
-    try {
-      while (true) {
-        LDIFChangeRecord changeRecord = ldifReader.readChangeRecord();
-        if (changeRecord == null) {
-          break; // End of file
-        }
-
-        try {
-          // Process the change record
-          switch (changeRecord.getChangeType()) {
-            case ADD:
-            // Convert to LdapEntry and add
-            LdapEntry entry = new LdapEntry();
-            entry.setDn(changeRecord.getDN());
-
-            // Get attributes from the add change record
-            if (changeRecord instanceof com.unboundid.ldif.LDIFAddChangeRecord) {
-              com.unboundid.ldif.LDIFAddChangeRecord addRecord =
-              (com.unboundid.ldif.LDIFAddChangeRecord) changeRecord;
-
-              for (com.unboundid.ldap.sdk.Attribute attr : addRecord.getAttributes()) {
-                for (String value : attr.getValues()) {
-                  entry.addAttribute(attr.getName(), value);
-                }
-              }
-            }
-
-            ldapService.addEntry(serverConfig.getId(), entry);
-            break;
-
-            case MODIFY:
-            if (changeRecord instanceof com.unboundid.ldif.LDIFModifyChangeRecord) {
-              com.unboundid.ldif.LDIFModifyChangeRecord modifyRecord =
-              (com.unboundid.ldif.LDIFModifyChangeRecord) changeRecord;
-
-              // Prepare controls based on checkbox selections
-              List<Control> controls = new ArrayList<>();
-
-              // Check and add No Operation control if requested
-              if (ldifNoOperation.getValue()) {
-                try {
-                  boolean isSupported = ldapService.isControlSupported(serverConfig.getId(), NO_OPERATION_CONTROL_OID);
-                  if (isSupported) {
-                    // Create No Operation control (OID: 1.3.6.1.4.1.4203.1.10.2)
-                    Control noOpControl = new Control(NO_OPERATION_CONTROL_OID, false);
-                    controls.add(noOpControl);
-                  } else {
-                  throw new Exception("LDAP server does not support No Operation request control (OID: " + NO_OPERATION_CONTROL_OID + ")");
-                }
-              } catch (LDAPException e) {
-              throw new Exception("Failed to check control support: " + e.getMessage());
-            }
-          }
-
-          // Check and add Permissive Modify control if requested
-          if (ldifPermissiveModify.getValue()) {
-            try {
-              boolean isSupported = ldapService.isControlSupported(serverConfig.getId(), PERMISSIVE_MODIFY_CONTROL_OID);
-              if (isSupported) {
-                // Create Permissive Modify control (OID: 1.2.840.113556.1.4.1413)
-                Control permissiveModifyControl = new Control(PERMISSIVE_MODIFY_CONTROL_OID, false);
-                controls.add(permissiveModifyControl);
-              } else {
-              throw new Exception("LDAP server does not support Permissive Modify request control (OID: " + PERMISSIVE_MODIFY_CONTROL_OID + ")");
-            }
-          } catch (LDAPException e) {
-          throw new Exception("Failed to check control support: " + e.getMessage());
-        }
-      }
-
-      // Perform modify with controls
-      ldapService.modifyEntry(serverConfig.getId(),
-      modifyRecord.getDN(),
-      Arrays.asList(modifyRecord.getModifications()),
-      controls.isEmpty() ? null : controls);
-    }
-    break;
-
-    case DELETE:
-    ldapService.deleteEntry(serverConfig.getId(), changeRecord.getDN());
-    break;
-
-    default:
-    throw new Exception("Unsupported change type: " + changeRecord.getChangeType());
+  boolean isSupported = ldapService.isControlSupported(serverConfig.getId(), NO_OPERATION_CONTROL_OID);
+  if (isSupported) {
+  // Create No Operation control (OID: 1.3.6.1.4.1.4203.1.10.2)
+  Control noOpControl = new Control(NO_OPERATION_CONTROL_OID, false);
+  controls.add(noOpControl);
+  } else {
+  throw new Exception("LDAP server does not support No Operation request control (OID: " + NO_OPERATION_CONTROL_OID + ")");
   }
+ } catch (LDAPException e) {
+ throw new Exception("Failed to check control support: " + e.getMessage());
+ }
+ }
 
-  successCount++;
+ // Check and add Permissive Modify control if requested
+ if (ldifPermissiveModify.getValue()) {
+ try {
+ boolean isSupported = ldapService.isControlSupported(serverConfig.getId(), PERMISSIVE_MODIFY_CONTROL_OID);
+ if (isSupported) {
+  // Create Permissive Modify control (OID: 1.2.840.113556.1.4.1413)
+  Control permissiveModifyControl = new Control(PERMISSIVE_MODIFY_CONTROL_OID, false);
+  controls.add(permissiveModifyControl);
+ } else {
+ throw new Exception("LDAP server does not support Permissive Modify request control (OID: " + PERMISSIVE_MODIFY_CONTROL_OID + ")");
+ }
+ } catch (LDAPException e) {
+ throw new Exception("Failed to check control support: " + e.getMessage());
+ }
+}
+
+// Perform modify with controls
+ldapService.modifyEntry(serverConfig.getId(),
+modifyRecord.getDN(),
+Arrays.asList(modifyRecord.getModifications()),
+controls.isEmpty() ? null : controls);
+}
+break;
+
+case DELETE:
+ldapService.deleteEntry(serverConfig.getId(), changeRecord.getDN());
+break;
+
+default:
+throw new Exception("Unsupported change type: " + changeRecord.getChangeType());
+}
+
+successCount++;
 
 } catch (Exception e) {
 errorCount++;
 if (!ldifContinueOnError.getValue()) {
-  throw e;
+throw e;
 }
 // Log error but continue if continue on error is enabled
 System.err.println("Error processing LDIF record " + changeRecord.getDN() + ": " + e.getMessage());
@@ -663,9 +663,9 @@ ldifReader.close();
 hideProgress();
 
 if (errorCount > 0) {
-  loggingService.logImport(serverConfig.getName(), "LDIF file", successCount);
-  loggingService.logWarning("IMPORT", "LDIF import completed with errors - Server: " + serverConfig.getName() + ", Successes: " + successCount + ", Errors: " + errorCount);
-  showInfo("LDIF import completed with " + successCount + " successes and " + errorCount + " errors");
+loggingService.logImport(serverConfig.getName(), "LDIF file", successCount);
+loggingService.logWarning("IMPORT", "LDIF import completed with errors - Server: " + serverConfig.getName() + ", Successes: " + successCount + ", Errors: " + errorCount);
+showInfo("LDIF import completed with " + successCount + " successes and " + errorCount + " errors");
 } else {
 loggingService.logImport(serverConfig.getName(), "LDIF file", successCount);
 showSuccess("LDIF import completed successfully. " + successCount + " entries processed");
@@ -679,143 +679,143 @@ showError("LDIF import failed: " + e.getMessage());
 }
 
 private void performCsvImport() {
-  if (serverConfig == null) {
-    showError("Please connect to an LDAP server first");
-    return;
+if (serverConfig == null) {
+showError("Please connect to an LDAP server first");
+return;
+}
+
+if (csvData.isEmpty()) {
+showError("Please upload a CSV file first");
+return;
+}
+
+showProgress();
+
+try {
+String template = ldifTemplateArea.getValue();
+String dnMethod = dnMethodSelector.getValue();
+int successCount = 0;
+int errorCount = 0;
+
+for (Map<String, String> row : csvData) {
+try {
+ String dn;
+ if ("CSV Column".equals(dnMethod)) {
+ // Use first column as DN
+ dn = row.getOrDefault("C1", "");
+ if (dn.isEmpty()) {
+ throw new Exception("DN column (C1) is empty");
+ }
+ } else {
+ // Search for DN using LDAP search
+ String searchFilter = substituteVariables(searchFilterField.getValue(), row);
+ String searchBase = searchBaseField.getValue();
+
+ // Perform actual LDAP search to find DN
+ List<LdapEntry> results = ldapService.searchEntries(
+ serverConfig.getId(), searchBase, searchFilter, SearchScope.SUB);
+
+ if (results.isEmpty()) {
+ throw new Exception("No entry found matching search filter: " + searchFilter);
+ } else if (results.size() > 1) {
+ throw new Exception("Multiple entries found matching search filter: " + searchFilter);
+}
+
+dn = results.get(0).getDn();
+}
+
+// Generate LDIF for this row
+Map<String, String> variables = new HashMap<>(row);
+variables.put("DN", dn);
+String ldifEntry = substituteVariables(template, variables);
+
+// Process the generated LDIF using UnboundID LDIF parser
+if (ldifEntry != null && !ldifEntry.trim().isEmpty()) {
+byte[] contentBytes = ldifEntry.getBytes(StandardCharsets.UTF_8);
+LDIFReader ldifReader = new LDIFReader(new java.io.ByteArrayInputStream(contentBytes));
+
+try {
+ while (true) {
+ LDIFChangeRecord changeRecord = ldifReader.readChangeRecord();
+ if (changeRecord == null) {
+ break; // End of LDIF content
+ }
+
+ // Process the change record (same logic as LDIF import)
+ switch (changeRecord.getChangeType()) {
+ case ADD:
+ LdapEntry entry = new LdapEntry();
+ entry.setDn(changeRecord.getDN());
+
+ if (changeRecord instanceof com.unboundid.ldif.LDIFAddChangeRecord) {
+ com.unboundid.ldif.LDIFAddChangeRecord addRecord =
+ (com.unboundid.ldif.LDIFAddChangeRecord) changeRecord;
+
+ for (com.unboundid.ldap.sdk.Attribute attr : addRecord.getAttributes()) {
+  for (String value : attr.getValues()) {
+  entry.addAttribute(attr.getName(), value);
   }
+ }
+ }
 
-  if (csvData.isEmpty()) {
-    showError("Please upload a CSV file first");
-    return;
-  }
+ ldapService.addEntry(serverConfig.getId(), entry);
+ break;
 
-  showProgress();
+ case MODIFY:
+ if (changeRecord instanceof com.unboundid.ldif.LDIFModifyChangeRecord) {
+ com.unboundid.ldif.LDIFModifyChangeRecord modifyRecord =
+ (com.unboundid.ldif.LDIFModifyChangeRecord) changeRecord;
 
+ // Prepare controls based on checkbox selections
+ List<Control> controls = new ArrayList<>();
+
+ // Check and add No Operation control if requested
+ if (csvNoOperation.getValue()) {
   try {
-    String template = ldifTemplateArea.getValue();
-    String dnMethod = dnMethodSelector.getValue();
-    int successCount = 0;
-    int errorCount = 0;
-
-    for (Map<String, String> row : csvData) {
-      try {
-        String dn;
-        if ("CSV Column".equals(dnMethod)) {
-          // Use first column as DN
-          dn = row.getOrDefault("C1", "");
-          if (dn.isEmpty()) {
-            throw new Exception("DN column (C1) is empty");
-          }
-        } else {
-        // Search for DN using LDAP search
-        String searchFilter = substituteVariables(searchFilterField.getValue(), row);
-        String searchBase = searchBaseField.getValue();
-
-        // Perform actual LDAP search to find DN
-        List<LdapEntry> results = ldapService.searchEntries(
-        serverConfig.getId(), searchBase, searchFilter, SearchScope.SUB);
-
-        if (results.isEmpty()) {
-          throw new Exception("No entry found matching search filter: " + searchFilter);
-        } else if (results.size() > 1) {
-        throw new Exception("Multiple entries found matching search filter: " + searchFilter);
-      }
-
-      dn = results.get(0).getDn();
-    }
-
-    // Generate LDIF for this row
-    Map<String, String> variables = new HashMap<>(row);
-    variables.put("DN", dn);
-    String ldifEntry = substituteVariables(template, variables);
-
-    // Process the generated LDIF using UnboundID LDIF parser
-    if (ldifEntry != null && !ldifEntry.trim().isEmpty()) {
-      byte[] contentBytes = ldifEntry.getBytes(StandardCharsets.UTF_8);
-      LDIFReader ldifReader = new LDIFReader(new java.io.ByteArrayInputStream(contentBytes));
-
-      try {
-        while (true) {
-          LDIFChangeRecord changeRecord = ldifReader.readChangeRecord();
-          if (changeRecord == null) {
-            break; // End of LDIF content
-          }
-
-          // Process the change record (same logic as LDIF import)
-          switch (changeRecord.getChangeType()) {
-            case ADD:
-            LdapEntry entry = new LdapEntry();
-            entry.setDn(changeRecord.getDN());
-
-            if (changeRecord instanceof com.unboundid.ldif.LDIFAddChangeRecord) {
-              com.unboundid.ldif.LDIFAddChangeRecord addRecord =
-              (com.unboundid.ldif.LDIFAddChangeRecord) changeRecord;
-
-              for (com.unboundid.ldap.sdk.Attribute attr : addRecord.getAttributes()) {
-                for (String value : attr.getValues()) {
-                  entry.addAttribute(attr.getName(), value);
-                }
-              }
-            }
-
-            ldapService.addEntry(serverConfig.getId(), entry);
-            break;
-
-            case MODIFY:
-            if (changeRecord instanceof com.unboundid.ldif.LDIFModifyChangeRecord) {
-              com.unboundid.ldif.LDIFModifyChangeRecord modifyRecord =
-              (com.unboundid.ldif.LDIFModifyChangeRecord) changeRecord;
-
-              // Prepare controls based on checkbox selections
-              List<Control> controls = new ArrayList<>();
-
-              // Check and add No Operation control if requested
-              if (csvNoOperation.getValue()) {
-                try {
-                  boolean isSupported = ldapService.isControlSupported(serverConfig.getId(), NO_OPERATION_CONTROL_OID);
-                  if (isSupported) {
-                    // Create No Operation control (OID: 1.3.6.1.4.1.4203.1.10.2)
-                    Control noOpControl = new Control(NO_OPERATION_CONTROL_OID, false);
-                    controls.add(noOpControl);
-                  } else {
-                  throw new Exception("LDAP server does not support No Operation request control (OID: " + NO_OPERATION_CONTROL_OID + ")");
-                }
-              } catch (LDAPException e) {
-              throw new Exception("Failed to check control support: " + e.getMessage());
-            }
-          }
-
-          // Check and add Permissive Modify control if requested
-          if (csvPermissiveModify.getValue()) {
-            try {
-              boolean isSupported = ldapService.isControlSupported(serverConfig.getId(), PERMISSIVE_MODIFY_CONTROL_OID);
-              if (isSupported) {
-                // Create Permissive Modify control (OID: 1.2.840.113556.1.4.1413)
-                Control permissiveModifyControl = new Control(PERMISSIVE_MODIFY_CONTROL_OID, false);
-                controls.add(permissiveModifyControl);
-              } else {
-              throw new Exception("LDAP server does not support Permissive Modify request control (OID: " + PERMISSIVE_MODIFY_CONTROL_OID + ")");
-            }
-          } catch (LDAPException e) {
-          throw new Exception("Failed to check control support: " + e.getMessage());
-        }
-      }
-
-      // Perform modify with controls
-      ldapService.modifyEntry(serverConfig.getId(),
-      modifyRecord.getDN(),
-      Arrays.asList(modifyRecord.getModifications()),
-      controls.isEmpty() ? null : controls);
-    }
-    break;
-
-    case DELETE:
-    ldapService.deleteEntry(serverConfig.getId(), changeRecord.getDN());
-    break;
-
-    default:
-    throw new Exception("Unsupported change type: " + changeRecord.getChangeType());
+  boolean isSupported = ldapService.isControlSupported(serverConfig.getId(), NO_OPERATION_CONTROL_OID);
+  if (isSupported) {
+  // Create No Operation control (OID: 1.3.6.1.4.1.4203.1.10.2)
+  Control noOpControl = new Control(NO_OPERATION_CONTROL_OID, false);
+  controls.add(noOpControl);
+  } else {
+  throw new Exception("LDAP server does not support No Operation request control (OID: " + NO_OPERATION_CONTROL_OID + ")");
   }
+ } catch (LDAPException e) {
+ throw new Exception("Failed to check control support: " + e.getMessage());
+ }
+ }
+
+ // Check and add Permissive Modify control if requested
+ if (csvPermissiveModify.getValue()) {
+ try {
+ boolean isSupported = ldapService.isControlSupported(serverConfig.getId(), PERMISSIVE_MODIFY_CONTROL_OID);
+ if (isSupported) {
+  // Create Permissive Modify control (OID: 1.2.840.113556.1.4.1413)
+  Control permissiveModifyControl = new Control(PERMISSIVE_MODIFY_CONTROL_OID, false);
+  controls.add(permissiveModifyControl);
+ } else {
+ throw new Exception("LDAP server does not support Permissive Modify request control (OID: " + PERMISSIVE_MODIFY_CONTROL_OID + ")");
+ }
+ } catch (LDAPException e) {
+ throw new Exception("Failed to check control support: " + e.getMessage());
+ }
+}
+
+// Perform modify with controls
+ldapService.modifyEntry(serverConfig.getId(),
+modifyRecord.getDN(),
+Arrays.asList(modifyRecord.getModifications()),
+controls.isEmpty() ? null : controls);
+}
+break;
+
+case DELETE:
+ldapService.deleteEntry(serverConfig.getId(), changeRecord.getDN());
+break;
+
+default:
+throw new Exception("Unsupported change type: " + changeRecord.getChangeType());
+}
 }
 } finally {
 ldifReader.close();
@@ -827,7 +827,7 @@ successCount++;
 } catch (Exception e) {
 errorCount++;
 if (!csvContinueOnError.getValue()) {
-  throw e;
+throw e;
 }
 // Log error but continue if continue on error is enabled
 System.err.println("Error processing row: " + e.getMessage());
@@ -837,7 +837,7 @@ System.err.println("Error processing row: " + e.getMessage());
 hideProgress();
 
 if (errorCount > 0) {
-  showInfo("CSV import completed with " + successCount + " successes and " + errorCount + " errors");
+showInfo("CSV import completed with " + successCount + " successes and " + errorCount + " errors");
 } else {
 showSuccess("CSV import completed successfully. " + successCount + " entries processed");
 }
@@ -849,47 +849,47 @@ showError("CSV import failed: " + e.getMessage());
 }
 
 private void showProgress() {
-  progressContainer.setVisible(true);
-  ldifImportButton.setEnabled(false);
-  csvImportButton.setEnabled(false);
+progressContainer.setVisible(true);
+ldifImportButton.setEnabled(false);
+csvImportButton.setEnabled(false);
 }
 
 private void hideProgress() {
-  progressContainer.setVisible(false);
-  ldifImportButton.setEnabled(rawLdifContent != null);
-  csvImportButton.setEnabled(!csvData.isEmpty());
+progressContainer.setVisible(false);
+ldifImportButton.setEnabled(rawLdifContent != null);
+csvImportButton.setEnabled(!csvData.isEmpty());
 }
 
 public void setServerConfig(LdapServerConfig serverConfig) {
-  this.serverConfig = serverConfig;
+this.serverConfig = serverConfig;
 }
 
 public void clear() {
-  rawLdifContent = null;
-  rawCsvContent = null;
-  csvData.clear();
-  csvColumnOrder.clear();
-  ldifImportButton.setEnabled(false);
-  csvImportButton.setEnabled(false);
-  csvPreviewContainer.setVisible(false);
-  previewLdifArea.setValue("");
-  ldifTemplateArea.setValue("dn: {DN}\nchangetype: modify\nreplace: userpassword\nuserpassword: {C2}");
-  searchFilterField.setValue("(&(objectClass=person)(uid={C1}))");
-  hideProgress();
+rawLdifContent = null;
+rawCsvContent = null;
+csvData.clear();
+csvColumnOrder.clear();
+ldifImportButton.setEnabled(false);
+csvImportButton.setEnabled(false);
+csvPreviewContainer.setVisible(false);
+previewLdifArea.setValue("");
+ldifTemplateArea.setValue("dn: {DN}\nchangetype: modify\nreplace: userpassword\nuserpassword: {C2}");
+searchFilterField.setValue("(&(objectClass=person)(uid={C1}))");
+hideProgress();
 }
 
 private void showSuccess(String message) {
-  Notification notification = Notification.show(message, 3000, Notification.Position.TOP_END);
-  notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+Notification notification = Notification.show(message, 3000, Notification.Position.TOP_END);
+notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 }
 
 private void showError(String message) {
-  Notification notification = Notification.show(message, 5000, Notification.Position.TOP_END);
-  notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+Notification notification = Notification.show(message, 5000, Notification.Position.TOP_END);
+notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
 }
 
 private void showInfo(String message) {
-  Notification notification = Notification.show(message, 4000, Notification.Position.TOP_END);
-  notification.addThemeVariants(NotificationVariant.LUMO_PRIMARY);
+Notification notification = Notification.show(message, 4000, Notification.Position.TOP_END);
+notification.addThemeVariants(NotificationVariant.LUMO_PRIMARY);
 }
 }

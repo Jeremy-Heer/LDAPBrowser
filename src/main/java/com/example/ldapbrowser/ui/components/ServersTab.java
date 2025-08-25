@@ -15,120 +15,120 @@ import java.util.function.Consumer;
 */
 public class ServersTab extends VerticalLayout {
 
-  private final LdapService ldapService;
-  private final ConfigurationService configurationService;
-  private final InMemoryLdapService inMemoryLdapService;
+private final LdapService ldapService;
+private final ConfigurationService configurationService;
+private final InMemoryLdapService inMemoryLdapService;
 
-  // Sub-tabs
-  private TabSheet tabSheet;
-  private Tab externalTab;
-  private Tab internalTab;
+// Sub-tabs
+private TabSheet tabSheet;
+private Tab externalTab;
+private Tab internalTab;
 
-  // Components
-  private ExternalServersTab externalServersTab;
-  private InternalServersTab internalServersTab;
+// Components
+private ExternalServersTab externalServersTab;
+private InternalServersTab internalServersTab;
 
-  // Event listeners
-  private Consumer<LdapServerConfig> connectionListener;
-  private Runnable disconnectionListener;
+// Event listeners
+private Consumer<LdapServerConfig> connectionListener;
+private Runnable disconnectionListener;
 
-  public ServersTab(LdapService ldapService, ConfigurationService configurationService,
-  EnvironmentRefreshListener environmentRefreshListener,
-  InMemoryLdapService inMemoryLdapService) {
-    this.ldapService = ldapService;
-    this.configurationService = configurationService;
-    this.inMemoryLdapService = inMemoryLdapService;
+public ServersTab(LdapService ldapService, ConfigurationService configurationService,
+EnvironmentRefreshListener environmentRefreshListener,
+InMemoryLdapService inMemoryLdapService) {
+this.ldapService = ldapService;
+this.configurationService = configurationService;
+this.inMemoryLdapService = inMemoryLdapService;
 
-    initializeComponents(environmentRefreshListener);
-    setupLayout();
-  }
+initializeComponents(environmentRefreshListener);
+setupLayout();
+}
 
-  private void initializeComponents(EnvironmentRefreshListener environmentRefreshListener) {
-    // Create sub-tabs
-    tabSheet = new TabSheet();
-    tabSheet.setSizeFull();
+private void initializeComponents(EnvironmentRefreshListener environmentRefreshListener) {
+// Create sub-tabs
+tabSheet = new TabSheet();
+tabSheet.setSizeFull();
 
-    // External servers tab (existing connections functionality)
-    externalTab = new Tab("External");
-    externalServersTab = new ExternalServersTab(ldapService, configurationService, environmentRefreshListener);
-    tabSheet.add(externalTab, externalServersTab);
+// External servers tab (existing connections functionality)
+externalTab = new Tab("External");
+externalServersTab = new ExternalServersTab(ldapService, configurationService, environmentRefreshListener);
+tabSheet.add(externalTab, externalServersTab);
 
-    // Internal servers tab (UnboundID in-memory servers)
-    internalTab = new Tab("Internal");
-  internalServersTab = new InternalServersTab(ldapService, environmentRefreshListener, inMemoryLdapService);
-    tabSheet.add(internalTab, internalServersTab);
+// Internal servers tab (UnboundID in-memory servers)
+internalTab = new Tab("Internal");
+internalServersTab = new InternalServersTab(ldapService, environmentRefreshListener, inMemoryLdapService);
+tabSheet.add(internalTab, internalServersTab);
 
-    // Set External as the default selected tab
-    tabSheet.setSelectedTab(externalTab);
+// Set External as the default selected tab
+tabSheet.setSelectedTab(externalTab);
 
-    // Forward events from sub-tabs
-    externalServersTab.setConnectionListener(config -> {
-      if (connectionListener != null) {
-        connectionListener.accept(config);
-      }
-    });
+// Forward events from sub-tabs
+externalServersTab.setConnectionListener(config -> {
+if (connectionListener != null) {
+ connectionListener.accept(config);
+}
+});
 
-    externalServersTab.setDisconnectionListener(() -> {
-      if (disconnectionListener != null) {
-        disconnectionListener.run();
-      }
-    });
+externalServersTab.setDisconnectionListener(() -> {
+if (disconnectionListener != null) {
+ disconnectionListener.run();
+}
+});
 
-    internalServersTab.setConnectionListener(config -> {
-      if (connectionListener != null) {
-        connectionListener.accept(config);
-      }
-    });
+internalServersTab.setConnectionListener(config -> {
+if (connectionListener != null) {
+ connectionListener.accept(config);
+}
+});
 
-    internalServersTab.setDisconnectionListener(() -> {
-      if (disconnectionListener != null) {
-        disconnectionListener.run();
-      }
-    });
-  }
+internalServersTab.setDisconnectionListener(() -> {
+if (disconnectionListener != null) {
+ disconnectionListener.run();
+}
+});
+}
 
-  private void setupLayout() {
-    setSizeFull();
-    setPadding(false);
-    setSpacing(false);
+private void setupLayout() {
+setSizeFull();
+setPadding(false);
+setSpacing(false);
 
-    add(tabSheet);
-    setFlexGrow(1, tabSheet);
-  }
+add(tabSheet);
+setFlexGrow(1, tabSheet);
+}
 
-  public void refreshServerList() {
-    externalServersTab.refreshServerList();
-    internalServersTab.refreshServerList();
-  }
+public void refreshServerList() {
+externalServersTab.refreshServerList();
+internalServersTab.refreshServerList();
+}
 
-  public void updateConnectionButtons() {
-    externalServersTab.updateConnectionButtons();
-    internalServersTab.updateConnectionButtons();
-  }
+public void updateConnectionButtons() {
+externalServersTab.updateConnectionButtons();
+internalServersTab.updateConnectionButtons();
+}
 
-  public LdapServerConfig getSelectedServer() {
-    // Check both external and internal tabs for connected servers
-    LdapServerConfig external = externalServersTab.getSelectedServer();
-    if (external != null) {
-      return external;
-    }
-    return internalServersTab.getSelectedServer();
-  }
+public LdapServerConfig getSelectedServer() {
+// Check both external and internal tabs for connected servers
+LdapServerConfig external = externalServersTab.getSelectedServer();
+if (external != null) {
+return external;
+}
+return internalServersTab.getSelectedServer();
+}
 
-  public void setSelectedServer(LdapServerConfig config) {
-    // This method is legacy and no longer needed
-  }
+public void setSelectedServer(LdapServerConfig config) {
+// This method is legacy and no longer needed
+}
 
-  public void clear() {
-    externalServersTab.clear();
-    internalServersTab.clear();
-  }
+public void clear() {
+externalServersTab.clear();
+internalServersTab.clear();
+}
 
-  public void setConnectionListener(Consumer<LdapServerConfig> listener) {
-    this.connectionListener = listener;
-  }
+public void setConnectionListener(Consumer<LdapServerConfig> listener) {
+this.connectionListener = listener;
+}
 
-  public void setDisconnectionListener(Runnable listener) {
-    this.disconnectionListener = listener;
-  }
+public void setDisconnectionListener(Runnable listener) {
+this.disconnectionListener = listener;
+}
 }

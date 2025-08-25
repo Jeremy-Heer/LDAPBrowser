@@ -3,6 +3,13 @@ package com.example.ldapbrowser.ui.components;
 import com.example.ldapbrowser.model.LdapServerConfig;
 import com.example.ldapbrowser.service.LdapService;
 import com.example.ldapbrowser.util.SchemaCompareUtil;
+import com.unboundid.ldap.sdk.LDAPException;
+import com.unboundid.ldap.sdk.schema.AttributeSyntaxDefinition;
+import com.unboundid.ldap.sdk.schema.AttributeTypeDefinition;
+import com.unboundid.ldap.sdk.schema.MatchingRuleDefinition;
+import com.unboundid.ldap.sdk.schema.MatchingRuleUseDefinition;
+import com.unboundid.ldap.sdk.schema.ObjectClassDefinition;
+import com.unboundid.ldap.sdk.schema.Schema;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.grid.Grid;
@@ -16,14 +23,6 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.TabSheet;
-import com.unboundid.ldap.sdk.LDAPException;
-import com.unboundid.ldap.sdk.schema.AttributeSyntaxDefinition;
-import com.unboundid.ldap.sdk.schema.AttributeTypeDefinition;
-import com.unboundid.ldap.sdk.schema.MatchingRuleDefinition;
-import com.unboundid.ldap.sdk.schema.MatchingRuleUseDefinition;
-import com.unboundid.ldap.sdk.schema.ObjectClassDefinition;
-import com.unboundid.ldap.sdk.schema.Schema;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -59,6 +58,17 @@ public class GroupSchemaTab extends VerticalLayout {
   private Grid<RowModel> mruGrid;
   private Grid<RowModel> synGrid;
 
+  /**
+   * A Vaadin UI component tab that displays LDAP schema information, including object classes,
+   * attribute types, matching rules, matching rule use, and syntaxes. Provides controls for
+   * refreshing schema data and displays status information.
+   *
+   * <p>This tab uses grids to present different schema elements and organizes them into
+   * separate tabs for easy navigation. The header includes an icon and title, and controls
+   * allow users to refresh the displayed data.</p>
+   *
+   * @param ldapService the service used to retrieve LDAP schema information
+   */
   public GroupSchemaTab(LdapService ldapService) {
     this.ldapService = ldapService;
     setSizeFull();
@@ -147,7 +157,7 @@ public class GroupSchemaTab extends VerticalLayout {
       }
     }
 
-    // Fetch schemas with an all-or-none decision: if any server lacks support, don't use the control anywhere
+    // Fetch schemas with an all-or-none decision: if any server lacks support, don't use the control
     for (LdapServerConfig cfg : sortedServers) {
       String serverName = displayName(cfg);
       try {
@@ -168,11 +178,23 @@ public class GroupSchemaTab extends VerticalLayout {
     renderSyntaxes(schemas);
 
     if (errors > 0) {
-      statusLabel.setText("Loaded with " + errors + " error(s). Extended schema info control " + (allSupportExtended ? "used" : "disabled for consistency") + ".");
+      statusLabel.setText(
+          "Loaded with " + errors + " error(s). Extended schema info control " +
+          (allSupportExtended ? "used" : "disabled for consistency") + "."
+      );
       Notification n = Notification.show("Some servers failed to load schema.");
       n.addThemeVariants(NotificationVariant.LUMO_ERROR);
     } else {
-    statusLabel.setText("Schema loaded. Extended schema info control " + (schemas.isEmpty() ? "n/a" : (allSupportExtended ? "used" : "disabled for consistency")) + ".");
+      statusLabel.setText(
+          "Schema loaded. Extended schema info control " +
+          (schemas.isEmpty()
+          ? "n/a"
+          : (allSupportExtended
+          ? "used"
+          : "disabled for consistency")
+          ) +
+          "."
+      );
     }
   }
 
@@ -216,17 +238,27 @@ public class GroupSchemaTab extends VerticalLayout {
 
   private void setupColumns(Grid<RowModel> grid, Collection<String> serverNames) {
     grid.removeAllColumns();
-    grid.addColumn(RowModel::getName).setHeader("Name").setAutoWidth(true).setFrozen(true);
+    grid.addColumn(RowModel::getName)
+        .setHeader("Name")
+        .setAutoWidth(true)
+        .setFrozen(true);
     for (String server : serverNames) {
-      grid.addColumn(row -> row.getChecksum(server)).setHeader(server).setAutoWidth(true);
+      grid.addColumn(row -> row.getChecksum(server))
+          .setHeader(server)
+          .setAutoWidth(true);
     }
     grid.addColumn(row -> row.isEqualAcross(serverNames) ? "Equal" : "Unequal")
-        .setHeader("Status").setAutoWidth(true);
+        .setHeader("Status")
+        .setAutoWidth(true);
   }
 
-  private enum ComponentType { OBJECT_CLASS, ATTRIBUTE_TYPE, MATCHING_RULE, MATCHING_RULE_USE, SYNTAX }
+  private enum ComponentType {
+    OBJECT_CLASS, ATTRIBUTE_TYPE, MATCHING_RULE, MATCHING_RULE_USE, SYNTAX
+  }
 
-  private Map<String, Map<String, String>> buildRowsFor(Map<String, Schema> schemas, ComponentType type) {
+  private Map<String, Map<String, String>> buildRowsFor(
+      Map<String, Schema> schemas, ComponentType type
+  ) {
     // name -> (serverName -> checksum or "MISSING"/"ERROR")
     Map<String, Map<String, String>> rows = new LinkedHashMap<>();
     Set<String> allNames = new TreeSet<>();
@@ -279,29 +311,29 @@ public class GroupSchemaTab extends VerticalLayout {
           checksums.put(server, "ERROR");
           continue;
         }
-    String sum = switch (type) {
+        String sum = switch (type) {
           case OBJECT_CLASS -> {
             ObjectClassDefinition d = schema.getObjectClass(name);
-      yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
+            yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
           }
           case ATTRIBUTE_TYPE -> {
             AttributeTypeDefinition d = schema.getAttributeType(name);
-      yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
+            yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
           }
           case MATCHING_RULE -> {
             MatchingRuleDefinition d = schema.getMatchingRule(name);
-      yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
+            yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
           }
           case MATCHING_RULE_USE -> {
             MatchingRuleUseDefinition d = schema.getMatchingRuleUse(name);
-      yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
+            yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
           }
           case SYNTAX -> {
             AttributeSyntaxDefinition d = schema.getAttributeSyntax(name);
-      yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
+            yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
           }
-  };
-  checksums.put(server, sum);
+        };
+        checksums.put(server, sum);
       }
       rows.put(name, checksums);
     }
@@ -343,6 +375,28 @@ public class GroupSchemaTab extends VerticalLayout {
   }
 
   // Row model for the grid with dynamic per-server checksum map
+  /**
+   * Represents a row in the group schema tab, containing a name and a mapping of server names to their checksums.
+   * <p>
+   * This model is used to track checksum values for different servers associated with a particular group or entity.
+   * </p>
+   *
+   * <p>
+   * Example usage:
+   * <pre>
+   *   Map&lt;String, String&gt; checksums = new HashMap&lt;&gt;();
+   *   checksums.put("server1", "abc123");
+   *   checksums.put("server2", "abc123");
+   *   RowModel row = new RowModel("GroupA", checksums);
+   * </pre>
+   * </p>
+   *
+   * <ul>
+   *   <li>{@code getName()} returns the name of the row.</li>
+   *   <li>{@code getChecksum(String serverName)} retrieves the checksum for a specific server.</li>
+   *   <li>{@code isEqualAcross(Collection&lt;String&gt; serverNames)} checks if all non-null checksums for the given servers are equal.</li>
+   * </ul>
+   */
   public static class RowModel {
     private final String name;
     private final Map<String, String> checksums; // serverName -> checksum
@@ -352,12 +406,26 @@ public class GroupSchemaTab extends VerticalLayout {
       this.checksums = checksums;
     }
 
-    public String getName() { return name; }
+    public String getName() {
+      return name;
+    }
 
     public String getChecksum(String serverName) {
       return checksums.getOrDefault(serverName, "");
     }
 
+    /**
+     * Checks if all non-null checksum values for the given server names are equal.
+     *
+     * <p>Iterates through the provided collection of server names, retrieves their corresponding
+     * checksum values from the {@code checksums} map, and compares them. If all non-null checksum
+     * values are equal, returns {@code true}. If any non-null checksum value differs, returns {@code false}.
+     * If no non-null checksum values are found, returns {@code false}.</p>
+     *
+     * @param serverNames the collection of server names to check
+     * @return {@code true} if all non-null checksum values are equal and at least one exists;
+     *         {@code false} otherwise
+     */
     public boolean isEqualAcross(Collection<String> serverNames) {
       String ref = null;
       for (String s : serverNames) {

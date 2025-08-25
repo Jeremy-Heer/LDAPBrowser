@@ -17,97 +17,113 @@ import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
-
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * View for performing group-specific operations, such as directory search and schema comparison.
+ */
 @Route(value = "group-search/:group", layout = MainLayout.class)
 @PageTitle("Group Operations")
 @AnonymousAllowed
 public class GroupSearchView extends VerticalLayout implements BeforeEnterObserver {
 
-    private final LdapService ldapService;
-    private final ConfigurationService configurationService;
-    private final InMemoryLdapService inMemoryLdapService;
-    private final ServerSelectionService selectionService;
+  private final LdapService ldapService;
+  private final ConfigurationService configurationService;
+  private final InMemoryLdapService inMemoryLdapService;
+  private final ServerSelectionService selectionService;
 
-    private TabSheet tabSheet;
-    private DirectorySearchTab directorySearchTab;
-    private GroupSchemaTab schemaTabContent;
-    private String groupName;
+  private TabSheet tabSheet;
+  private DirectorySearchTab directorySearchTab;
+  private GroupSchemaTab schemaTabContent;
+  private String groupName;
 
-    public GroupSearchView(LdapService ldapService,
-                           ConfigurationService configurationService,
-                           InMemoryLdapService inMemoryLdapService,
-                           LoggingService loggingService,
-                           ServerSelectionService selectionService) {
-        this.ldapService = ldapService;
-        this.configurationService = configurationService;
-        this.inMemoryLdapService = inMemoryLdapService;
-        this.selectionService = selectionService;
+  /**
+   * Constructs the GroupSearchView with the required services.
+   *
+   * @param ldapService the LDAP service
+   * @param configurationService the configuration service
+   * @param inMemoryLdapService the in-memory LDAP service
+   * @param loggingService the logging service
+   * @param selectionService the server selection service
+   */
+  public GroupSearchView(LdapService ldapService,
+      ConfigurationService configurationService,
+      InMemoryLdapService inMemoryLdapService,
+      LoggingService loggingService,
+      ServerSelectionService selectionService) {
+    this.ldapService = ldapService;
+    this.configurationService = configurationService;
+    this.inMemoryLdapService = inMemoryLdapService;
+    this.selectionService = selectionService;
 
-        setSizeFull();
-        setPadding(false);
-        setSpacing(false);
+    setSizeFull();
+    setPadding(false);
+    setSpacing(false);
 
-        initTabs();
-    }
+    initTabs();
+  }
 
-    private void initTabs() {
-        tabSheet = new TabSheet();
-        tabSheet.setSizeFull();
+  private void initTabs() {
+    tabSheet = new TabSheet();
+    tabSheet.setSizeFull();
 
     Tab directorySearchTabComponent = new Tab("Directory Search");
-        directorySearchTab = new DirectorySearchTab(ldapService, configurationService, inMemoryLdapService, selectionService);
-        tabSheet.add(directorySearchTabComponent, directorySearchTab);
+    directorySearchTab = new DirectorySearchTab(ldapService, configurationService,
+        inMemoryLdapService, selectionService);
+    tabSheet.add(directorySearchTabComponent, directorySearchTab);
 
     // Schema tab for group-wide schema comparison
     Tab schemaTab = new Tab("Schema");
     schemaTabContent = new GroupSchemaTab(ldapService);
     tabSheet.add(schemaTab, schemaTabContent);
 
-        add(tabSheet);
-        setFlexGrow(1, tabSheet);
+    add(tabSheet);
+    setFlexGrow(1, tabSheet);
+  }
+
+  @Override
+  public void beforeEnter(BeforeEnterEvent event) {
+    this.groupName = event.getRouteParameters().get("group").orElse("");
+    if (groupName == null || groupName.isBlank()) {
+      Notification.show("No group specified", 3000, Notification.Position.TOP_END);
+      return;
     }
 
-    @Override
-    public void beforeEnter(BeforeEnterEvent event) {
-        this.groupName = event.getRouteParameters().get("group").orElse("");
-        if (groupName == null || groupName.isBlank()) {
-            Notification.show("No group specified", 3000, Notification.Position.TOP_END);
-            return;
-        }
+    // Build the environment set for this group from both external and running internal servers
+    Set<LdapServerConfig> groupServers = new HashSet<>();
+    List<LdapServerConfig> external = configurationService.getAllConfigurations()
+        .stream()
+        .filter(c -> groupName.equalsIgnoreCase(safe(c.getGroup())))
+        .collect(Collectors.toList());
+    groupServers.addAll(external);
 
-        // Build the environment set for this group from both external and running internal servers
-        Set<LdapServerConfig> groupServers = new HashSet<>();
-        List<LdapServerConfig> external = configurationService.getAllConfigurations().stream()
-                .filter(c -> groupName.equalsIgnoreCase(safe(c.getGroup())))
-                .collect(Collectors.toList());
-        groupServers.addAll(external);
-
-        // Add internal running servers matching the group
-        for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
-            if (inMemoryLdapService.isServerRunning(cfg.getId()) && groupName.equalsIgnoreCase(safe(cfg.getGroup()))) {
-                groupServers.add(cfg);
-            }
-        }
+    // Add internal running servers matching the group
+    for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
+      if (inMemoryLdapService.isServerRunning(cfg.getId())
+          && groupName.equalsIgnoreCase(safe(cfg.getGroup()))) {
+        groupServers.add(cfg);
+      }
+    }
 
     // Provide the environments to the tabs and refresh UI state
-        directorySearchTab.setEnvironmentSupplier(() -> groupServers);
-        directorySearchTab.refreshEnvironments();
+    directorySearchTab.setEnvironmentSupplier(() -> groupServers);
+    directorySearchTab.refreshEnvironments();
     schemaTabContent.setEnvironments(groupServers);
-    }
+  }
 
-    private String safe(String s) {
-        return s == null ? "" : s.trim();
-    }
+  private String safe(String s) {
+    return s == null ? "" : s.trim();
+  }
 
-    /**
-     * Expose the active group name for layout/context display.
-     */
-    public String getGroupName() {
-        return groupName;
-    }
+  /**
+   * Expose the active group name for layout/context display.
+   *
+   * @return the active group name
+   */
+  public String getGroupName() {
+    return groupName;
+  }
 }

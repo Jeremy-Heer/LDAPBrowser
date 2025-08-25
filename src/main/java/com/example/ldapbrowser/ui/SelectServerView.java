@@ -19,34 +19,47 @@ import com.vaadin.flow.server.auth.AnonymousAllowed;
 @AnonymousAllowed
 public class SelectServerView extends Div implements BeforeEnterObserver {
 
-    private final ConfigurationService configurationService;
-    private final InMemoryLdapService inMemoryLdapService;
-    private final ServerSelectionService selectionService;
+  private final ConfigurationService configurationService;
+  private final InMemoryLdapService inMemoryLdapService;
+  private final ServerSelectionService selectionService;
 
-    public SelectServerView(ConfigurationService configurationService,
-                            InMemoryLdapService inMemoryLdapService,
-                            ServerSelectionService selectionService) {
-        this.configurationService = configurationService;
-        this.inMemoryLdapService = inMemoryLdapService;
-        this.selectionService = selectionService;
-        setVisible(false);
-    }
+  /**
+   * Constructs a new SelectServerView.
+   *
+   * @param configurationService the configuration service
+   * @param inMemoryLdapService the in-memory LDAP service
+   * @param selectionService the server selection service
+   */
+  public SelectServerView(ConfigurationService configurationService,
+                          InMemoryLdapService inMemoryLdapService,
+                          ServerSelectionService selectionService) {
+    this.configurationService = configurationService;
+    this.inMemoryLdapService = inMemoryLdapService;
+    this.selectionService = selectionService;
+    setVisible(false);
+  }
 
-    @Override
-    public void beforeEnter(BeforeEnterEvent event) {
-        String id = event.getRouteParameters().get("sid").orElse(null);
-        if (id != null) {
-            LdapServerConfig cfg = configurationService.getAllConfigurations().stream()
-                    .filter(c -> id.equals(c.getId()))
-                    .findFirst()
-                    .orElseGet(() -> inMemoryLdapService.getAllInMemoryServers().stream()
-                            .filter(c -> id.equals(c.getId()))
-                            .findFirst().orElse(null));
-            if (cfg != null) {
-                selectionService.setSelected(cfg);
-            }
-        }
-        // Always forward to servers view after selection
-        event.forwardTo(ServersView.class);
+  /**
+   * Handles the before-enter event to select a server by ID and forward to ServersView.
+   *
+   * @param event the before-enter event
+   */
+  @Override
+  public void beforeEnter(BeforeEnterEvent event) {
+    String id = event.getRouteParameters().get("sid").orElse(null);
+    if (id != null) {
+      LdapServerConfig cfg = configurationService.getAllConfigurations().stream()
+          .filter(c -> id.equals(c.getId()))
+          .findFirst()
+          .orElseGet(() -> inMemoryLdapService.getAllInMemoryServers().stream()
+              .filter(c -> id.equals(c.getId()))
+              .findFirst()
+              .orElse(null));
+      if (cfg != null) {
+        selectionService.setSelected(cfg);
+      }
     }
+    // Always forward to servers view after selection
+    event.forwardTo(ServersView.class);
+  }
 }

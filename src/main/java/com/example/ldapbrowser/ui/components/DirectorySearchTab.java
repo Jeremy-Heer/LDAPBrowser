@@ -25,172 +25,172 @@ import com.example.ldapbrowser.service.ServerSelectionService;
 */
 public class DirectorySearchTab extends VerticalLayout {
 
-  private final LdapService ldapService;
-  private final ConfigurationService configurationService;
-  private final InMemoryLdapService inMemoryLdapService;
-  private final ServerSelectionService selectionService;
-  // Optional supplier for environments (e.g., group search). If set, overrides selectionService.
-  private java.util.function.Supplier<java.util.Set<LdapServerConfig>> environmentSupplier;
+private final LdapService ldapService;
+private final ConfigurationService configurationService;
+private final InMemoryLdapService inMemoryLdapService;
+private final ServerSelectionService selectionService;
+// Optional supplier for environments (e.g., group search). If set, overrides selectionService.
+private java.util.function.Supplier<java.util.Set<LdapServerConfig>> environmentSupplier;
 
-  // Environment dropdown
-  // Removed: environment dropdown UI; selection is driven by drawer via ServerSelectionService
+// Environment dropdown
+// Removed: environment dropdown UI; selection is driven by drawer via ServerSelectionService
 
-  // Sub-tabs
-  private TabSheet tabSheet;
-  private Tab searchTab;
-  private Tab resultsTab;
-  private Tab entryComparisonTab;
+// Sub-tabs
+private TabSheet tabSheet;
+private Tab searchTab;
+private Tab resultsTab;
+private Tab entryComparisonTab;
 
-  // Components
-  private DirectorySearchSubTab searchTabContent;
-  private SearchResultsTab resultsTabContent;
-  private EntryComparisonTab entryComparisonTabContent;
+// Components
+private DirectorySearchSubTab searchTabContent;
+private SearchResultsTab resultsTabContent;
+private EntryComparisonTab entryComparisonTabContent;
 
-  public DirectorySearchTab(LdapService ldapService, ConfigurationService configurationService,
-  InMemoryLdapService inMemoryLdapService, ServerSelectionService selectionService) {
-    this.ldapService = ldapService;
-    this.configurationService = configurationService;
-    this.inMemoryLdapService = inMemoryLdapService;
-    this.selectionService = selectionService;
+public DirectorySearchTab(LdapService ldapService, ConfigurationService configurationService,
+InMemoryLdapService inMemoryLdapService, ServerSelectionService selectionService) {
+this.ldapService = ldapService;
+this.configurationService = configurationService;
+this.inMemoryLdapService = inMemoryLdapService;
+this.selectionService = selectionService;
 
-    initializeComponents();
-    setupLayout();
-    // When server selection changes, update search button state
-    this.selectionService.addListener(cfg -> searchTabContent.updateSearchButton());
-  }
+initializeComponents();
+setupLayout();
+// When server selection changes, update search button state
+this.selectionService.addListener(cfg -> searchTabContent.updateSearchButton());
+}
 
-  private void initializeComponents() {
-    // Create sub-tabs
-    tabSheet = new TabSheet();
-    tabSheet.setSizeFull();
+private void initializeComponents() {
+// Create sub-tabs
+tabSheet = new TabSheet();
+tabSheet.setSizeFull();
 
-    // Search tab (existing functionality)
-    searchTab = new Tab("Search");
-    searchTabContent = new DirectorySearchSubTab(ldapService, configurationService, inMemoryLdapService);
+// Search tab (existing functionality)
+searchTab = new Tab("Search");
+searchTabContent = new DirectorySearchSubTab(ldapService, configurationService, inMemoryLdapService);
 
-    // Set parent tab reference for environment dropdown access
-    searchTabContent.setParentTab(this);
+// Set parent tab reference for environment dropdown access
+searchTabContent.setParentTab(this);
 
-    tabSheet.add(searchTab, searchTabContent);
+tabSheet.add(searchTab, searchTabContent);
 
-    // Results tab (new functionality for displaying search results)
-    resultsTab = new Tab("Results");
-    resultsTabContent = new SearchResultsTab(ldapService);
-    
-    // Set up comparison callback from results tab to switch to comparison tab
-    resultsTabContent.setComparisonCallback(this::showComparison);
-    
-    tabSheet.add(resultsTab, resultsTabContent);
+// Results tab (new functionality for displaying search results)
+resultsTab = new Tab("Results");
+resultsTabContent = new SearchResultsTab(ldapService);
 
-    // Entry Comparison tab (existing functionality)
-    entryComparisonTab = new Tab("Entry Comparison");
-    entryComparisonTabContent = new EntryComparisonTab();
-    tabSheet.add(entryComparisonTab, entryComparisonTabContent);
+// Set up comparison callback from results tab to switch to comparison tab
+resultsTabContent.setComparisonCallback(this::showComparison);
 
-    // Set up search result callback to switch to results tab
-    searchTabContent.setSearchResultsCallback(this::showSearchResults);
+tabSheet.add(resultsTab, resultsTabContent);
 
-    // Set Search as the default selected tab
-    tabSheet.setSelectedTab(searchTab);
-  }
+// Entry Comparison tab (existing functionality)
+entryComparisonTab = new Tab("Entry Comparison");
+entryComparisonTabContent = new EntryComparisonTab();
+tabSheet.add(entryComparisonTab, entryComparisonTabContent);
 
-  private void setupLayout() {
-    setSizeFull();
-    setPadding(true);
-    setSpacing(true);
-    addClassName("directory-search-tab");
+// Set up search result callback to switch to results tab
+searchTabContent.setSearchResultsCallback(this::showSearchResults);
 
-    // Title with icon and environment dropdown
-    HorizontalLayout titleLayout = new HorizontalLayout();
-    titleLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-    titleLayout.setSpacing(true);
-    titleLayout.setWidthFull();
+// Set Search as the default selected tab
+tabSheet.setSelectedTab(searchTab);
+}
 
-    // Left side: icon and title
-    HorizontalLayout leftSide = new HorizontalLayout();
-    leftSide.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-    leftSide.setSpacing(true);
+private void setupLayout() {
+setSizeFull();
+setPadding(true);
+setSpacing(true);
+addClassName("directory-search-tab");
 
-    Icon searchIcon = new Icon(VaadinIcon.SEARCH);
-    searchIcon.setSize("20px");
-    searchIcon.getStyle().set("color", "#2196f3");
+// Title with icon and environment dropdown
+HorizontalLayout titleLayout = new HorizontalLayout();
+titleLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+titleLayout.setSpacing(true);
+titleLayout.setWidthFull();
 
-    H3 title = new H3("Directory Search");
-    title.addClassNames(LumoUtility.Margin.NONE);
-    title.getStyle().set("color", "#333");
+// Left side: icon and title
+HorizontalLayout leftSide = new HorizontalLayout();
+leftSide.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+leftSide.setSpacing(true);
 
-    leftSide.add(searchIcon, title);
+Icon searchIcon = new Icon(VaadinIcon.SEARCH);
+searchIcon.setSize("20px");
+searchIcon.getStyle().set("color", "#2196f3");
 
-  // Right side removed (environment dropdown)
+H3 title = new H3("Directory Search");
+title.addClassNames(LumoUtility.Margin.NONE);
+title.getStyle().set("color", "#333");
 
-  titleLayout.add(leftSide);
-  titleLayout.setFlexGrow(1, leftSide);
+leftSide.add(searchIcon, title);
 
-    add(titleLayout, tabSheet);
-    setFlexGrow(1, tabSheet);
-  }
+// Right side removed (environment dropdown)
 
-  /**
-  * Clear the content of all sub-tabs
-  */
-  public void clear() {
-    searchTabContent.clear();
-    resultsTabContent.clear();
-    entryComparisonTabContent.clear();
-  }
+titleLayout.add(leftSide);
+titleLayout.setFlexGrow(1, leftSide);
 
-  /**
-  * Refresh environments in the dropdown and search tab
-  */
-  public void refreshEnvironments() {
-    searchTabContent.refreshEnvironments();
-  }
+add(titleLayout, tabSheet);
+setFlexGrow(1, tabSheet);
+}
 
-  /**
-  * Show search results and switch to results tab
-  */
-  private void showSearchResults(List<SearchResultEntry> results, String searchDescription) {
-    // Set the results in the results tab
-    resultsTabContent.displayResults(results, searchDescription);
+/**
+* Clear the content of all sub-tabs
+*/
+public void clear() {
+searchTabContent.clear();
+resultsTabContent.clear();
+entryComparisonTabContent.clear();
+}
 
-    // Switch to the results tab
-    tabSheet.setSelectedTab(resultsTab);
-  }
+/**
+* Refresh environments in the dropdown and search tab
+*/
+public void refreshEnvironments() {
+searchTabContent.refreshEnvironments();
+}
 
-  /**
-  * Show comparison with the provided entries and switch to comparison tab
-  */
-  private void showComparison(List<SearchResultEntry> entries) {
-    // Set the entries in the comparison tab
-    entryComparisonTabContent.setComparisonEntries(entries);
+/**
+* Show search results and switch to results tab
+*/
+private void showSearchResults(List<SearchResultEntry> results, String searchDescription) {
+// Set the results in the results tab
+resultsTabContent.displayResults(results, searchDescription);
 
-    // Switch to the comparison tab
-    tabSheet.setSelectedTab(entryComparisonTab);
-  }
+// Switch to the results tab
+tabSheet.setSelectedTab(resultsTab);
+}
 
-  /**
-  * Get the selected environments from the environment dropdown
-  */
-  public Set<LdapServerConfig> getSelectedEnvironments() {
-  if (environmentSupplier != null) {
-    try {
-      java.util.Set<LdapServerConfig> envs = environmentSupplier.get();
-      return envs != null ? envs : java.util.Collections.emptySet();
-    } catch (Exception e) {
-      return java.util.Collections.emptySet();
-    }
-  }
-  LdapServerConfig cfg = selectionService.getSelected();
-  return cfg != null ? Set.of(cfg) : Collections.emptySet();
-  }
+/**
+* Show comparison with the provided entries and switch to comparison tab
+*/
+private void showComparison(List<SearchResultEntry> entries) {
+// Set the entries in the comparison tab
+entryComparisonTabContent.setComparisonEntries(entries);
 
-  /**
-   * Override the environments provider. When set, searches will run against these environments
-   * instead of the single selection from ServerSelectionService.
-   */
-  public void setEnvironmentSupplier(java.util.function.Supplier<java.util.Set<LdapServerConfig>> supplier) {
-    this.environmentSupplier = supplier;
-    // Trigger UI enable/disable updates
-    searchTabContent.updateSearchButton();
-  }
+// Switch to the comparison tab
+tabSheet.setSelectedTab(entryComparisonTab);
+}
+
+/**
+* Get the selected environments from the environment dropdown
+*/
+public Set<LdapServerConfig> getSelectedEnvironments() {
+if (environmentSupplier != null) {
+try {
+java.util.Set<LdapServerConfig> envs = environmentSupplier.get();
+return envs != null ? envs : java.util.Collections.emptySet();
+} catch (Exception e) {
+return java.util.Collections.emptySet();
+}
+}
+LdapServerConfig cfg = selectionService.getSelected();
+return cfg != null ? Set.of(cfg) : Collections.emptySet();
+}
+
+/**
+* Override the environments provider. When set, searches will run against these environments
+* instead of the single selection from ServerSelectionService.
+*/
+public void setEnvironmentSupplier(java.util.function.Supplier<java.util.Set<LdapServerConfig>> supplier) {
+this.environmentSupplier = supplier;
+// Trigger UI enable/disable updates
+searchTabContent.updateSearchButton();
+}
 }
