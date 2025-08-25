@@ -514,25 +514,26 @@ return;
 entryPageState.put(parent.getDn(), page);
 
 try {
-// First, check if the parent actually has children (lazy check)
-boolean actuallyHasChildren = ldapService.checkHasChildren(serverConfig.getId(), parent.getDn());
+        // First, check if the parent actually has children (lazy check)
+        boolean actuallyHasChildren = ldapService.checkHasChildren(serverConfig.getId(), parent.getDn());
 
-if (!actuallyHasChildren) {
-// Remove the expander since there are no children
-getUI().ifPresent(ui -> ui.access(() -> {
- parent.setHasChildren(false);
- // Remove any placeholder children
- List<LdapEntry> existingChildren = new ArrayList<>(treeData.getChildren(parent));
- for (LdapEntry child : existingChildren) {
- treeData.removeItem(child);
- }
- dataProvider.refreshItem(parent, true);
- showNotification("No child entries found under " + parent.getDn(), NotificationVariant.LUMO_PRIMARY);
-}));
-return;
-}
-
-// Show loading indicator
+        if (!actuallyHasChildren) {
+            // Only remove the expander for entries that definitely shouldn't have one
+            // Keep expander for entries that might have children in the future or should always show expander
+            getUI().ifPresent(ui -> ui.access(() -> {
+                if (!shouldShowExpanderForEntry(parent)) {
+                    parent.setHasChildren(false);
+                }
+                // Remove any placeholder children but keep the expander if it should be shown
+                List<LdapEntry> existingChildren = new ArrayList<>(treeData.getChildren(parent));
+                for (LdapEntry child : existingChildren) {
+                    treeData.removeItem(child);
+                }
+                dataProvider.refreshItem(parent, true);
+                showNotification("No child entries found under " + parent.getDn(), NotificationVariant.LUMO_PRIMARY);
+            }));
+            return;
+        }// Show loading indicator
 getUI().ifPresent(ui -> ui.access(() -> {
 parent.addAttribute("_loading", "true");
 dataProvider.refreshItem(parent);
@@ -553,8 +554,10 @@ for (LdapEntry child : existingChildren) {
 }
 
 if (children.isEmpty()) {
- // No children found, remove the expander
+ // No children found, but only remove expander if entry shouldn't have one
+ if (!shouldShowExpanderForEntry(parent)) {
  parent.setHasChildren(false);
+ }
  showNotification("No child entries found under " + parent.getDn(), NotificationVariant.LUMO_PRIMARY);
 } else {
  // Add real children
@@ -680,62 +683,56 @@ collapse(entry);
 
 /**
 * Ensure that entries that typically have children are marked as such
+* Modified to be more aggressive in showing expanders for better browsing experience
 */
 private void ensureHasChildrenFlagIsSet(LdapEntry entry) {
-if (!entry.isHasChildren() && shouldShowExpanderForEntry(entry)) {
+// Always check if an entry should show expander, regardless of current hasChildren flag
+if (shouldShowExpanderForEntry(entry)) {
 entry.setHasChildren(true);
 }
 }
 
 /**
 * Determine if an entry should show an expander based on its object classes
+* Modified to be more permissive and always show expanders unless explicitly a leaf entry
 */
 private boolean shouldShowExpanderForEntry(LdapEntry entry) {
-// Check DN pattern first - if it starts with "ou=" it's likely an organizational unit
-String dn = entry.getDn();
-if (dn != null && dn.toLowerCase().startsWith("ou=")) {
+// Skip pagination and placeholder entries
+if (entry.getDn().startsWith("_pagination_") || entry.getDn().startsWith("_placeholder_")) {
+return false;
+}
+
+List<String> objectClasses = entry.getAttributeValues("objectClass");
+if (objectClasses == null || objectClasses.isEmpty()) {
+// If no object classes, assume it might have children and show expander
 return true;
 }
 
-// Check all object classes to determine if this entry should have an expander
-// But exclude person/user types even if they contain organizational patterns
-boolean hasPersonClass = false;
-boolean hasContainerClass = false;
-
-List<String> objectClasses = entry.getAttributeValues("objectClass");
+// Check for definitely leaf entry types that should NOT show expanders
+boolean isDefinitelyLeaf = false;
 for (String oc : objectClasses) {
 String lowerOc = oc.toLowerCase();
 
-// Check if this is a person/user entry
+// These are typically leaf entries that should not show expanders
 if (lowerOc.contains("person") || lowerOc.contains("user") ||
-lowerOc.contains("inetorgperson") || lowerOc.contains("posixaccount")) {
-hasPersonClass = true;
-}
-
-// Check if this is a container/organizational entry
-if (lowerOc.equals("organizationalunit") ||
-lowerOc.contains("organizationalunit") ||
-lowerOc.equals("organization") ||
-lowerOc.contains("organization") ||
-lowerOc.contains("container") ||
-lowerOc.contains("domain") ||
-lowerOc.contains("dcobject") ||
-lowerOc.contains("builtindomain")) {
-hasContainerClass = true;
+lowerOc.contains("inetorgperson") || lowerOc.contains("posixaccount") ||
+lowerOc.contains("computer") || lowerOc.contains("device") ||
+lowerOc.contains("printer") || lowerOc.contains("certificate") ||
+lowerOc.contains("alias")) {
+isDefinitelyLeaf = true;
+break;
 }
 }
 
-// If it's a person/user, don't show expander regardless of other classes
-if (hasPersonClass && !hasContainerClass) {
+// For entries that are definitely leaf entries, don't show expander
+if (isDefinitelyLeaf) {
 return false;
 }
 
-// If it has container classes, show expander
-if (hasContainerClass) {
+// For all other entries, show expander to allow browsing
+// This includes organizationalUnit, organization, container, domain, etc.
+// and any unknown object classes that might potentially have children
 return true;
-}
-
-return false;
 }
 
 private void showNotification(String message, NotificationVariant variant) {
