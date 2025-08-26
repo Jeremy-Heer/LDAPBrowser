@@ -1,0 +1,143 @@
+/* Bulk Group Memberships Tab Styles */
+
+.bulk-group-memberships-tab {
+    background: #fafafa;
+}
+
+.bulk-group-memberships-field-group {
+    background: white;
+    border: 1px solid var(--lumo-contrast-20pct);
+    border-radius: var(--lumo-border-radius-m);
+    padding: var(--lumo-space-l);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.bulk-group-memberships-field-group h4 {
+    color: #1f2937;
+    margin-bottom: var(--lumo-space-s);
+    font-weight: 600;
+}
+
+.bulk-group-memberships-field-group > span {
+    color: #6b7280;
+    margin-bottom: var(--lumo-space-m);
+    display: block;
+}
+
+/* Style the user list text area to look more like a code editor */
+.bulk-group-memberships-tab textarea {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    background: #f8fafc;
+    border: 1px solid var(--lumo-contrast-30pct);
+}
+
+.bulk-group-memberships-tab textarea:focus {
+    background: white;
+    border-color: var(--lumo-primary-color);
+    box-shadow: 0 0 0 2px var(--lumo-primary-color-10pct);
+}
+
+/* File upload styling */
+.bulk-group-memberships-tab vaadin-upload {
+    border: 2px dashed var(--lumo-contrast-30pct);
+    border-radius: var(--lumo-border-radius-m);
+    background: #f8fafc;
+    transition: all 0.2s ease;
+}
+
+.bulk-group-memberships-tab vaadin-upload:hover {
+    border-color: var(--lumo-primary-color);
+    background: var(--lumo-primary-color-10pct);
+}
+
+/* Checkbox styling */
+.bulk-group-memberships-tab vaadin-checkbox {
+    margin: var(--lumo-space-xs) var(--lumo-space-s) var(--lumo-space-xs) 0;
+}
+
+/* Progress container styling */
+.bulk-group-memberships-tab .progress-container {
+    background: #f0f9ff;
+    border: 1px solid #0ea5e9;
+    border-radius: var(--lumo-border-radius-m);
+    padding: var(--lumo-space-m);
+    margin: var(--lumo-space-m) 0;
+}
+
+.bulk-group-memberships-tab .progress-container span {
+    color: #0c4a6e;
+    font-weight: 500;
+}
+
+/* Error report download link styling */
+.bulk-group-memberships-tab vaadin-anchor[download] vaadin-button {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #f59e0b;
+}
+
+.bulk-group-memberships-tab vaadin-anchor[download] vaadin-button:hover {
+    background: #fde68a;
+}
+
+/* Success/error notification styling improvements */
+.bulk-group-memberships-tab .notification-success {
+    background: #10b981;
+    color: white;
+    border-radius: var(--lumo-border-radius-m);
+}
+
+.bulk-group-memberships-tab .notification-error {
+    background: #ef4444;
+    color: white;
+    border-radius: var(--lumo-border-radius-m);
+}
+
+/* Responsive layout adjustments */
+@media (max-width: 768px) {
+    .bulk-group-memberships-field-group {
+        padding: var(--lumo-space-m);
+    }
+    
+    .bulk-group-memberships-tab vaadin-horizontal-layout {
+        flex-direction: column;
+    }
+    
+    .bulk-group-memberships-tab vaadin-horizontal-layout > * {
+        width: 100% !important;
+        margin-bottom: var(--lumo-space-s);
+    }
+}
+
+/* Group type indicator styling */
+.group-type-indicator {
+    display: inline-block;
+    padding: var(--lumo-space-xs) var(--lumo-space-s);
+    border-radius: var(--lumo-border-radius-s);
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.group-type-posix {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.group-type-names {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.group-type-unique {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.group-type-urls {
+    background: #fce7f3;
+    color: #be185d;
+}

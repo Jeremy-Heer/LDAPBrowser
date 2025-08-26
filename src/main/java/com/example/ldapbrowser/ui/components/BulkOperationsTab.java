@@ -31,11 +31,13 @@ private TabSheet tabSheet;
 private Tab importTab;
 private Tab searchTab;
 private Tab generateTab;
+private Tab groupMembershipsTab;
 
 // Components
 private ImportTab importTabContent;
 private BulkSearchTab searchTabContent;
 private BulkGenerateTab generateTabContent;
+private BulkGroupMembershipsTab groupMembershipsTabContent;
 
 public BulkOperationsTab(LdapService ldapService, LoggingService loggingService,
 ConfigurationService configurationService, InMemoryLdapService inMemoryLdapService) {
@@ -69,6 +71,11 @@ tabSheet.add(searchTab, searchTabContent);
 generateTab = new Tab("Generate");
 generateTabContent = new BulkGenerateTab(ldapService, loggingService);
 tabSheet.add(generateTab, generateTabContent);
+
+// Group Memberships tab (new bulk group memberships operations)
+groupMembershipsTab = new Tab("Group Memberships");
+groupMembershipsTabContent = new BulkGroupMembershipsTab(ldapService, loggingService);
+tabSheet.add(groupMembershipsTab, groupMembershipsTabContent);
 
 // Set Import as the default selected tab
 tabSheet.setSelectedTab(importTab);
@@ -105,6 +112,7 @@ public void setServerConfig(LdapServerConfig serverConfig) {
 importTabContent.setServerConfig(serverConfig);
 searchTabContent.setServerConfig(serverConfig);
 generateTabContent.setServerConfig(serverConfig);
+groupMembershipsTabContent.setServerConfig(serverConfig);
 }
 
 /**
@@ -118,5 +126,6 @@ public void clear() {
 importTabContent.clear();
 searchTabContent.clear();
 generateTabContent.clear();
+groupMembershipsTabContent.clear();
 }
 }
