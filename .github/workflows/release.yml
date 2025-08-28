@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'  # Triggers on version tags like v0.1, v1.0.0, etc.
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
