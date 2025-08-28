@@ -42,11 +42,11 @@
         </dependency>
 
         <!-- UnboundID LDAP SDK Tools (for command-line utilities) -->
-        <dependency>
+        <!-- <dependency>
         <groupId>com.unboundid</groupId>
         <artifactId>unboundid-ldapsdk-tools</artifactId>
         <version>7.0.3</version>
-        </dependency>
+        </dependency> -->
 
 
         <!-- Spring Boot Starters -->
