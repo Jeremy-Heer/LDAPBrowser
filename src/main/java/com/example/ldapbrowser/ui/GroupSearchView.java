@@ -88,7 +88,7 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
 
   @Override
   public void beforeEnter(BeforeEnterEvent event) {
-    this.groupName = event.getRouteParameters().get("group").orElse("");
+  this.groupName = event.getRouteParameters().get("group").orElse("");
     if (groupName == null || groupName.isBlank()) {
       Notification.show("No group specified", 3000, Notification.Position.TOP_END);
       return;
@@ -96,16 +96,17 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
 
     // Build the environment set for this group from both external and running internal servers
     Set<LdapServerConfig> groupServers = new HashSet<>();
-    List<LdapServerConfig> external = configurationService.getAllConfigurations()
-        .stream()
-        .filter(c -> groupName.equalsIgnoreCase(safe(c.getGroup())))
-        .collect(Collectors.toList());
+  final String normalized = normalizeGroup(groupName);
+  List<LdapServerConfig> external = configurationService.getAllConfigurations()
+    .stream()
+    .filter(c -> normalized.equalsIgnoreCase(normalizeGroup(c.getGroup())))
+    .collect(Collectors.toList());
     groupServers.addAll(external);
 
     // Add internal running servers matching the group
     for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
       if (inMemoryLdapService.isServerRunning(cfg.getId())
-          && groupName.equalsIgnoreCase(safe(cfg.getGroup()))) {
+          && normalized.equalsIgnoreCase(normalizeGroup(cfg.getGroup()))) {
         groupServers.add(cfg);
       }
     }
@@ -116,8 +117,25 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
     schemaTabContent.setEnvironments(groupServers);
   }
 
-  private String safe(String s) {
-    return s == null ? "" : s.trim();
+  /**
+   * Normalize group names for comparison.
+   * - URL-decode the incoming route parameter
+   * - Treat '+' as space
+   * - Collapse multiple whitespace to a single space
+   * - Trim
+   */
+  private String normalizeGroup(String s) {
+    if (s == null) return "";
+    String value = s;
+    try {
+      // URL decode in case the route segment contained encoded spaces (%20)
+      value = java.net.URLDecoder.decode(value, java.nio.charset.StandardCharsets.UTF_8.name());
+    } catch (Exception ignored) {
+      // ignore and continue with original value
+    }
+    // Replace '+' (common in some encodings) with space and collapse whitespace
+    value = value.replace('+', ' ').trim().replaceAll("\\s+", " ");
+    return value;
   }
 
   /**
