@@ -53,6 +53,10 @@ private Span debugCountSpan;
 private Button refreshButton;
 private Button clearLogsButton;
 private Button exportLogsButton;
+// Debug capture toggle
+private com.vaadin.flow.component.checkbox.Checkbox debugCaptureCheckbox;
+// Listener runnable to refresh when logs update
+private final Runnable logUpdateListener = this::safeRefreshFromListener;
 
 public LogsTab(LoggingService loggingService) {
 this.loggingService = loggingService;
@@ -60,6 +64,19 @@ initializeComponents();
 setupLayout();
 refreshLogs();
 updateStatistics();
+}
+
+// Ensure the checkbox reflects the current service state when the component is attached
+@Override
+public void onAttach(com.vaadin.flow.component.AttachEvent attachEvent) {
+	super.onAttach(attachEvent);
+	try {
+		// Sync checkbox to current service value
+		debugCaptureCheckbox.setValue(loggingService.isDebugCaptureEnabled());
+		// Re-register listener in case the component was detached and re-attached
+		loggingService.removeLogUpdateListener(logUpdateListener);
+		loggingService.addLogUpdateListener(logUpdateListener);
+	} catch (Exception ignored) {}
 }
 
 private void initializeComponents() {
@@ -154,6 +171,26 @@ clearLogsButton.addClickListener(e -> clearLogs());
 exportLogsButton = new Button("Export Logs", new Icon(VaadinIcon.DOWNLOAD));
 exportLogsButton.addClickListener(e -> exportLogs());
 
+	// Debug capture checkbox (initialize to current service state so it remains
+	// checked when the tab is recreated) and avoid showing a notification
+	// when the state didn't actually change.
+	debugCaptureCheckbox = new com.vaadin.flow.component.checkbox.Checkbox("Debug");
+	// set initial value from the service before wiring the listener to avoid
+	// triggering the listener on construction
+	debugCaptureCheckbox.setValue(loggingService.isDebugCaptureEnabled());
+	debugCaptureCheckbox.addValueChangeListener(e -> {
+		boolean enabled = Boolean.TRUE.equals(e.getValue());
+		boolean already = loggingService.isDebugCaptureEnabled();
+		// If there's no actual change, just refresh stats and return
+		if (enabled == already) {
+			updateStatistics();
+			return;
+		}
+		loggingService.setDebugCaptureEnabled(enabled);
+		updateStatistics();
+		showSuccess(enabled ? "Debug capture enabled" : "Debug capture disabled");
+	});
+
 // Statistics spans
 totalLogsSpan = new Span();
 errorCountSpan = new Span();
@@ -214,7 +251,7 @@ controlsLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
 controlsLayout.setSpacing(true);
 controlsLayout.addClassName("logs-controls");
 
-controlsLayout.add(refreshButton, clearLogsButton, exportLogsButton);
+	controlsLayout.add(refreshButton, clearLogsButton, exportLogsButton, debugCaptureCheckbox);
 
 // Combine filters and controls
 HorizontalLayout topActionsLayout = new HorizontalLayout();
@@ -225,6 +262,9 @@ topActionsLayout.add(filtersLayout, controlsLayout);
 // Add all components
 add(titleLayout, statsLayout, topActionsLayout, logsGrid);
 setFlexGrow(1, logsGrid);
+
+	// Register for updates so the tab auto-refreshes when new logs arrive
+	loggingService.addLogUpdateListener(logUpdateListener);
 }
 
 private void refreshLogs() {
@@ -347,6 +387,28 @@ categoryFilter.clear();
 searchFilter.clear();
 dataProvider.clearFilters();
 dataProvider.refreshAll();
+}
+
+// Ensure we remove the listener if the component is detached
+@Override
+public void onDetach(com.vaadin.flow.component.DetachEvent detachEvent) {
+	super.onDetach(detachEvent);
+	try {
+		loggingService.removeLogUpdateListener(logUpdateListener);
+	} catch (Exception ignored) {
+	}
+}
+
+// Called from the logging listener - must access UI thread safely
+private void safeRefreshFromListener() {
+	// Use UI access if available
+	getUI().ifPresent(ui -> ui.access(() -> {
+		try {
+			refreshLogs();
+			updateStatistics();
+			updateCategoryFilter();
+		} catch (Exception ignored) {}
+	}));
 }
 
 private void showSuccess(String message) {

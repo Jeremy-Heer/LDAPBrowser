@@ -34,6 +34,7 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
   private final ServerSelectionService selectionService;
+  private final LoggingService loggingService;
 
   private TabSheet tabSheet;
   private DirectorySearchTab directorySearchTab;
@@ -57,6 +58,7 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
     this.ldapService = ldapService;
     this.configurationService = configurationService;
     this.inMemoryLdapService = inMemoryLdapService;
+  this.loggingService = loggingService;
     this.selectionService = selectionService;
 
     setSizeFull();
@@ -71,8 +73,8 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
     tabSheet.setSizeFull();
 
     Tab directorySearchTabComponent = new Tab("Directory Search");
-    directorySearchTab = new DirectorySearchTab(ldapService, configurationService,
-        inMemoryLdapService, selectionService);
+  directorySearchTab = new DirectorySearchTab(ldapService, configurationService,
+    inMemoryLdapService, selectionService, loggingService);
     tabSheet.add(directorySearchTabComponent, directorySearchTab);
 
     // Schema tab for group-wide schema comparison

@@ -77,8 +77,8 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
     tabSheet.setSizeFull();
 
     Tab directorySearchTabComponent = new Tab("Directory Search");
-    directorySearchTab = new DirectorySearchTab(ldapService, configurationService,
-       inMemoryLdapService, selectionService);
+  directorySearchTab = new DirectorySearchTab(ldapService, configurationService,
+     inMemoryLdapService, selectionService, loggingService);
     tabSheet.add(directorySearchTabComponent, directorySearchTab);
 
     Tab dashboardTabComponent = new Tab("LDAP Browser");
