@@ -6,6 +6,7 @@ import com.example.ldapbrowser.model.SearchResultEntry;
 import com.example.ldapbrowser.service.LdapService;
 import com.example.ldapbrowser.service.ConfigurationService;
 import com.example.ldapbrowser.service.InMemoryLdapService;
+import com.example.ldapbrowser.service.LoggingService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
@@ -41,6 +42,7 @@ public class DirectorySearchSubTab extends VerticalLayout {
 private final LdapService ldapService;
 private final ConfigurationService configurationService;
 private final InMemoryLdapService inMemoryLdapService;
+private final LoggingService loggingService;
 
 // Parent tab reference for environment dropdown
 private DirectorySearchTab parentTab;
@@ -106,10 +108,11 @@ public String toString() { return label; }
 }
 
 public DirectorySearchSubTab(LdapService ldapService, ConfigurationService configurationService,
-InMemoryLdapService inMemoryLdapService) {
-this.ldapService = ldapService;
-this.configurationService = configurationService;
-this.inMemoryLdapService = inMemoryLdapService;
+		InMemoryLdapService inMemoryLdapService, LoggingService loggingService) {
+	this.ldapService = ldapService;
+	this.configurationService = configurationService;
+	this.inMemoryLdapService = inMemoryLdapService;
+	this.loggingService = loggingService;
 initializeComponents();
 setupLayout();
 }
@@ -385,7 +388,23 @@ String searchTerm = nameField != null ? nameField.getValue() : "";
 Set<LdapServerConfig> selectedEnvironments = parentTab != null ? 
 parentTab.getSelectedEnvironments() : new HashSet<>();
 if (searchButton != null) {
-searchButton.setEnabled(searchTerm != null && !searchTerm.trim().isEmpty() && !selectedEnvironments.isEmpty());
+	boolean enabled = searchTerm != null && !searchTerm.trim().isEmpty() && !selectedEnvironments.isEmpty();
+	searchButton.setEnabled(enabled);
+	// Debug logging about why button is disabled
+		if (loggingService != null && loggingService.isDebugCaptureEnabled()) {
+			if (!enabled) {
+				StringBuilder missing = new StringBuilder();
+				if (searchTerm == null || searchTerm.trim().isEmpty()) {
+					missing.append("name field empty; ");
+				}
+				if (selectedEnvironments.isEmpty()) {
+					missing.append("no environments selected; ");
+				}
+				loggingService.logDebug("UI/SEARCH", "Basic Search button enabled=" + enabled, missing.toString());
+			} else {
+				loggingService.logDebug("UI/SEARCH", "Basic Search button enabled=true", null);
+			}
+		}
 }
 }
 
@@ -394,7 +413,18 @@ Set<LdapServerConfig> selectedEnvironments = parentTab != null ?
 parentTab.getSelectedEnvironments() : new HashSet<>();
 String filter = advancedSearchBuilder != null ? advancedSearchBuilder.getGeneratedFilter() : "";
 if (advancedSearchButton != null) {
-advancedSearchButton.setEnabled(!selectedEnvironments.isEmpty() && !filter.trim().isEmpty());
+	boolean enabled = !selectedEnvironments.isEmpty() && !filter.trim().isEmpty();
+	advancedSearchButton.setEnabled(enabled);
+		if (loggingService != null && loggingService.isDebugCaptureEnabled()) {
+			if (!enabled) {
+				StringBuilder missing = new StringBuilder();
+				if (selectedEnvironments.isEmpty()) missing.append("no environments selected; ");
+				if (filter == null || filter.trim().isEmpty()) missing.append("filter empty; ");
+				loggingService.logDebug("UI/SEARCH", "Advanced Search button enabled=" + enabled, missing.toString());
+			} else {
+				loggingService.logDebug("UI/SEARCH", "Advanced Search button enabled=true", null);
+			}
+		}
 }
 }
 

@@ -81,6 +81,11 @@ private final List<Runnable> logUpdateListeners = new CopyOnWriteArrayList<>();
 // Maximum number of log entries to keep in memory
 private static final int MAX_LOG_ENTRIES = 1000;
 
+// Debug capture state and original streams
+private volatile boolean debugCaptureEnabled = false;
+private java.io.PrintStream originalErr = System.err;
+private java.io.PrintStream capturingErrStream = null;
+
 /**
 * Add a log entry
 */
@@ -268,6 +273,94 @@ int infoCount = (int) logs.stream().filter(entry -> entry.getLevel() == LogLevel
 int debugCount = (int) logs.stream().filter(entry -> entry.getLevel() == LogLevel.DEBUG).count();
 
 return new LogStats(totalLogs, errorCount, warningCount, infoCount, debugCount);
+}
+
+/**
+ * Enable or disable capturing of System.err output and redirect it to the logging service.
+ * When enabled, stderr lines are captured and recorded as DEBUG logs with category "STDERR".
+ */
+public synchronized void setDebugCaptureEnabled(boolean enabled) {
+	if (enabled == debugCaptureEnabled) {
+		return;
+	}
+	debugCaptureEnabled = enabled;
+	if (enabled) {
+		startStderrCapture();
+	} else {
+		stopStderrCapture();
+	}
+}
+
+public boolean isDebugCaptureEnabled() {
+	return debugCaptureEnabled;
+}
+
+private void startStderrCapture() {
+	if (capturingErrStream != null) return;
+
+	// Keep a reference to the original err stream to forward messages
+	originalErr = System.err;
+
+	// OutputStream that forwards lines to loggingService
+	java.io.OutputStream os = new java.io.OutputStream() {
+		private final StringBuilder sb = new StringBuilder();
+
+		@Override
+		public void write(int b) {
+			char c = (char) b;
+			sb.append(c);
+			if (c == '\n') {
+				String line = sb.toString().trim();
+				if (!line.isEmpty()) {
+					// Record as DEBUG with category STDERR
+					log(LogLevel.DEBUG, "STDERR", line);
+				}
+				sb.setLength(0);
+			}
+		}
+
+		@Override
+		public void write(byte[] b, int off, int len) {
+			for (int i = off; i < off + len; i++) {
+				write(b[i]);
+			}
+		}
+	};
+
+	capturingErrStream = new java.io.PrintStream(new java.io.FilterOutputStream(os) {
+		@Override
+		public void write(int b) throws java.io.IOException {
+			super.write(b);
+			// Also forward to original stderr so console still receives messages
+			try {
+				originalErr.write(b);
+			} catch (Exception ignored) {}
+		}
+
+		@Override
+		public void write(byte[] b, int off, int len) throws java.io.IOException {
+			super.write(b, off, len);
+			try {
+				originalErr.write(b, off, len);
+			} catch (Exception ignored) {}
+		}
+	}, true);
+
+	System.setErr(capturingErrStream);
+	log(LogLevel.INFO, "DEBUG_CAPTURE", "Stderr capture enabled");
+}
+
+private void stopStderrCapture() {
+	if (capturingErrStream == null) return;
+	try {
+		System.setErr(originalErr);
+	} catch (Exception ignored) {}
+	try {
+		capturingErrStream.flush();
+		capturingErrStream.close();
+	} catch (Exception ignored) {}
+	capturingErrStream = null;
+	log(LogLevel.INFO, "DEBUG_CAPTURE", "Stderr capture disabled");
 }
 
 public static class LogStats {

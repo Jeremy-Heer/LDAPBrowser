@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.Collections;
 
 import com.example.ldapbrowser.service.ServerSelectionService;
+import com.example.ldapbrowser.service.LoggingService;
 
 /**
 * Directory Search tab containing Search and Entry Comparison sub-tabs
@@ -29,6 +30,7 @@ private final LdapService ldapService;
 private final ConfigurationService configurationService;
 private final InMemoryLdapService inMemoryLdapService;
 private final ServerSelectionService selectionService;
+private final LoggingService loggingService;
 // Optional supplier for environments (e.g., group search). If set, overrides selectionService.
 private java.util.function.Supplier<java.util.Set<LdapServerConfig>> environmentSupplier;
 
@@ -47,11 +49,13 @@ private SearchResultsTab resultsTabContent;
 private EntryComparisonTab entryComparisonTabContent;
 
 public DirectorySearchTab(LdapService ldapService, ConfigurationService configurationService,
-InMemoryLdapService inMemoryLdapService, ServerSelectionService selectionService) {
+	InMemoryLdapService inMemoryLdapService, ServerSelectionService selectionService,
+	LoggingService loggingService) {
 this.ldapService = ldapService;
 this.configurationService = configurationService;
 this.inMemoryLdapService = inMemoryLdapService;
 this.selectionService = selectionService;
+this.loggingService = loggingService;
 
 initializeComponents();
 setupLayout();
@@ -66,7 +70,7 @@ tabSheet.setSizeFull();
 
 // Search tab (existing functionality)
 searchTab = new Tab("Search");
-searchTabContent = new DirectorySearchSubTab(ldapService, configurationService, inMemoryLdapService);
+	searchTabContent = new DirectorySearchSubTab(ldapService, configurationService, inMemoryLdapService, loggingService);
 
 // Set parent tab reference for environment dropdown access
 searchTabContent.setParentTab(this);
