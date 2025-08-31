@@ -3,6 +3,7 @@ package com.example.ldapbrowser.ui.components;
 import com.example.ldapbrowser.model.SearchResultEntry;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.MultiSelectComboBox;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
@@ -36,6 +37,7 @@ public class EntryComparisonTab extends VerticalLayout {
   private VerticalLayout contentLayout;
   private VerticalLayout placeholderLayout;
   private MultiSelectComboBox<String> hideAttributesComboBox;
+  private Checkbox includeOperationalAttributesCheckbox;
   private Set<String> hiddenAttributes = new HashSet<>();
 
   // Data model for comparison rows
@@ -94,6 +96,12 @@ public class EntryComparisonTab extends VerticalLayout {
       refreshComparisonGrid();
     });
 
+    // Include Operational Attributes checkbox
+    includeOperationalAttributesCheckbox = new Checkbox("Include operational attributes");
+    includeOperationalAttributesCheckbox.setValue(false);
+    includeOperationalAttributesCheckbox.setVisible(false);
+    includeOperationalAttributesCheckbox.addValueChangeListener(e -> refreshComparisonGrid());
+
     // Comparison grid
     comparisonGrid = new Grid<>(ComparisonRow.class, false);
     comparisonGrid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
@@ -113,8 +121,15 @@ public class EntryComparisonTab extends VerticalLayout {
     contentLayout.setPadding(false);
     contentLayout.setSpacing(true);
     contentLayout.setSizeFull();
-    contentLayout.add(hideAttributesComboBox, comparisonGrid);
-    contentLayout.setFlexGrow(0, hideAttributesComboBox);
+    
+    // Controls layout for checkbox and dropdown
+    HorizontalLayout controlsLayout = new HorizontalLayout();
+    controlsLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+    controlsLayout.setSpacing(true);
+    controlsLayout.add(includeOperationalAttributesCheckbox, hideAttributesComboBox);
+    
+    contentLayout.add(controlsLayout, comparisonGrid);
+    contentLayout.setFlexGrow(0, controlsLayout);
     contentLayout.setFlexGrow(1, comparisonGrid);
     contentLayout.setVisible(false);
 
@@ -198,6 +213,7 @@ public class EntryComparisonTab extends VerticalLayout {
     titleLabel.setText("No entries selected for comparison");
     clearButton.setVisible(false);
     hideAttributesComboBox.setVisible(false);
+    includeOperationalAttributesCheckbox.setVisible(false);
     contentLayout.setVisible(false);
     placeholderLayout.setVisible(true);
     setFlexGrow(1, placeholderLayout);
@@ -208,6 +224,7 @@ public class EntryComparisonTab extends VerticalLayout {
     titleLabel.setText(String.format("Comparing %d entries", comparisonEntries.size()));
     clearButton.setVisible(true);
     hideAttributesComboBox.setVisible(true);
+    includeOperationalAttributesCheckbox.setVisible(true);
     placeholderLayout.setVisible(false);
     contentLayout.setVisible(true);
     setFlexGrow(0, placeholderLayout);
@@ -220,14 +237,29 @@ public class EntryComparisonTab extends VerticalLayout {
       comparisonGrid.removeColumn(comparisonGrid.getColumns().get(1));
     }
 
-    // Collect all unique attribute names
+    // Collect all unique attribute names for the hide attributes dropdown
     Set<String> allAttributes = new TreeSet<>();
     for (SearchResultEntry entry : comparisonEntries) {
       allAttributes.addAll(entry.getAttributes().keySet());
     }
 
-    // Update hide attributes dropdown with all available attributes
-    hideAttributesComboBox.setItems(allAttributes);
+    // Update hide attributes dropdown with all available attributes (excluding operational if not included)
+    Set<String> visibleAttributes = new TreeSet<>();
+    for (String attributeName : allAttributes) {
+      if (includeOperationalAttributesCheckbox.getValue() || !isOperationalAttribute(attributeName)) {
+        visibleAttributes.add(attributeName);
+      }
+    }
+    hideAttributesComboBox.setItems(visibleAttributes);
+    
+    // Filter hidden attributes to only include those that are currently visible
+    Set<String> filteredHiddenAttributes = new HashSet<>();
+    for (String hiddenAttr : hiddenAttributes) {
+      if (visibleAttributes.contains(hiddenAttr)) {
+        filteredHiddenAttributes.add(hiddenAttr);
+      }
+    }
+    hiddenAttributes = filteredHiddenAttributes;
     hideAttributesComboBox.select(hiddenAttributes);
 
     // Add dynamic columns for each entry/environment
@@ -270,11 +302,16 @@ public class EntryComparisonTab extends VerticalLayout {
       allAttributes.addAll(entry.getAttributes().keySet());
     }
 
-    // Build comparison rows, filtering out hidden attributes
+    // Build comparison rows, filtering out hidden attributes and operational attributes if not included
     List<ComparisonRow> comparisonRows = new ArrayList<>();
     for (String attributeName : allAttributes) {
       // Skip if this attribute is in the hidden set
       if (hiddenAttributes.contains(attributeName)) {
+        continue;
+      }
+
+      // Skip operational attributes if the checkbox is not checked
+      if (!includeOperationalAttributesCheckbox.getValue() && isOperationalAttribute(attributeName)) {
         continue;
       }
 
@@ -290,6 +327,44 @@ public class EntryComparisonTab extends VerticalLayout {
     }
 
     comparisonGrid.setItems(comparisonRows);
+  }
+
+  /**
+   * Check if an attribute is operational (system-generated)
+   */
+  private boolean isOperationalAttribute(String attributeName) {
+    String lowerName = attributeName.toLowerCase();
+    return lowerName.startsWith("create")
+        || lowerName.startsWith("modify")
+        || lowerName.equals("entryuuid")
+        || lowerName.equals("entrydd")
+        || lowerName.equals("entrycsn")
+        || lowerName.equals("hassubordinates")
+        || lowerName.equals("subschemasubentry")
+        || lowerName.equals("pwdchangedtime")
+        || lowerName.equals("pwdaccountlockedtime")
+        || lowerName.equals("pwdfailuretime")
+        || lowerName.equals("structuralobjectclass")
+        || lowerName.startsWith("ds-")
+        || lowerName.startsWith("nsds-")
+        || lowerName.contains("timestamp")
+        // Additional common operational attributes
+        || lowerName.equals("entrydn")
+        || lowerName.equals("modifiersname")
+        || lowerName.equals("creatorsname")
+        || lowerName.equals("modifytimestamp")
+        || lowerName.equals("createtimestamp")
+        || lowerName.equals("contextcsn")
+        || lowerName.equals("numsubordinates")
+        || lowerName.equals("subordinatecount")
+        || lowerName.startsWith("operational")
+        || lowerName.startsWith("ds")
+        || lowerName.startsWith("ads-")
+        || lowerName.startsWith("ibm-")
+        || lowerName.startsWith("sun-")
+        || lowerName.startsWith("oracle-")
+        || lowerName.startsWith("microsoft-")
+        || lowerName.startsWith("novell-");
   }
 
   private String getEnvironmentKey(int index) {
@@ -312,7 +387,7 @@ public class EntryComparisonTab extends VerticalLayout {
   }
 
   /**
-   * Clear the comparison tab content
+   * Clear the comparison tab content.
    */
   public void clear() {
     clearComparison();

@@ -523,9 +523,9 @@ public class DirectorySearchSubTab extends VerticalLayout {
         }
 
         try {
-          // Use searchEntries method with correct parameters
+          // Use searchEntries method with correct parameters - include operational attributes for comparison
           List<LdapEntry> environmentResults = ldapService.searchEntries(
-              environment.getId(), searchBase, filter, SearchScope.SUB);
+              environment.getId(), searchBase, filter, SearchScope.SUB, "*", "+");
 
           // Convert to SearchResultEntry objects
           for (LdapEntry entry : environmentResults) {
@@ -616,9 +616,9 @@ public class DirectorySearchSubTab extends VerticalLayout {
         }
 
         try {
-          // Perform the search
+          // Perform the search - include operational attributes for comparison
           List<LdapEntry> results = ldapService.searchEntries(
-              environment.getId(), searchBase, filter, SearchScope.SUB // Search entire subtree
+              environment.getId(), searchBase, filter, SearchScope.SUB, "*", "+" // Request all user and operational attributes
           );
 
           // Convert to SearchResultEntry objects

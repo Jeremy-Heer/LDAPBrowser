@@ -101,21 +101,35 @@ Added a comprehensive entry comparison functionality to the Directory Search tab
 3. **Comparison Phase**:
    - Automatically switches to Entry Comparison tab
    - Review side-by-side attribute comparison
+   - Optionally enable "Include operational attributes" to view system-generated attributes
    - Use Clear Comparison to start over if needed
 
 ## Benefits
 
 - **Cross-Environment Analysis**: Compare entries from different LDAP environments
 - **Attribute Discovery**: Easily identify differences and similarities between entries
+- **Operational Insight**: Option to include system-generated attributes for troubleshooting
 - **Efficient Workflow**: Streamlined process from search to comparison
 - **Scalable Design**: Handles multiple entries and large attribute sets
 - **Professional UI**: Consistent with existing application design
+
+## Recent Enhancements
+
+### Operational Attributes Support ✅
+- **Feature**: Added checkbox to include operational attributes in comparison
+- **Location**: Entry Comparison tab controls area
+- **Functionality**: 
+  - Toggle between user attributes only (default) and full attribute view
+  - Real-time grid updates when checkbox state changes
+  - Smart filtering in the "Hide Attributes" dropdown
+- **Benefits**: Enhanced troubleshooting capabilities and system-level analysis
 
 ## Future Enhancements
 
 Potential improvements that could be added:
 - Export comparison results to CSV/Excel
-- Highlight differences between attribute values
+- Highlight differences between attribute values  
 - Save/load comparison sets
 - Advanced filtering options for comparison results
 - Visual diff indicators for better difference identification
+- Operational attribute highlighting and categorization
