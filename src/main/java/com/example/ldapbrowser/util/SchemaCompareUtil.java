@@ -16,15 +16,18 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
- * Utilities to canonicalize LDAP schema elements for stable comparison across servers.
- * This aims to emulate UnboundID CompareLDAPSchemas normalization without copying code.
+ * Utilities to canonicalize LDAP schema elements for stable comparison across
+ * servers.
+ * This aims to emulate UnboundID CompareLDAPSchemas normalization without
+ * copying code.
  */
 public final class SchemaCompareUtil {
 
   /**
    * Private constructor to prevent instantiation.
    */
-  private SchemaCompareUtil() {}
+  private SchemaCompareUtil() {
+  }
 
   /**
    * Generates a canonical string representation of an ObjectClassDefinition.
@@ -159,8 +162,8 @@ public final class SchemaCompareUtil {
   /**
    * Appends the OID and names to the StringBuilder.
    *
-   * @param sb the StringBuilder to append to
-   * @param oid the OID to append
+   * @param sb    the StringBuilder to append to
+   * @param oid   the OID to append
    * @param names the names to append
    */
   private static void appendOidAndNames(StringBuilder sb, String oid, String[] names) {
@@ -180,8 +183,8 @@ public final class SchemaCompareUtil {
   /**
    * Appends a list of strings to the StringBuilder with a given key.
    *
-   * @param sb the StringBuilder to append to
-   * @param key the key for the list
+   * @param sb   the StringBuilder to append to
+   * @param key  the key for the list
    * @param list the list of strings to append
    */
   private static void appendList(StringBuilder sb, String key, List<String> list) {
@@ -220,7 +223,7 @@ public final class SchemaCompareUtil {
   /**
    * Appends extensions to the StringBuilder.
    *
-   * @param sb the StringBuilder to append to
+   * @param sb         the StringBuilder to append to
    * @param extensions the extensions to append
    */
   private static void appendExtensions(StringBuilder sb, Map<String, String[]> extensions) {

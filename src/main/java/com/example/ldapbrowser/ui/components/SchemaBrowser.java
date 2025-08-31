@@ -46,9 +46,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
-* Component for browsing LDAP schema information including object classes,
-* attribute types, matching rules, matching rule use, and syntaxes.
-*/
+ * Component for browsing LDAP schema information including object classes,
+ * attribute types, matching rules, matching rule use, and syntaxes.
+ */
 public class SchemaBrowser extends VerticalLayout {
 
   private final LdapService ldapService;
@@ -88,14 +88,19 @@ public class SchemaBrowser extends VerticalLayout {
 
   /**
    * Constructs a new {@code SchemaBrowser} component.
-   * Initializes the schema browser with the provided LDAP service, configuration service,
-   * in-memory LDAP service, and server selection service. Sets up the UI components and layout,
+   * Initializes the schema browser with the provided LDAP service, configuration
+   * service,
+   * in-memory LDAP service, and server selection service. Sets up the UI
+   * components and layout,
    * and registers a listener for environment selection events.
    *
-   * @param ldapService the service for interacting with LDAP servers
-   * @param configurationService the service for managing application configuration
-   * @param inMemoryLdapService the service for handling in-memory LDAP operations
-   * @param selectionService the service for managing server selection and environment changes
+   * @param ldapService          the service for interacting with LDAP servers
+   * @param configurationService the service for managing application
+   *                             configuration
+   * @param inMemoryLdapService  the service for handling in-memory LDAP
+   *                             operations
+   * @param selectionService     the service for managing server selection and
+   *                             environment changes
    */
   public SchemaBrowser(LdapService ldapService, ConfigurationService configurationService,
       InMemoryLdapService inMemoryLdapService, ServerSelectionService selectionService) {
@@ -213,11 +218,9 @@ public class SchemaBrowser extends VerticalLayout {
         .setResizable(true)
         .setSortable(true);
 
-    objectClassGrid.addColumn(oc -> 
-      oc.getObjectClassType() != null 
-        ? oc.getObjectClassType().getName() 
-        : ""
-      )
+    objectClassGrid.addColumn(oc -> oc.getObjectClassType() != null
+        ? oc.getObjectClassType().getName()
+        : "")
         .setHeader("Type")
         .setFlexGrow(1)
         .setResizable(true)
@@ -235,14 +238,18 @@ public class SchemaBrowser extends VerticalLayout {
         Map<String, String[]> ext = oc.getExtensions();
         if (ext != null) {
           String[] vals = ext.get("X-SCHEMA-FILE");
-          if (vals == null) vals = ext.get("X-Schema-File");
-          if (vals == null) vals = ext.get("X-Schema-file");
-          if (vals == null) vals = ext.get("x-schema-file");
+          if (vals == null)
+            vals = ext.get("X-Schema-File");
+          if (vals == null)
+            vals = ext.get("X-Schema-file");
+          if (vals == null)
+            vals = ext.get("x-schema-file");
           if (vals != null && vals.length > 0) {
             return String.join(", ", vals);
           }
         }
-      } catch (Exception ignored) {}
+      } catch (Exception ignored) {
+      }
       return "";
     })
         .setHeader("Schema File")
@@ -292,14 +299,18 @@ public class SchemaBrowser extends VerticalLayout {
         Map<String, String[]> ext = at.getExtensions();
         if (ext != null) {
           String[] vals = ext.get("X-SCHEMA-FILE");
-          if (vals == null) vals = ext.get("X-Schema-File");
-          if (vals == null) vals = ext.get("X-Schema-file");
-          if (vals == null) vals = ext.get("x-schema-file");
+          if (vals == null)
+            vals = ext.get("X-Schema-File");
+          if (vals == null)
+            vals = ext.get("X-Schema-file");
+          if (vals == null)
+            vals = ext.get("x-schema-file");
           if (vals != null && vals.length > 0) {
             return String.join(", ", vals);
           }
         }
-      } catch (Exception ignored) {}
+      } catch (Exception ignored) {
+      }
       return "";
     })
         .setHeader("Schema File")
@@ -430,18 +441,17 @@ public class SchemaBrowser extends VerticalLayout {
     H3 title = new H3("Schema Browser");
     title.addClassNames(LumoUtility.Margin.NONE);
     title.getStyle()
-      .set("font-size", "0.9em")
-      .set("font-weight", "600")
-      .set("color", "#333");
+        .set("font-size", "0.9em")
+        .set("font-weight", "600")
+        .set("color", "#333");
 
     schemaHeader.add(
-      schemaIcon,
-      title,
-      searchField,
-      addObjectClassButton,
-      addAttributeTypeButton,
-      refreshButton
-    );
+        schemaIcon,
+        title,
+        searchField,
+        addObjectClassButton,
+        addAttributeTypeButton,
+        refreshButton);
     schemaHeader.setFlexGrow(1, title);
 
     // Schema tabs container
@@ -511,9 +521,9 @@ public class SchemaBrowser extends VerticalLayout {
     H3 detailsTitle = new H3("Schema Details");
     detailsTitle.addClassNames(LumoUtility.Margin.NONE);
     detailsTitle.getStyle()
-      .set("font-size", "0.9em")
-      .set("font-weight", "600")
-      .set("color", "#333");
+        .set("font-size", "0.9em")
+        .set("font-weight", "600")
+        .set("color", "#333");
     detailsHeader.add(detailsIcon, detailsTitle);
 
     detailsContainer.add(detailsHeader, detailsPanel);
@@ -532,7 +542,9 @@ public class SchemaBrowser extends VerticalLayout {
 
     add(mainHorizontalSplit);
     setFlexGrow(1, mainHorizontalSplit);
-  }private void onEnvironmentSelected(LdapServerConfig environment) {
+  }
+
+  private void onEnvironmentSelected(LdapServerConfig environment) {
     this.serverConfig = environment;
     if (environment != null) {
       loadSchema();
@@ -583,7 +595,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   private void showObjectClasses() {
-    if (schema == null) return;
+    if (schema == null)
+      return;
 
     clearGridContainer();
     getGridContainer().add(objectClassGrid);
@@ -594,7 +607,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   private void showAttributeTypes() {
-    if (schema == null) return;
+    if (schema == null)
+      return;
 
     clearGridContainer();
     getGridContainer().add(attributeTypeGrid);
@@ -605,7 +619,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   private void showMatchingRules() {
-    if (schema == null) return;
+    if (schema == null)
+      return;
 
     clearGridContainer();
     getGridContainer().add(matchingRuleGrid);
@@ -616,7 +631,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   private void showMatchingRuleUse() {
-    if (schema == null) return;
+    if (schema == null)
+      return;
 
     clearGridContainer();
     getGridContainer().add(matchingRuleUseGrid);
@@ -627,7 +643,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   private void showSyntaxes() {
-    if (schema == null) return;
+    if (schema == null)
+      return;
 
     clearGridContainer();
     getGridContainer().add(syntaxGrid);
@@ -676,16 +693,15 @@ public class SchemaBrowser extends VerticalLayout {
 
     String filter = currentFilter.toLowerCase().trim();
     return objectClasses.stream()
-      .filter(oc ->
-        (oc.getNameOrOID() != null &&
-          oc.getNameOrOID().toLowerCase().contains(filter)) ||
-        (oc.getDescription() != null &&
-          oc.getDescription().toLowerCase().contains(filter)) ||
-        (oc.getOID() != null &&
-          oc.getOID().toLowerCase().contains(filter))
-      )
-      .sorted(Comparator.comparing(ObjectClassDefinition::getNameOrOID))
-      .collect(Collectors.toList());
+        .filter(oc -> (oc.getNameOrOID() != null &&
+            oc.getNameOrOID().toLowerCase().contains(filter)) ||
+            (oc.getDescription() != null &&
+                oc.getDescription().toLowerCase().contains(filter))
+            ||
+            (oc.getOID() != null &&
+                oc.getOID().toLowerCase().contains(filter)))
+        .sorted(Comparator.comparing(ObjectClassDefinition::getNameOrOID))
+        .collect(Collectors.toList());
   }
 
   private List<AttributeTypeDefinition> filterAttributeTypes(
@@ -696,16 +712,15 @@ public class SchemaBrowser extends VerticalLayout {
 
     String filter = currentFilter.toLowerCase().trim();
     return attributeTypes.stream()
-      .filter(at ->
-        (at.getNameOrOID() != null &&
-          at.getNameOrOID().toLowerCase().contains(filter)) ||
-        (at.getDescription() != null &&
-          at.getDescription().toLowerCase().contains(filter)) ||
-        (at.getOID() != null &&
-          at.getOID().toLowerCase().contains(filter))
-      )
-      .sorted(Comparator.comparing(AttributeTypeDefinition::getNameOrOID))
-      .collect(Collectors.toList());
+        .filter(at -> (at.getNameOrOID() != null &&
+            at.getNameOrOID().toLowerCase().contains(filter)) ||
+            (at.getDescription() != null &&
+                at.getDescription().toLowerCase().contains(filter))
+            ||
+            (at.getOID() != null &&
+                at.getOID().toLowerCase().contains(filter)))
+        .sorted(Comparator.comparing(AttributeTypeDefinition::getNameOrOID))
+        .collect(Collectors.toList());
   }
 
   private List<MatchingRuleDefinition> filterMatchingRules(
@@ -716,16 +731,15 @@ public class SchemaBrowser extends VerticalLayout {
 
     String filter = currentFilter.toLowerCase().trim();
     return matchingRules.stream()
-      .filter(mr ->
-        (mr.getNameOrOID() != null &&
-          mr.getNameOrOID().toLowerCase().contains(filter)) ||
-        (mr.getDescription() != null &&
-          mr.getDescription().toLowerCase().contains(filter)) ||
-        (mr.getOID() != null &&
-          mr.getOID().toLowerCase().contains(filter))
-      )
-      .sorted(Comparator.comparing(MatchingRuleDefinition::getNameOrOID))
-      .collect(Collectors.toList());
+        .filter(mr -> (mr.getNameOrOID() != null &&
+            mr.getNameOrOID().toLowerCase().contains(filter)) ||
+            (mr.getDescription() != null &&
+                mr.getDescription().toLowerCase().contains(filter))
+            ||
+            (mr.getOID() != null &&
+                mr.getOID().toLowerCase().contains(filter)))
+        .sorted(Comparator.comparing(MatchingRuleDefinition::getNameOrOID))
+        .collect(Collectors.toList());
   }
 
   private List<MatchingRuleUseDefinition> filterMatchingRuleUse(
@@ -736,13 +750,11 @@ public class SchemaBrowser extends VerticalLayout {
 
     String filter = currentFilter.toLowerCase().trim();
     return matchingRuleUses.stream()
-      .filter(mru ->
-        (mru.getOID() != null && mru.getOID().toLowerCase().contains(filter)) ||
-        (mru.getDescription() != null &&
-          mru.getDescription().toLowerCase().contains(filter))
-      )
-      .sorted(Comparator.comparing(MatchingRuleUseDefinition::getOID))
-      .collect(Collectors.toList());
+        .filter(mru -> (mru.getOID() != null && mru.getOID().toLowerCase().contains(filter)) ||
+            (mru.getDescription() != null &&
+                mru.getDescription().toLowerCase().contains(filter)))
+        .sorted(Comparator.comparing(MatchingRuleUseDefinition::getOID))
+        .collect(Collectors.toList());
   }
 
   private List<AttributeSyntaxDefinition> filterSyntaxes(
@@ -753,13 +765,11 @@ public class SchemaBrowser extends VerticalLayout {
 
     String filter = currentFilter.toLowerCase().trim();
     return syntaxes.stream()
-      .filter(syn ->
-        (syn.getOID() != null && syn.getOID().toLowerCase().contains(filter)) ||
-        (syn.getDescription() != null &&
-          syn.getDescription().toLowerCase().contains(filter))
-      )
-      .sorted(Comparator.comparing(AttributeSyntaxDefinition::getOID))
-      .collect(Collectors.toList());
+        .filter(syn -> (syn.getOID() != null && syn.getOID().toLowerCase().contains(filter)) ||
+            (syn.getDescription() != null &&
+                syn.getDescription().toLowerCase().contains(filter)))
+        .sorted(Comparator.comparing(AttributeSyntaxDefinition::getOID))
+        .collect(Collectors.toList());
   }
 
   private void showObjectClassDetails(ObjectClassDefinition objectClass) {
@@ -776,42 +786,43 @@ public class SchemaBrowser extends VerticalLayout {
 
     // Basic information
     addDetailRow(details, "OID", objectClass.getOID());
-    addDetailRow(details, "Names", objectClass.getNames() != null ?
-        String.join(", ", Arrays.asList(objectClass.getNames())) : "");
+    addDetailRow(details, "Names",
+        objectClass.getNames() != null ? String.join(", ", Arrays.asList(objectClass.getNames())) : "");
     addDetailRow(details, "Description", objectClass.getDescription());
     // Schema file (extension)
     String ocSchemaFile = getSchemaFileFromExtensions(objectClass.getExtensions());
     addDetailRow(details, "Schema File", ocSchemaFile);
-    addDetailRow(details, "Type", objectClass.getObjectClassType() != null ?
-        objectClass.getObjectClassType().getName() : "");
+    addDetailRow(details, "Type",
+        objectClass.getObjectClassType() != null ? objectClass.getObjectClassType().getName() : "");
     addDetailRow(details, "Obsolete", objectClass.isObsolete() ? "Yes" : "No");
 
     // Superior classes
     if (objectClass.getSuperiorClasses() != null
-      && objectClass.getSuperiorClasses().length > 0) {
+        && objectClass.getSuperiorClasses().length > 0) {
       addDetailRow(details, "Superior Classes",
-        String.join(", ", objectClass.getSuperiorClasses()));
+          String.join(", ", objectClass.getSuperiorClasses()));
     }
 
     // Required attributes
     if (objectClass.getRequiredAttributes() != null
-      && objectClass.getRequiredAttributes().length > 0) {
+        && objectClass.getRequiredAttributes().length > 0) {
       addDetailRow(details, "Required Attributes",
-        String.join(", ", objectClass.getRequiredAttributes()));
+          String.join(", ", objectClass.getRequiredAttributes()));
     }
 
     // Optional attributes
     if (objectClass.getOptionalAttributes() != null
-      && objectClass.getOptionalAttributes().length > 0) {
+        && objectClass.getOptionalAttributes().length > 0) {
       addDetailRow(details, "Optional Attributes",
-        String.join(", ", objectClass.getOptionalAttributes()));
+          String.join(", ", objectClass.getOptionalAttributes()));
     }
 
     // Extensions (additional properties)
     if (objectClass.getExtensions() != null && !objectClass.getExtensions().isEmpty()) {
       StringBuilder extensions = new StringBuilder();
       for (Map.Entry<String, String[]> entry : objectClass.getExtensions().entrySet()) {
-        if (extensions.length() > 0) extensions.append(", ");
+        if (extensions.length() > 0)
+          extensions.append(", ");
         extensions.append(entry.getKey()).append("=").append(String.join(",", entry.getValue()));
       }
       addDetailRow(details, "Extensions", extensions.toString());
@@ -834,8 +845,8 @@ public class SchemaBrowser extends VerticalLayout {
 
     // Basic information
     addDetailRow(details, "OID", attributeType.getOID());
-    addDetailRow(details, "Names", attributeType.getNames() != null ?
-        String.join(", ", Arrays.asList(attributeType.getNames())) : "");
+    addDetailRow(details, "Names",
+        attributeType.getNames() != null ? String.join(", ", Arrays.asList(attributeType.getNames())) : "");
     addDetailRow(details, "Description", attributeType.getDescription());
     // Schema file (extension)
     String atSchemaFile = getSchemaFileFromExtensions(attributeType.getExtensions());
@@ -845,7 +856,7 @@ public class SchemaBrowser extends VerticalLayout {
     addDetailRow(details, "Single Value", attributeType.isSingleValued() ? "Yes" : "No");
     addDetailRow(details, "Collective", attributeType.isCollective() ? "Yes" : "No");
     addDetailRow(details, "No User Modification",
-      attributeType.isNoUserModification() ? "Yes" : "No");
+        attributeType.isNoUserModification() ? "Yes" : "No");
 
     // Usage
     if (attributeType.getUsage() != null) {
@@ -877,9 +888,10 @@ public class SchemaBrowser extends VerticalLayout {
 
   // Helper to read the X-Schema-file extension (supports common casings)
   private String getSchemaFileFromExtensions(Map<String, String[]> extensions) {
-    if (extensions == null || extensions.isEmpty()) return null;
+    if (extensions == null || extensions.isEmpty())
+      return null;
     String[] keys = new String[] {
-      "X-SCHEMA-FILE", "X-Schema-File", "X-Schema-file", "x-schema-file"
+        "X-SCHEMA-FILE", "X-Schema-File", "X-Schema-file", "x-schema-file"
     };
     for (String k : keys) {
       String[] vals = extensions.get(k);
@@ -904,8 +916,8 @@ public class SchemaBrowser extends VerticalLayout {
 
     // Basic information
     addDetailRow(details, "OID", matchingRule.getOID());
-    addDetailRow(details, "Names", matchingRule.getNames() != null ?
-        String.join(", ", Arrays.asList(matchingRule.getNames())) : "");
+    addDetailRow(details, "Names",
+        matchingRule.getNames() != null ? String.join(", ", Arrays.asList(matchingRule.getNames())) : "");
     addDetailRow(details, "Description", matchingRule.getDescription());
     addDetailRow(details, "Syntax OID", matchingRule.getSyntaxOID());
     addDetailRow(details, "Obsolete", matchingRule.isObsolete() ? "Yes" : "No");
@@ -927,16 +939,16 @@ public class SchemaBrowser extends VerticalLayout {
 
     // Basic information
     addDetailRow(details, "OID", matchingRuleUse.getOID());
-    addDetailRow(details, "Names", matchingRuleUse.getNames() != null ?
-        String.join(", ", Arrays.asList(matchingRuleUse.getNames())) : "");
+    addDetailRow(details, "Names",
+        matchingRuleUse.getNames() != null ? String.join(", ", Arrays.asList(matchingRuleUse.getNames())) : "");
     addDetailRow(details, "Description", matchingRuleUse.getDescription());
     addDetailRow(details, "Obsolete", matchingRuleUse.isObsolete() ? "Yes" : "No");
 
     // Applicable attribute types
     if (matchingRuleUse.getApplicableAttributeTypes() != null &&
-          matchingRuleUse.getApplicableAttributeTypes().length > 0) {
+        matchingRuleUse.getApplicableAttributeTypes().length > 0) {
       addDetailRow(details, "Applicable Attribute Types",
-            String.join(", ", matchingRuleUse.getApplicableAttributeTypes()));
+          String.join(", ", matchingRuleUse.getApplicableAttributeTypes()));
     }
 
     detailsPanel.add(details);
@@ -981,15 +993,17 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-   * Clears the current schema and resets all UI components to their default state.
+   * Clears the current schema and resets all UI components to their default
+   * state.
    * <p>
    * This includes:
    * <ul>
-   *   <li>Setting the schema to {@code null}</li>
-   *   <li>Clearing all grids (object classes, attribute types, matching rules,
-   *       matching rule uses, syntaxes)</li>
-   *   <li>Removing all components from the details panel and displaying a default message</li>
-   *   <li>Updating the state of add buttons</li>
+   * <li>Setting the schema to {@code null}</li>
+   * <li>Clearing all grids (object classes, attribute types, matching rules,
+   * matching rule uses, syntaxes)</li>
+   * <li>Removing all components from the details panel and displaying a default
+   * message</li>
+   * <li>Updating the state of add buttons</li>
    * </ul>
    */
   public void clear() {
@@ -1019,8 +1033,9 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-  * Update visibility of add buttons based on current view and server capabilities.
-  */
+   * Update visibility of add buttons based on current view and server
+   * capabilities.
+   */
   private void updateAddButtons() {
     boolean hasSchema = schema != null && serverConfig != null;
     boolean canAddSchema = hasSchema && canModifySchema();
@@ -1041,8 +1056,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-  * Check if the current server supports schema modifications.
-  */
+   * Check if the current server supports schema modifications.
+   */
   private boolean canModifySchema() {
     if (serverConfig == null) {
       return false;
@@ -1062,8 +1077,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-  * Get available object class names from schema for selectors.
-  */
+   * Get available object class names from schema for selectors.
+   */
   private List<String> getAvailableObjectClassNames() {
     List<String> objectClassNames = new ArrayList<>();
     if (schema != null) {
@@ -1084,8 +1099,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-  * Get available attribute type names from schema for selectors.
-  */
+   * Get available attribute type names from schema for selectors.
+   */
   private List<String> getAvailableAttributeTypeNames() {
     List<String> attributeNames = new ArrayList<>();
     if (schema != null) {
@@ -1106,8 +1121,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-  * Get available matching rule names from schema for selectors.
-  */
+   * Get available matching rule names from schema for selectors.
+   */
   private List<String> getAvailableMatchingRuleNames() {
     List<String> matchingRuleNames = new ArrayList<>();
     if (schema != null) {
@@ -1128,8 +1143,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-  * Get available syntax OIDs from schema for selectors.
-  */
+   * Get available syntax OIDs from schema for selectors.
+   */
   private List<String> getAvailableSyntaxOIDs() {
     List<String> syntaxOIDs = new ArrayList<>();
     if (schema != null) {
@@ -1150,8 +1165,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-  * Create a multi-select component with existing items from schema.
-  */
+   * Create a multi-select component with existing items from schema.
+   */
   private MultiSelectComboBox<String> createSchemaMultiSelect(String label, String placeholder,
       List<String> items) {
     MultiSelectComboBox<String> multiSelect = new MultiSelectComboBox<>(label);
@@ -1162,8 +1177,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-  * Create a combobox component with existing items from schema.
-  */
+   * Create a combobox component with existing items from schema.
+   */
   private ComboBox<String> createSchemaComboBox(String label, String placeholder,
       List<String> items) {
     ComboBox<String> comboBox = new ComboBox<>(label);
@@ -1181,8 +1196,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-  * Open dialog for adding a new object class.
-  */
+   * Open dialog for adding a new object class.
+   */
   private void openAddObjectClassDialog() {
     Dialog dialog = new Dialog();
     dialog.setHeaderTitle("Add Object Class");
@@ -1196,7 +1211,7 @@ public class SchemaBrowser extends VerticalLayout {
     if (serverConfig != null && !inMemoryLdapService.isInMemoryServer(serverConfig.getId())) {
       Span warningSpan = new Span(
           "⚠️ Adding schema elements to external LDAP servers may require administrator "
-          + "privileges and could affect production systems.");
+              + "privileges and could affect production systems.");
       warningSpan.getStyle().set("color", "#ff6b35");
       warningSpan.getStyle().set("font-size", "0.875rem");
       warningSpan.getStyle().set("margin-bottom", "1rem");
@@ -1226,10 +1241,9 @@ public class SchemaBrowser extends VerticalLayout {
 
     // Superior classes - enhanced with selector
     MultiSelectComboBox<String> superiorClassesSelector = createSchemaMultiSelect(
-        "Superior Classes (Select)", 
-        "Choose from existing object classes...", 
-        availableObjectClasses
-    );
+        "Superior Classes (Select)",
+        "Choose from existing object classes...",
+        availableObjectClasses);
     superiorClassesSelector.setHelperText("Select from existing object classes or type new ones");
 
     TextArea superiorClassesField = new TextArea("Superior Classes (Manual Entry)");
@@ -1239,10 +1253,9 @@ public class SchemaBrowser extends VerticalLayout {
 
     // Required attributes - enhanced with selector
     MultiSelectComboBox<String> requiredAttributesSelector = createSchemaMultiSelect(
-        "Required Attributes (MUST) - Select", 
-        "Choose from existing attributes...", 
-        availableAttributes
-    );
+        "Required Attributes (MUST) - Select",
+        "Choose from existing attributes...",
+        availableAttributes);
     requiredAttributesSelector.setHelperText(
         "Select from existing attribute types or type new ones");
 
@@ -1253,10 +1266,9 @@ public class SchemaBrowser extends VerticalLayout {
 
     // Optional attributes - enhanced with selector
     MultiSelectComboBox<String> optionalAttributesSelector = createSchemaMultiSelect(
-        "Optional Attributes (MAY) - Select", 
-        "Choose from existing attributes...", 
-        availableAttributes
-    );
+        "Optional Attributes (MAY) - Select",
+        "Choose from existing attributes...",
+        availableAttributes);
     optionalAttributesSelector.setHelperText(
         "Select from existing attribute types or type new ones");
 
@@ -1273,7 +1285,7 @@ public class SchemaBrowser extends VerticalLayout {
     // Buttons
     Button saveButton = new Button("Add Object Class", e -> {
       if (validateAndSaveObjectClass(dialog, nameField, oidField, descriptionField,
-          typeComboBox, obsoleteCheckbox, 
+          typeComboBox, obsoleteCheckbox,
           superiorClassesSelector, superiorClassesField,
           requiredAttributesSelector, requiredAttributesField,
           optionalAttributesSelector, optionalAttributesField)) {
@@ -1290,8 +1302,8 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-  * Open dialog for adding a new attribute type.
-  */
+   * Open dialog for adding a new attribute type.
+   */
   private void openAddAttributeTypeDialog() {
     Dialog dialog = new Dialog();
     dialog.setHeaderTitle("Add Attribute Type");
@@ -1305,7 +1317,7 @@ public class SchemaBrowser extends VerticalLayout {
     if (serverConfig != null && !inMemoryLdapService.isInMemoryServer(serverConfig.getId())) {
       Span warningSpan = new Span(
           "⚠️ Adding schema elements to external LDAP servers may require administrator "
-          + "privileges and could affect production systems.");
+              + "privileges and could affect production systems.");
       warningSpan.getStyle().set("color", "#ff6b35");
       warningSpan.getStyle().set("font-size", "0.875rem");
       warningSpan.getStyle().set("margin-bottom", "1rem");
@@ -1330,10 +1342,9 @@ public class SchemaBrowser extends VerticalLayout {
 
     // Syntax OID - enhanced with selector
     ComboBox<String> syntaxOidSelector = createSchemaComboBox(
-        "Syntax OID* (Select)", 
-        "Choose from available syntaxes...", 
-        availableSyntaxes
-    );
+        "Syntax OID* (Select)",
+        "Choose from available syntaxes...",
+        availableSyntaxes);
     syntaxOidSelector.setRequired(true);
     syntaxOidSelector.setValue("1.3.6.1.4.1.1466.115.121.1.15"); // DirectoryString
     syntaxOidSelector.setHelperText("Select from existing syntaxes or enter custom OID");
@@ -1346,10 +1357,9 @@ public class SchemaBrowser extends VerticalLayout {
 
     // Superior Type - enhanced with selector
     ComboBox<String> superiorTypeSelector = createSchemaComboBox(
-        "Superior Type (Select)", 
-        "Choose from existing attribute types...", 
-        availableAttributes
-    );
+        "Superior Type (Select)",
+        "Choose from existing attribute types...",
+        availableAttributes);
     superiorTypeSelector.setHelperText(
         "Select from existing attribute types or enter custom name");
 
@@ -1370,10 +1380,9 @@ public class SchemaBrowser extends VerticalLayout {
 
     // Matching rules - enhanced with selectors
     ComboBox<String> equalityMatchingRuleSelector = createSchemaComboBox(
-        "Equality Matching Rule (Select)", 
-        "Choose from existing matching rules...", 
-        availableMatchingRules
-    );
+        "Equality Matching Rule (Select)",
+        "Choose from existing matching rules...",
+        availableMatchingRules);
     equalityMatchingRuleSelector.setHelperText(
         "Select from existing matching rules or enter custom name");
 
@@ -1381,10 +1390,9 @@ public class SchemaBrowser extends VerticalLayout {
     equalityMatchingRuleField.setHelperText("Alternative to selector above");
 
     ComboBox<String> orderingMatchingRuleSelector = createSchemaComboBox(
-        "Ordering Matching Rule (Select)", 
-        "Choose from existing matching rules...", 
-        availableMatchingRules
-    );
+        "Ordering Matching Rule (Select)",
+        "Choose from existing matching rules...",
+        availableMatchingRules);
     orderingMatchingRuleSelector.setHelperText(
         "Select from existing matching rules or enter custom name");
 
@@ -1392,21 +1400,20 @@ public class SchemaBrowser extends VerticalLayout {
     orderingMatchingRuleField.setHelperText("Alternative to selector above");
 
     ComboBox<String> substringMatchingRuleSelector = createSchemaComboBox(
-        "Substring Matching Rule (Select)", 
-        "Choose from existing matching rules...", 
-        availableMatchingRules
-    );
+        "Substring Matching Rule (Select)",
+        "Choose from existing matching rules...",
+        availableMatchingRules);
     substringMatchingRuleSelector.setHelperText(
         "Select from existing matching rules or enter custom name");
 
     TextField substringMatchingRuleField = new TextField("Substring Matching Rule (Manual Entry)");
     substringMatchingRuleField.setHelperText("Alternative to selector above");
 
-    formLayout.add(nameField, oidField, descriptionField, 
+    formLayout.add(nameField, oidField, descriptionField,
         syntaxOidSelector, syntaxOidField,
         superiorTypeSelector, superiorTypeField,
         usageComboBox, singleValuedCheckbox, obsoleteCheckbox, collectiveCheckbox,
-        noUserModificationCheckbox, 
+        noUserModificationCheckbox,
         equalityMatchingRuleSelector, equalityMatchingRuleField,
         orderingMatchingRuleSelector, orderingMatchingRuleField,
         substringMatchingRuleSelector, substringMatchingRuleField);
@@ -1417,7 +1424,7 @@ public class SchemaBrowser extends VerticalLayout {
           syntaxOidSelector, syntaxOidField,
           superiorTypeSelector, superiorTypeField, usageComboBox,
           singleValuedCheckbox, obsoleteCheckbox, collectiveCheckbox,
-          noUserModificationCheckbox, 
+          noUserModificationCheckbox,
           equalityMatchingRuleSelector, equalityMatchingRuleField,
           orderingMatchingRuleSelector, orderingMatchingRuleField,
           substringMatchingRuleSelector, substringMatchingRuleField)) {
@@ -1619,13 +1626,13 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-  * Validate and save new attribute type.
-  */
+   * Validate and save new attribute type.
+   */
   private boolean validateAndSaveAttributeType(Dialog dialog, TextField nameField,
       TextField oidField,
-      TextField descriptionField, 
+      TextField descriptionField,
       ComboBox<String> syntaxOidSelector, TextField syntaxOidField,
-      ComboBox<String> superiorTypeSelector, TextField superiorTypeField, 
+      ComboBox<String> superiorTypeSelector, TextField superiorTypeField,
       ComboBox<String> usageComboBox,
       Checkbox singleValuedCheckbox, Checkbox obsoleteCheckbox,
       Checkbox collectiveCheckbox, Checkbox noUserModificationCheckbox,

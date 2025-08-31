@@ -27,12 +27,12 @@ public class SelectServerView extends Div implements BeforeEnterObserver {
    * Constructs a new SelectServerView.
    *
    * @param configurationService the configuration service
-   * @param inMemoryLdapService the in-memory LDAP service
-   * @param selectionService the server selection service
+   * @param inMemoryLdapService  the in-memory LDAP service
+   * @param selectionService     the server selection service
    */
   public SelectServerView(ConfigurationService configurationService,
-                          InMemoryLdapService inMemoryLdapService,
-                          ServerSelectionService selectionService) {
+      InMemoryLdapService inMemoryLdapService,
+      ServerSelectionService selectionService) {
     this.configurationService = configurationService;
     this.inMemoryLdapService = inMemoryLdapService;
     this.selectionService = selectionService;
@@ -40,7 +40,8 @@ public class SelectServerView extends Div implements BeforeEnterObserver {
   }
 
   /**
-   * Handles the before-enter event to select a server by ID and forward to ServersView.
+   * Handles the before-enter event to select a server by ID and forward to
+   * ServersView.
    *
    * @param event the before-enter event
    */

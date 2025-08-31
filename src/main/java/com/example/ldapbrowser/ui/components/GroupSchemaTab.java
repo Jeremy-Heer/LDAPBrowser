@@ -37,7 +37,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Schema comparison tab for group operations. Displays per-server checksums of schema elements
+ * Schema comparison tab for group operations. Displays per-server checksums of
+ * schema elements
  * across all servers in the selected group with an equality indicator.
  */
 public class GroupSchemaTab extends VerticalLayout {
@@ -59,13 +60,19 @@ public class GroupSchemaTab extends VerticalLayout {
   private Grid<RowModel> synGrid;
 
   /**
-   * A Vaadin UI component tab that displays LDAP schema information, including object classes,
-   * attribute types, matching rules, matching rule use, and syntaxes. Provides controls for
+   * A Vaadin UI component tab that displays LDAP schema information, including
+   * object classes,
+   * attribute types, matching rules, matching rule use, and syntaxes. Provides
+   * controls for
    * refreshing schema data and displays status information.
    *
-   * <p>This tab uses grids to present different schema elements and organizes them into
-   * separate tabs for easy navigation. The header includes an icon and title, and controls
-   * allow users to refresh the displayed data.</p>
+   * <p>
+   * This tab uses grids to present different schema elements and organizes them
+   * into
+   * separate tabs for easy navigation. The header includes an icon and title, and
+   * controls
+   * allow users to refresh the displayed data.
+   * </p>
    *
    * @param ldapService the service used to retrieve LDAP schema information
    */
@@ -157,11 +164,13 @@ public class GroupSchemaTab extends VerticalLayout {
       }
     }
 
-    // Fetch schemas with an all-or-none decision: if any server lacks support, don't use the control
+    // Fetch schemas with an all-or-none decision: if any server lacks support,
+    // don't use the control
     for (LdapServerConfig cfg : sortedServers) {
       String serverName = displayName(cfg);
       try {
-        // Connections ensured in previous loop; fetch schema honoring group-wide decision
+        // Connections ensured in previous loop; fetch schema honoring group-wide
+        // decision
         Schema schema = ldapService.getSchema(cfg.getId(), allSupportExtended);
         schemas.put(serverName, schema);
       } catch (LDAPException e) {
@@ -180,21 +189,19 @@ public class GroupSchemaTab extends VerticalLayout {
     if (errors > 0) {
       statusLabel.setText(
           "Loaded with " + errors + " error(s). Extended schema info control " +
-          (allSupportExtended ? "used" : "disabled for consistency") + "."
-      );
+              (allSupportExtended ? "used" : "disabled for consistency") + ".");
       Notification n = Notification.show("Some servers failed to load schema.");
       n.addThemeVariants(NotificationVariant.LUMO_ERROR);
     } else {
       statusLabel.setText(
           "Schema loaded. Extended schema info control " +
-          (schemas.isEmpty()
-          ? "n/a"
-          : (allSupportExtended
-          ? "used"
-          : "disabled for consistency")
-          ) +
-          "."
-      );
+              (schemas.isEmpty()
+                  ? "n/a"
+                  : (allSupportExtended
+                      ? "used"
+                      : "disabled for consistency"))
+              +
+              ".");
     }
   }
 
@@ -257,8 +264,7 @@ public class GroupSchemaTab extends VerticalLayout {
   }
 
   private Map<String, Map<String, String>> buildRowsFor(
-      Map<String, Schema> schemas, ComponentType type
-  ) {
+      Map<String, Schema> schemas, ComponentType type) {
     // name -> (serverName -> checksum or "MISSING"/"ERROR")
     Map<String, Map<String, String>> rows = new LinkedHashMap<>();
     Set<String> allNames = new TreeSet<>();
@@ -376,25 +382,30 @@ public class GroupSchemaTab extends VerticalLayout {
 
   // Row model for the grid with dynamic per-server checksum map
   /**
-   * Represents a row in the group schema tab, containing a name and a mapping of server names to their checksums.
+   * Represents a row in the group schema tab, containing a name and a mapping of
+   * server names to their checksums.
    * <p>
-   * This model is used to track checksum values for different servers associated with a particular group or entity.
+   * This model is used to track checksum values for different servers associated
+   * with a particular group or entity.
    * </p>
    *
    * <p>
    * Example usage:
+   * 
    * <pre>
-   *   Map&lt;String, String&gt; checksums = new HashMap&lt;&gt;();
-   *   checksums.put("server1", "abc123");
-   *   checksums.put("server2", "abc123");
-   *   RowModel row = new RowModel("GroupA", checksums);
+   * Map&lt;String, String&gt; checksums = new HashMap&lt;&gt;();
+   * checksums.put("server1", "abc123");
+   * checksums.put("server2", "abc123");
+   * RowModel row = new RowModel("GroupA", checksums);
    * </pre>
    * </p>
    *
    * <ul>
-   *   <li>{@code getName()} returns the name of the row.</li>
-   *   <li>{@code getChecksum(String serverName)} retrieves the checksum for a specific server.</li>
-   *   <li>{@code isEqualAcross(Collection&lt;String&gt; serverNames)} checks if all non-null checksums for the given servers are equal.</li>
+   * <li>{@code getName()} returns the name of the row.</li>
+   * <li>{@code getChecksum(String serverName)} retrieves the checksum for a
+   * specific server.</li>
+   * <li>{@code isEqualAcross(Collection&lt;String&gt; serverNames)} checks if all
+   * non-null checksums for the given servers are equal.</li>
    * </ul>
    */
   public static class RowModel {
@@ -417,20 +428,27 @@ public class GroupSchemaTab extends VerticalLayout {
     /**
      * Checks if all non-null checksum values for the given server names are equal.
      *
-     * <p>Iterates through the provided collection of server names, retrieves their corresponding
-     * checksum values from the {@code checksums} map, and compares them. If all non-null checksum
-     * values are equal, returns {@code true}. If any non-null checksum value differs, returns {@code false}.
-     * If no non-null checksum values are found, returns {@code false}.</p>
+     * <p>
+     * Iterates through the provided collection of server names, retrieves their
+     * corresponding
+     * checksum values from the {@code checksums} map, and compares them. If all
+     * non-null checksum
+     * values are equal, returns {@code true}. If any non-null checksum value
+     * differs, returns {@code false}.
+     * If no non-null checksum values are found, returns {@code false}.
+     * </p>
      *
      * @param serverNames the collection of server names to check
-     * @return {@code true} if all non-null checksum values are equal and at least one exists;
+     * @return {@code true} if all non-null checksum values are equal and at least
+     *         one exists;
      *         {@code false} otherwise
      */
     public boolean isEqualAcross(Collection<String> serverNames) {
       String ref = null;
       for (String s : serverNames) {
         String v = checksums.get(s);
-        if (v == null) continue;
+        if (v == null)
+          continue;
         if (ref == null) {
           ref = v;
         } else if (!ref.equals(v)) {

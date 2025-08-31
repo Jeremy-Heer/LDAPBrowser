@@ -109,7 +109,7 @@ public class MainView extends AppLayout implements EnvironmentRefreshListener {
 
     dashboardTab = new DashboardTab(ldapService, configurationService, inMemoryLdapService,
                                     selectionService);
-  directorySearchTab = new DirectorySearchTab(ldapService, configurationService,
+    directorySearchTab = new DirectorySearchTab(ldapService, configurationService,
                         inMemoryLdapService, selectionService, loggingService);
     schemaBrowser = new SchemaBrowser(ldapService, configurationService, inMemoryLdapService,
                                       selectionService);

@@ -17,7 +17,8 @@ import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 
 /**
- * View for managing application settings, including external servers, internal servers, and logs.
+ * View for managing application settings, including external servers, internal
+ * servers, and logs.
  */
 @Route(value = "settings", layout = MainLayout.class)
 @PageTitle("Settings")
@@ -37,10 +38,10 @@ public class SettingsView extends VerticalLayout implements EnvironmentRefreshLi
   /**
    * Constructs the SettingsView with the required services.
    *
-   * @param ldapService the LDAP service
+   * @param ldapService          the LDAP service
    * @param configurationService the configuration service
-   * @param inMemoryLdapService the in-memory LDAP service
-   * @param loggingService the logging service
+   * @param inMemoryLdapService  the in-memory LDAP service
+   * @param loggingService       the logging service
    */
   public SettingsView(LdapService ldapService,
       ConfigurationService configurationService,
@@ -90,7 +91,8 @@ public class SettingsView extends VerticalLayout implements EnvironmentRefreshLi
     if (internalServersTab != null) {
       internalServersTab.refreshServerList();
     }
-    // Also refresh the drawer server list in MainLayout so changes are immediately visible
+    // Also refresh the drawer server list in MainLayout so changes are immediately
+    // visible
     MainLayout mainLayout = findMainLayout();
     if (mainLayout != null) {
       mainLayout.refreshServerListInDrawer();

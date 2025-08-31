@@ -28,7 +28,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Root application layout with a side drawer and a top navbar used as view header.
+ * Root application layout with a side drawer and a top navbar used as view
+ * header.
  */
 @AnonymousAllowed
 public class MainLayout extends AppLayout {
@@ -92,9 +93,9 @@ public class MainLayout extends AppLayout {
    * Constructs the MainLayout with the required services.
    *
    * @param configurationService the configuration service
-   * @param inMemoryLdapService the in-memory LDAP service
-   * @param selectionService the server selection service
-   * @param ldapService the LDAP service
+   * @param inMemoryLdapService  the in-memory LDAP service
+   * @param selectionService     the server selection service
+   * @param ldapService          the LDAP service
    */
   public MainLayout(ConfigurationService configurationService,
       InMemoryLdapService inMemoryLdapService,

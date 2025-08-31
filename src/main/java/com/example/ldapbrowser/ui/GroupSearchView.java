@@ -40,7 +40,7 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
   private DirectorySearchTab directorySearchTab;
   private GroupSchemaTab schemaTabContent;
   private String groupName;
-
+  
   /**
    * Constructs the GroupSearchView with the required services.
    *
@@ -58,7 +58,7 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
     this.ldapService = ldapService;
     this.configurationService = configurationService;
     this.inMemoryLdapService = inMemoryLdapService;
-  this.loggingService = loggingService;
+    this.loggingService = loggingService;
     this.selectionService = selectionService;
 
     setSizeFull();
@@ -73,8 +73,8 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
     tabSheet.setSizeFull();
 
     Tab directorySearchTabComponent = new Tab("Directory Search");
-  directorySearchTab = new DirectorySearchTab(ldapService, configurationService,
-    inMemoryLdapService, selectionService, loggingService);
+    directorySearchTab = new DirectorySearchTab(ldapService, configurationService,
+        inMemoryLdapService, selectionService, loggingService);
     tabSheet.add(directorySearchTabComponent, directorySearchTab);
 
     // Schema tab for group-wide schema comparison
@@ -88,7 +88,7 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
 
   @Override
   public void beforeEnter(BeforeEnterEvent event) {
-  this.groupName = event.getRouteParameters().get("group").orElse("");
+    this.groupName = event.getRouteParameters().get("group").orElse("");
     if (groupName == null || groupName.isBlank()) {
       Notification.show("No group specified", 3000, Notification.Position.TOP_END);
       return;
@@ -96,11 +96,11 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
 
     // Build the environment set for this group from both external and running internal servers
     Set<LdapServerConfig> groupServers = new HashSet<>();
-  final String normalized = normalizeGroup(groupName);
-  List<LdapServerConfig> external = configurationService.getAllConfigurations()
-    .stream()
-    .filter(c -> normalized.equalsIgnoreCase(normalizeGroup(c.getGroup())))
-    .collect(Collectors.toList());
+    final String normalized = normalizeGroup(groupName);
+    List<LdapServerConfig> external = configurationService.getAllConfigurations()
+        .stream()
+        .filter(c -> normalized.equalsIgnoreCase(normalizeGroup(c.getGroup())))
+        .collect(Collectors.toList());
     groupServers.addAll(external);
 
     // Add internal running servers matching the group
@@ -125,7 +125,9 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
    * - Trim
    */
   private String normalizeGroup(String s) {
-    if (s == null) return "";
+    if (s == null) {
+      return "";
+    }
     String value = s;
     try {
       // URL decode in case the route segment contained encoded spaces (%20)

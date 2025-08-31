@@ -28,8 +28,7 @@ public class HomeView extends VerticalLayout {
 
     Button openServers = new Button(
         "Open Servers",
-        e -> UI.getCurrent().navigate(ServersView.class)
-    );
+        e -> UI.getCurrent().navigate(ServersView.class));
     add(openServers);
   }
 }

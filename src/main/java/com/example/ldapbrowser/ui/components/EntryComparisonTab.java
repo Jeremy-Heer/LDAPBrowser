@@ -25,290 +25,296 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
-* Entry Comparison sub-tab for comparing LDAP entries across environments
-*/
+ * Entry Comparison sub-tab for comparing LDAP entries across environments
+ */
 public class EntryComparisonTab extends VerticalLayout {
 
-private List<SearchResultEntry> comparisonEntries = new ArrayList<>();
-private Grid<ComparisonRow> comparisonGrid;
-private Span titleLabel;
-private Button clearButton;
-private VerticalLayout contentLayout;
-private VerticalLayout placeholderLayout;
-private MultiSelectComboBox<String> hideAttributesComboBox;
-private Set<String> hiddenAttributes = new HashSet<>();
+  private List<SearchResultEntry> comparisonEntries = new ArrayList<>();
+  private Grid<ComparisonRow> comparisonGrid;
+  private Span titleLabel;
+  private Button clearButton;
+  private VerticalLayout contentLayout;
+  private VerticalLayout placeholderLayout;
+  private MultiSelectComboBox<String> hideAttributesComboBox;
+  private Set<String> hiddenAttributes = new HashSet<>();
 
-// Data model for comparison rows
-public static class ComparisonRow {
-private String attributeName;
-private Map<String, List<String>> valuesByEnvironment;
+  // Data model for comparison rows
+  public static class ComparisonRow {
+    private String attributeName;
+    private Map<String, List<String>> valuesByEnvironment;
 
-public ComparisonRow(String attributeName) {
-this.attributeName = attributeName;
-this.valuesByEnvironment = new LinkedHashMap<>();
-}
+    public ComparisonRow(String attributeName) {
+      this.attributeName = attributeName;
+      this.valuesByEnvironment = new LinkedHashMap<>();
+    }
 
-public String getAttributeName() { return attributeName; }
-public Map<String, List<String>> getValuesByEnvironment() { return valuesByEnvironment; }
+    public String getAttributeName() {
+      return attributeName;
+    }
 
-public void addEnvironmentValues(String environment, List<String> values) {
-valuesByEnvironment.put(environment, values != null ? values : new ArrayList<>());
-}
+    public Map<String, List<String>> getValuesByEnvironment() {
+      return valuesByEnvironment;
+    }
 
-public String getFormattedValues(String environment) {
-List<String> values = valuesByEnvironment.get(environment);
-if (values == null || values.isEmpty()) {
- return "";
-}
-return String.join("\n", values);
-}
-}
+    public void addEnvironmentValues(String environment, List<String> values) {
+      valuesByEnvironment.put(environment, values != null ? values : new ArrayList<>());
+    }
 
-public EntryComparisonTab() {
-initializeComponents();
-setupLayout();
-}
+    public String getFormattedValues(String environment) {
+      List<String> values = valuesByEnvironment.get(environment);
+      if (values == null || values.isEmpty()) {
+        return "";
+      }
+      return String.join("\n", values);
+    }
+  }
 
-private void initializeComponents() {
-// Title and controls
-titleLabel = new Span("No entries selected for comparison");
-titleLabel.getStyle().set("font-weight", "bold").set("color", "#333");
+  public EntryComparisonTab() {
+    initializeComponents();
+    setupLayout();
+  }
 
-clearButton = new Button("Clear Comparison", new Icon(VaadinIcon.TRASH));
-clearButton.addThemeVariants(ButtonVariant.LUMO_SMALL);
-clearButton.setVisible(false);
-clearButton.addClickListener(e -> clearComparison());
+  private void initializeComponents() {
+    // Title and controls
+    titleLabel = new Span("No entries selected for comparison");
+    titleLabel.getStyle().set("font-weight", "bold").set("color", "#333");
 
-// Hide Attributes multiselect dropdown
-hideAttributesComboBox = new MultiSelectComboBox<>();
-hideAttributesComboBox.setLabel("Hide Attributes");
-hideAttributesComboBox.setWidth("300px");
-hideAttributesComboBox.setVisible(false);
-hideAttributesComboBox.addSelectionListener(e -> {
-hiddenAttributes = new HashSet<>(e.getAllSelectedItems());
-refreshComparisonGrid();
-});
+    clearButton = new Button("Clear Comparison", new Icon(VaadinIcon.TRASH));
+    clearButton.addThemeVariants(ButtonVariant.LUMO_SMALL);
+    clearButton.setVisible(false);
+    clearButton.addClickListener(e -> clearComparison());
 
-// Comparison grid
-comparisonGrid = new Grid<>(ComparisonRow.class, false);
-comparisonGrid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
-comparisonGrid.setSizeFull();
-comparisonGrid.setVisible(false);
+    // Hide Attributes multiselect dropdown
+    hideAttributesComboBox = new MultiSelectComboBox<>();
+    hideAttributesComboBox.setLabel("Hide Attributes");
+    hideAttributesComboBox.setWidth("300px");
+    hideAttributesComboBox.setVisible(false);
+    hideAttributesComboBox.addSelectionListener(e -> {
+      hiddenAttributes = new HashSet<>(e.getAllSelectedItems());
+      refreshComparisonGrid();
+    });
 
-// Attribute Name column (fixed)
-comparisonGrid.addColumn(ComparisonRow::getAttributeName)
-.setHeader("Attribute Name")
-.setWidth("200px")
-.setFlexGrow(0)
-.setSortable(true)
-.setComparator(Comparator.comparing(ComparisonRow::getAttributeName));
+    // Comparison grid
+    comparisonGrid = new Grid<>(ComparisonRow.class, false);
+    comparisonGrid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
+    comparisonGrid.setSizeFull();
+    comparisonGrid.setVisible(false);
 
-// Content layout
-contentLayout = new VerticalLayout();
-contentLayout.setPadding(false);
-contentLayout.setSpacing(true);
-contentLayout.setSizeFull();
-contentLayout.add(hideAttributesComboBox, comparisonGrid);
-contentLayout.setFlexGrow(0, hideAttributesComboBox);
-contentLayout.setFlexGrow(1, comparisonGrid);
-contentLayout.setVisible(false);
+    // Attribute Name column (fixed)
+    comparisonGrid.addColumn(ComparisonRow::getAttributeName)
+        .setHeader("Attribute Name")
+        .setWidth("200px")
+        .setFlexGrow(0)
+        .setSortable(true)
+        .setComparator(Comparator.comparing(ComparisonRow::getAttributeName));
 
-// Placeholder layout
-setupPlaceholderContent();
-}
+    // Content layout
+    contentLayout = new VerticalLayout();
+    contentLayout.setPadding(false);
+    contentLayout.setSpacing(true);
+    contentLayout.setSizeFull();
+    contentLayout.add(hideAttributesComboBox, comparisonGrid);
+    contentLayout.setFlexGrow(0, hideAttributesComboBox);
+    contentLayout.setFlexGrow(1, comparisonGrid);
+    contentLayout.setVisible(false);
 
-private void setupPlaceholderContent() {
-placeholderLayout = new VerticalLayout();
-placeholderLayout.setPadding(true);
-placeholderLayout.setSpacing(true);
-placeholderLayout.setDefaultHorizontalComponentAlignment(Alignment.CENTER);
-placeholderLayout.getStyle().set("color", "#666");
+    // Placeholder layout
+    setupPlaceholderContent();
+  }
 
-Icon icon = new Icon(VaadinIcon.TWIN_COL_SELECT);
-icon.setSize("48px");
-icon.getStyle().set("color", "#ccc");
+  private void setupPlaceholderContent() {
+    placeholderLayout = new VerticalLayout();
+    placeholderLayout.setPadding(true);
+    placeholderLayout.setSpacing(true);
+    placeholderLayout.setDefaultHorizontalComponentAlignment(Alignment.CENTER);
+    placeholderLayout.getStyle().set("color", "#666");
 
-H4 title = new H4("Entry Comparison");
-title.getStyle().set("color", "#333");
+    Icon icon = new Icon(VaadinIcon.TWIN_COL_SELECT);
+    icon.setSize("48px");
+    icon.getStyle().set("color", "#ccc");
 
-Span description = new Span("Compare LDAP entries across different environments to identify differences and similarities.");
-description.getStyle().set("color", "#666").set("font-style", "italic").set("text-align", "center");
+    H4 title = new H4("Entry Comparison");
+    title.getStyle().set("color", "#333");
 
-Span instructions = new Span("To get started:");
-instructions.getStyle().set("color", "#333").set("font-weight", "bold").set("margin-top", "20px");
+    Span description = new Span(
+        "Compare LDAP entries across different environments to identify differences and similarities.");
+    description.getStyle().set("color", "#666").set("font-style", "italic").set("text-align", "center");
 
-VerticalLayout stepsList = new VerticalLayout();
-stepsList.setPadding(false);
-stepsList.setSpacing(false);
-stepsList.setDefaultHorizontalComponentAlignment(Alignment.START);
+    Span instructions = new Span("To get started:");
+    instructions.getStyle().set("color", "#333").set("font-weight", "bold").set("margin-top", "20px");
 
-Span step1 = new Span("1. Go to the Search tab");
-Span step2 = new Span("2. Perform a search to find entries");
-Span step3 = new Span("3. Check the boxes in the 'Compare' column (2-10 entries)");
-Span step4 = new Span("4. Click the 'Compare Selected' button");
+    VerticalLayout stepsList = new VerticalLayout();
+    stepsList.setPadding(false);
+    stepsList.setSpacing(false);
+    stepsList.setDefaultHorizontalComponentAlignment(Alignment.START);
 
-step1.getStyle().set("color", "#555");
-step2.getStyle().set("color", "#555");
-step3.getStyle().set("color", "#555");
-step4.getStyle().set("color", "#555");
+    Span step1 = new Span("1. Go to the Search tab");
+    Span step2 = new Span("2. Perform a search to find entries");
+    Span step3 = new Span("3. Check the boxes in the 'Compare' column (2-10 entries)");
+    Span step4 = new Span("4. Click the 'Compare Selected' button");
 
-stepsList.add(step1, step2, step3, step4);
+    step1.getStyle().set("color", "#555");
+    step2.getStyle().set("color", "#555");
+    step3.getStyle().set("color", "#555");
+    step4.getStyle().set("color", "#555");
 
-placeholderLayout.add(icon, title, description, instructions, stepsList);
-}
+    stepsList.add(step1, step2, step3, step4);
 
-private void setupLayout() {
-setSizeFull();
-setPadding(true);
-setSpacing(true);
-addClassName("entry-comparison-tab");
+    placeholderLayout.add(icon, title, description, instructions, stepsList);
+  }
 
-// Header with title and controls
-HorizontalLayout headerLayout = new HorizontalLayout();
-headerLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
-headerLayout.setWidthFull();
-headerLayout.setJustifyContentMode(JustifyContentMode.BETWEEN);
-headerLayout.add(titleLabel, clearButton);
+  private void setupLayout() {
+    setSizeFull();
+    setPadding(true);
+    setSpacing(true);
+    addClassName("entry-comparison-tab");
 
-add(headerLayout, placeholderLayout, contentLayout);
-setFlexGrow(1, placeholderLayout);
-setFlexGrow(1, contentLayout);
-}
+    // Header with title and controls
+    HorizontalLayout headerLayout = new HorizontalLayout();
+    headerLayout.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+    headerLayout.setWidthFull();
+    headerLayout.setJustifyContentMode(JustifyContentMode.BETWEEN);
+    headerLayout.add(titleLabel, clearButton);
 
-/**
-* Set the entries to compare
-*/
-public void setComparisonEntries(List<SearchResultEntry> entries) {
-this.comparisonEntries = new ArrayList<>(entries);
-if (entries.isEmpty()) {
-showPlaceholder();
-} else {
-buildComparisonTable();
-showComparisonTable();
-}
-}
+    add(headerLayout, placeholderLayout, contentLayout);
+    setFlexGrow(1, placeholderLayout);
+    setFlexGrow(1, contentLayout);
+  }
 
-private void showPlaceholder() {
-titleLabel.setText("No entries selected for comparison");
-clearButton.setVisible(false);
-hideAttributesComboBox.setVisible(false);
-contentLayout.setVisible(false);
-placeholderLayout.setVisible(true);
-setFlexGrow(1, placeholderLayout);
-setFlexGrow(0, contentLayout);
-}
+  /**
+   * Set the entries to compare
+   */
+  public void setComparisonEntries(List<SearchResultEntry> entries) {
+    this.comparisonEntries = new ArrayList<>(entries);
+    if (entries.isEmpty()) {
+      showPlaceholder();
+    } else {
+      buildComparisonTable();
+      showComparisonTable();
+    }
+  }
 
-private void showComparisonTable() {
-titleLabel.setText(String.format("Comparing %d entries", comparisonEntries.size()));
-clearButton.setVisible(true);
-hideAttributesComboBox.setVisible(true);
-placeholderLayout.setVisible(false);
-contentLayout.setVisible(true);
-setFlexGrow(0, placeholderLayout);
-setFlexGrow(1, contentLayout);
-}
+  private void showPlaceholder() {
+    titleLabel.setText("No entries selected for comparison");
+    clearButton.setVisible(false);
+    hideAttributesComboBox.setVisible(false);
+    contentLayout.setVisible(false);
+    placeholderLayout.setVisible(true);
+    setFlexGrow(1, placeholderLayout);
+    setFlexGrow(0, contentLayout);
+  }
 
-private void buildComparisonTable() {
-// Clear existing columns except the first one (Attribute Name)
-while (comparisonGrid.getColumns().size() > 1) {
-comparisonGrid.removeColumn(comparisonGrid.getColumns().get(1));
-}
+  private void showComparisonTable() {
+    titleLabel.setText(String.format("Comparing %d entries", comparisonEntries.size()));
+    clearButton.setVisible(true);
+    hideAttributesComboBox.setVisible(true);
+    placeholderLayout.setVisible(false);
+    contentLayout.setVisible(true);
+    setFlexGrow(0, placeholderLayout);
+    setFlexGrow(1, contentLayout);
+  }
 
-// Collect all unique attribute names
-Set<String> allAttributes = new TreeSet<>();
-for (SearchResultEntry entry : comparisonEntries) {
-allAttributes.addAll(entry.getAttributes().keySet());
-}
+  private void buildComparisonTable() {
+    // Clear existing columns except the first one (Attribute Name)
+    while (comparisonGrid.getColumns().size() > 1) {
+      comparisonGrid.removeColumn(comparisonGrid.getColumns().get(1));
+    }
 
-// Update hide attributes dropdown with all available attributes
-hideAttributesComboBox.setItems(allAttributes);
-hideAttributesComboBox.select(hiddenAttributes);
+    // Collect all unique attribute names
+    Set<String> allAttributes = new TreeSet<>();
+    for (SearchResultEntry entry : comparisonEntries) {
+      allAttributes.addAll(entry.getAttributes().keySet());
+    }
 
-// Add dynamic columns for each entry/environment
-for (int i = 0; i < comparisonEntries.size(); i++) {
-SearchResultEntry entry = comparisonEntries.get(i);
-String columnHeader = String.format("%s\n(%s)",
-entry.getEnvironmentName(),
-truncateDn(entry.getDn()));
+    // Update hide attributes dropdown with all available attributes
+    hideAttributesComboBox.setItems(allAttributes);
+    hideAttributesComboBox.select(hiddenAttributes);
 
-final int entryIndex = i;
-comparisonGrid.addColumn(new ComponentRenderer<>(row -> {
-String formattedValues = row.getFormattedValues(getEnvironmentKey(entryIndex));
-if (formattedValues.isEmpty()) {
- return new Span("");
-}
+    // Add dynamic columns for each entry/environment
+    for (int i = 0; i < comparisonEntries.size(); i++) {
+      SearchResultEntry entry = comparisonEntries.get(i);
+      String columnHeader = String.format("%s\n(%s)",
+          entry.getEnvironmentName(),
+          truncateDn(entry.getDn()));
 
-Div container = new Div();
-container.getStyle()
- .set("white-space", "pre-line")
- .set("word-wrap", "break-word")
- .set("line-height", "1.4");
+      final int entryIndex = i;
+      comparisonGrid.addColumn(new ComponentRenderer<>(row -> {
+        String formattedValues = row.getFormattedValues(getEnvironmentKey(entryIndex));
+        if (formattedValues.isEmpty()) {
+          return new Span("");
+        }
 
-container.setText(formattedValues);
-return container;
-}))
-.setHeader(columnHeader)
-.setFlexGrow(1)
-.setResizable(true);
-}
+        Div container = new Div();
+        container.getStyle()
+            .set("white-space", "pre-line")
+            .set("word-wrap", "break-word")
+            .set("line-height", "1.4");
 
-// Build and display comparison rows
-refreshComparisonGrid();
-comparisonGrid.setVisible(true);
-}
+        container.setText(formattedValues);
+        return container;
+      }))
+          .setHeader(columnHeader)
+          .setFlexGrow(1)
+          .setResizable(true);
+    }
 
-private void refreshComparisonGrid() {
-// Collect all unique attribute names
-Set<String> allAttributes = new TreeSet<>();
-for (SearchResultEntry entry : comparisonEntries) {
-allAttributes.addAll(entry.getAttributes().keySet());
-}
+    // Build and display comparison rows
+    refreshComparisonGrid();
+    comparisonGrid.setVisible(true);
+  }
 
-// Build comparison rows, filtering out hidden attributes
-List<ComparisonRow> comparisonRows = new ArrayList<>();
-for (String attributeName : allAttributes) {
-// Skip if this attribute is in the hidden set
-if (hiddenAttributes.contains(attributeName)) {
-continue;
-}
+  private void refreshComparisonGrid() {
+    // Collect all unique attribute names
+    Set<String> allAttributes = new TreeSet<>();
+    for (SearchResultEntry entry : comparisonEntries) {
+      allAttributes.addAll(entry.getAttributes().keySet());
+    }
 
-ComparisonRow row = new ComparisonRow(attributeName);
+    // Build comparison rows, filtering out hidden attributes
+    List<ComparisonRow> comparisonRows = new ArrayList<>();
+    for (String attributeName : allAttributes) {
+      // Skip if this attribute is in the hidden set
+      if (hiddenAttributes.contains(attributeName)) {
+        continue;
+      }
 
-for (int i = 0; i < comparisonEntries.size(); i++) {
-SearchResultEntry entry = comparisonEntries.get(i);
-List<String> values = entry.getAttributeValues(attributeName);
-row.addEnvironmentValues(getEnvironmentKey(i), values);
-}
+      ComparisonRow row = new ComparisonRow(attributeName);
 
-comparisonRows.add(row);
-}
+      for (int i = 0; i < comparisonEntries.size(); i++) {
+        SearchResultEntry entry = comparisonEntries.get(i);
+        List<String> values = entry.getAttributeValues(attributeName);
+        row.addEnvironmentValues(getEnvironmentKey(i), values);
+      }
 
-comparisonGrid.setItems(comparisonRows);
-}
+      comparisonRows.add(row);
+    }
 
-private String getEnvironmentKey(int index) {
-return "env_" + index;
-}
+    comparisonGrid.setItems(comparisonRows);
+  }
 
-private String truncateDn(String dn) {
-if (dn == null || dn.length() <= 40) {
-return dn;
-}
-return dn.substring(0, 37) + "...";
-}
+  private String getEnvironmentKey(int index) {
+    return "env_" + index;
+  }
 
-private void clearComparison() {
-comparisonEntries.clear();
-hiddenAttributes.clear();
-hideAttributesComboBox.clear();
-comparisonGrid.setItems(new ArrayList<>());
-showPlaceholder();
-}
+  private String truncateDn(String dn) {
+    if (dn == null || dn.length() <= 40) {
+      return dn;
+    }
+    return dn.substring(0, 37) + "...";
+  }
 
-/**
-* Clear the comparison tab content
-*/
-public void clear() {
-clearComparison();
-}
+  private void clearComparison() {
+    comparisonEntries.clear();
+    hiddenAttributes.clear();
+    hideAttributesComboBox.clear();
+    comparisonGrid.setItems(new ArrayList<>());
+    showPlaceholder();
+  }
+
+  /**
+   * Clear the comparison tab content
+   */
+  public void clear() {
+    clearComparison();
+  }
 }
