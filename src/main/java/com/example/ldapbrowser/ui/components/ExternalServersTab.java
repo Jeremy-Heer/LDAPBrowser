@@ -2,6 +2,7 @@ package com.example.ldapbrowser.ui.components;
 
 import com.example.ldapbrowser.model.LdapServerConfig;
 import com.example.ldapbrowser.service.ConfigurationService;
+import com.example.ldapbrowser.service.InMemoryLdapService;
 import com.example.ldapbrowser.service.LdapService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -19,6 +20,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -29,6 +31,7 @@ public class ExternalServersTab extends VerticalLayout {
   private final LdapService ldapService;
   private final ConfigurationService configurationService;
   private final EnvironmentRefreshListener environmentRefreshListener;
+  private final InMemoryLdapService inMemoryLdapService;
 
   // Server management controls
   private Grid<LdapServerConfig> serverGrid;
@@ -43,10 +46,11 @@ public class ExternalServersTab extends VerticalLayout {
   private Runnable disconnectionListener;
 
   public ExternalServersTab(LdapService ldapService, ConfigurationService configurationService,
-      EnvironmentRefreshListener environmentRefreshListener) {
+      EnvironmentRefreshListener environmentRefreshListener, InMemoryLdapService inMemoryLdapService) {
     this.ldapService = ldapService;
     this.configurationService = configurationService;
     this.environmentRefreshListener = environmentRefreshListener;
+    this.inMemoryLdapService = inMemoryLdapService;
 
     initializeComponents();
     setupLayout();
@@ -65,8 +69,11 @@ public class ExternalServersTab extends VerticalLayout {
         .setFlexGrow(1)
         .setSortable(true);
 
-    serverGrid.addColumn(cfg -> cfg.getGroup() != null ? cfg.getGroup() : "")
-        .setHeader("Group")
+    serverGrid.addColumn(cfg -> {
+      Set<String> groups = cfg.getGroups();
+      return groups.isEmpty() ? "" : String.join(", ", groups);
+    })
+        .setHeader("Groups")
         .setFlexGrow(0)
         .setWidth("140px")
         .setSortable(true);
@@ -241,7 +248,7 @@ public class ExternalServersTab extends VerticalLayout {
   }
 
   private void openServerDialog(LdapServerConfig config) {
-    ServerConfigDialog dialog = new ServerConfigDialog(config);
+    MultiGroupServerConfigDialog dialog = new MultiGroupServerConfigDialog(config, configurationService, inMemoryLdapService);
     dialog.addSaveListener(savedConfig -> {
       configurationService.saveConfiguration(savedConfig);
       refreshServerList();
@@ -294,7 +301,7 @@ public class ExternalServersTab extends VerticalLayout {
     copyConfig.setName(originalConfig.getName() + " (Copy)");
     copyConfig.setHost(originalConfig.getHost());
     copyConfig.setPort(originalConfig.getPort());
-    copyConfig.setGroup(originalConfig.getGroup());
+    copyConfig.setGroups(originalConfig.getGroups()); // Copy all groups
     copyConfig.setBindDn(originalConfig.getBindDn());
     copyConfig.setPassword(originalConfig.getPassword());
     copyConfig.setUseSSL(originalConfig.isUseSSL());

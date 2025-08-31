@@ -1,8 +1,9 @@
 package com.example.ldapbrowser.ui.components;
 
 import com.example.ldapbrowser.model.LdapServerConfig;
-import com.example.ldapbrowser.service.LdapService;
+import com.example.ldapbrowser.service.ConfigurationService;
 import com.example.ldapbrowser.service.InMemoryLdapService;
+import com.example.ldapbrowser.service.LdapService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
@@ -19,6 +20,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -29,6 +31,7 @@ public class InternalServersTab extends VerticalLayout {
   private final LdapService ldapService;
   private final InMemoryLdapService inMemoryLdapService;
   private final EnvironmentRefreshListener environmentRefreshListener;
+  private final ConfigurationService configurationService;
 
   // Server management controls
   private Grid<LdapServerConfig> serverGrid;
@@ -43,10 +46,12 @@ public class InternalServersTab extends VerticalLayout {
 
   public InternalServersTab(LdapService ldapService,
       EnvironmentRefreshListener environmentRefreshListener,
-      InMemoryLdapService inMemoryLdapService) {
+      InMemoryLdapService inMemoryLdapService,
+      ConfigurationService configurationService) {
     this.ldapService = ldapService;
     this.inMemoryLdapService = inMemoryLdapService;
     this.environmentRefreshListener = environmentRefreshListener;
+    this.configurationService = configurationService;
 
     initializeComponents();
     setupLayout();
@@ -65,8 +70,11 @@ public class InternalServersTab extends VerticalLayout {
         .setFlexGrow(1)
         .setSortable(true);
 
-    serverGrid.addColumn(cfg -> cfg.getGroup() != null ? cfg.getGroup() : "")
-        .setHeader("Group")
+    serverGrid.addColumn(cfg -> {
+      Set<String> groups = cfg.getGroups();
+      return groups.isEmpty() ? "" : String.join(", ", groups);
+    })
+        .setHeader("Groups")
         .setFlexGrow(0)
         .setWidth("140px")
         .setSortable(true);
@@ -251,7 +259,7 @@ public class InternalServersTab extends VerticalLayout {
   }
 
   private void openServerDialog(LdapServerConfig config) {
-    InMemoryServerConfigDialog dialog = new InMemoryServerConfigDialog(config);
+    MultiGroupInMemoryServerConfigDialog dialog = new MultiGroupInMemoryServerConfigDialog(config, configurationService, inMemoryLdapService);
     dialog.addSaveListener(savedConfig -> {
       inMemoryLdapService.saveInMemoryServer(savedConfig);
       refreshServerList();

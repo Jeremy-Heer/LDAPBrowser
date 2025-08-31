@@ -64,11 +64,11 @@ public class SettingsView extends VerticalLayout implements EnvironmentRefreshLi
     tabSheet.setSizeFull();
 
     Tab externalTab = new Tab("External Servers");
-    externalServersTab = new ExternalServersTab(ldapService, configurationService, this);
+    externalServersTab = new ExternalServersTab(ldapService, configurationService, this, inMemoryLdapService);
     addTab(externalTab, externalServersTab);
 
     Tab internalTab = new Tab("Internal Servers");
-    internalServersTab = new InternalServersTab(ldapService, this, inMemoryLdapService);
+    internalServersTab = new InternalServersTab(ldapService, this, inMemoryLdapService, configurationService);
     addTab(internalTab, internalServersTab);
 
     Tab logsTabT = new Tab("Logs");

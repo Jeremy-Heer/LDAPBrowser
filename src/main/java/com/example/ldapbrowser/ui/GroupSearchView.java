@@ -97,16 +97,20 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
     // Build the environment set for this group from both external and running internal servers
     Set<LdapServerConfig> groupServers = new HashSet<>();
     final String normalized = normalizeGroup(groupName);
+    
+    // Check external servers - now look at all groups each server belongs to
     List<LdapServerConfig> external = configurationService.getAllConfigurations()
         .stream()
-        .filter(c -> normalized.equalsIgnoreCase(normalizeGroup(c.getGroup())))
+        .filter(c -> c.getGroups().stream()
+            .anyMatch(group -> normalized.equalsIgnoreCase(normalizeGroup(group))))
         .collect(Collectors.toList());
     groupServers.addAll(external);
 
-    // Add internal running servers matching the group
+    // Add internal running servers matching the group - now check all groups
     for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
       if (inMemoryLdapService.isServerRunning(cfg.getId())
-          && normalized.equalsIgnoreCase(normalizeGroup(cfg.getGroup()))) {
+          && cfg.getGroups().stream()
+              .anyMatch(group -> normalized.equalsIgnoreCase(normalizeGroup(group)))) {
         groupServers.add(cfg);
       }
     }

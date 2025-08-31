@@ -60,7 +60,8 @@ public class ServersTab extends VerticalLayout {
     externalServersTab = new ExternalServersTab(
       ldapService,
       configurationService,
-      environmentRefreshListener
+      environmentRefreshListener,
+      inMemoryLdapService
     );
     tabSheet.add(externalTab, externalServersTab);
 
@@ -69,7 +70,8 @@ public class ServersTab extends VerticalLayout {
     internalServersTab = new InternalServersTab(
       ldapService,
       environmentRefreshListener,
-      inMemoryLdapService
+      inMemoryLdapService,
+      configurationService
     );
     tabSheet.add(internalTab, internalServersTab);
 

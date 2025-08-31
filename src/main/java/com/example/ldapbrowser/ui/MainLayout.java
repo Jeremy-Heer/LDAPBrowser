@@ -195,43 +195,73 @@ public class MainLayout extends AppLayout {
 
     // External servers
     for (LdapServerConfig cfg : configurationService.getAllConfigurations()) {
-      String group = cfg.getGroup() != null && !cfg.getGroup().isBlank()
-          ? cfg.getGroup().trim()
-          : null;
-      SideNavItem parent = group == null
-          ? ungrouped
-          : groups.computeIfAbsent(group, g -> {
-            SideNavItem grp = new SideNavItem(g, (String) null);
-            grp.setPrefixComponent(new Icon(VaadinIcon.FOLDER_OPEN));
-            return grp;
-          });
-
-      String name = cfg.getName() != null ? cfg.getName() : cfg.getHost();
-      SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
-      item.setPrefixComponent(new Icon(VaadinIcon.DATABASE));
-      parent.addItem(item);
-      serverItemIndex.put(cfg.getId(), item);
-    }
-
-    // Internal running servers
-    for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
-      if (inMemoryLdapService.isServerRunning(cfg.getId())) {
-        String group = cfg.getGroup() != null && !cfg.getGroup().isBlank()
-            ? cfg.getGroup().trim()
-            : null;
-        SideNavItem parent = group == null
-            ? ungrouped
-            : groups.computeIfAbsent(group, g -> {
+      Set<String> serverGroups = cfg.getGroups();
+      
+      if (serverGroups.isEmpty()) {
+        // Server belongs to no groups - add to ungrouped
+        String name = cfg.getName() != null ? cfg.getName() : cfg.getHost();
+        SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
+        item.setPrefixComponent(new Icon(VaadinIcon.DATABASE));
+        ungrouped.addItem(item);
+        serverItemIndex.put(cfg.getId(), item);
+      } else {
+        // Server belongs to one or more groups - add to each group
+        for (String groupName : serverGroups) {
+          if (groupName != null && !groupName.trim().isEmpty()) {
+            String trimmedGroup = groupName.trim();
+            SideNavItem parent = groups.computeIfAbsent(trimmedGroup, g -> {
               SideNavItem grp = new SideNavItem(g, (String) null);
               grp.setPrefixComponent(new Icon(VaadinIcon.FOLDER_OPEN));
               return grp;
             });
 
-        String name = (cfg.getName() != null ? cfg.getName() : cfg.getHost()) + " (internal)";
-        SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
-        item.setPrefixComponent(new Icon(VaadinIcon.CUBE));
-        parent.addItem(item);
-        serverItemIndex.put(cfg.getId(), item);
+            String name = cfg.getName() != null ? cfg.getName() : cfg.getHost();
+            SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
+            item.setPrefixComponent(new Icon(VaadinIcon.DATABASE));
+            parent.addItem(item);
+            // Only store in index once (use first group's item for highlighting)
+            if (!serverItemIndex.containsKey(cfg.getId())) {
+              serverItemIndex.put(cfg.getId(), item);
+            }
+          }
+        }
+      }
+    }
+
+    // Internal running servers
+    for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
+      if (inMemoryLdapService.isServerRunning(cfg.getId())) {
+        Set<String> serverGroups = cfg.getGroups();
+        
+        if (serverGroups.isEmpty()) {
+          // Server belongs to no groups - add to ungrouped
+          String name = (cfg.getName() != null ? cfg.getName() : cfg.getHost()) + " (internal)";
+          SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
+          item.setPrefixComponent(new Icon(VaadinIcon.CUBE));
+          ungrouped.addItem(item);
+          serverItemIndex.put(cfg.getId(), item);
+        } else {
+          // Server belongs to one or more groups - add to each group
+          for (String groupName : serverGroups) {
+            if (groupName != null && !groupName.trim().isEmpty()) {
+              String trimmedGroup = groupName.trim();
+              SideNavItem parent = groups.computeIfAbsent(trimmedGroup, g -> {
+                SideNavItem grp = new SideNavItem(g, (String) null);
+                grp.setPrefixComponent(new Icon(VaadinIcon.FOLDER_OPEN));
+                return grp;
+              });
+
+              String name = (cfg.getName() != null ? cfg.getName() : cfg.getHost()) + " (internal)";
+              SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
+              item.setPrefixComponent(new Icon(VaadinIcon.CUBE));
+              parent.addItem(item);
+              // Only store in index once (use first group's item for highlighting)
+              if (!serverItemIndex.containsKey(cfg.getId())) {
+                serverItemIndex.put(cfg.getId(), item);
+              }
+            }
+          }
+        }
       }
     }
 
@@ -251,16 +281,22 @@ public class MainLayout extends AppLayout {
     root.removeAll();
     // Collect groups from external and running internal servers
     Set<String> groups = new TreeSet<>();
+    
     for (LdapServerConfig cfg : configurationService.getAllConfigurations()) {
-      if (cfg.getGroup() != null && !cfg.getGroup().isBlank()) {
-        groups.add(cfg.getGroup().trim());
-      }
+      cfg.getGroups().forEach(group -> {
+        if (group != null && !group.trim().isEmpty()) {
+          groups.add(group.trim());
+        }
+      });
     }
+    
     for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
       if (inMemoryLdapService.isServerRunning(cfg.getId())) {
-        if (cfg.getGroup() != null && !cfg.getGroup().isBlank()) {
-          groups.add(cfg.getGroup().trim());
-        }
+        cfg.getGroups().forEach(group -> {
+          if (group != null && !group.trim().isEmpty()) {
+            groups.add(group.trim());
+          }
+        });
       }
     }
 
@@ -338,18 +374,59 @@ public class MainLayout extends AppLayout {
    * @param cfg the currently selected server configuration
    */
   private void updateDrawerHighlight(LdapServerConfig cfg) {
-    // Clear previous highlights
-    for (SideNavItem item : serverItemIndex.values()) {
-      item.setSuffixComponent(null);
-    }
+    // Clear previous highlights from all items
+    clearAllHighlights();
+    
     if (cfg != null) {
-      SideNavItem selectedItem = serverItemIndex.get(cfg.getId());
-      if (selectedItem != null) {
-        Icon check = new Icon(VaadinIcon.CHECK);
-        check.setSize("16px");
-        check.getStyle().set("color", "var(--lumo-success-color)");
-        selectedItem.setSuffixComponent(check);
-      }
+      // Find and highlight all instances of the selected server
+      highlightServerInstances(cfg.getId());
+    }
+  }
+  
+  /**
+   * Clears highlights from all server items in the drawer.
+   */
+  private void clearAllHighlights() {
+    // Clear highlights from main servers section
+    clearHighlightsFromNavItem(serversRoot);
+  }
+  
+  /**
+   * Recursively clears highlights from all items in a nav item tree.
+   */
+  private void clearHighlightsFromNavItem(SideNavItem navItem) {
+    navItem.setSuffixComponent(null);
+    for (SideNavItem child : navItem.getItems()) {
+      clearHighlightsFromNavItem(child);
+    }
+  }
+  
+  /**
+   * Highlights all instances of a server with the given ID in the drawer.
+   */
+  private void highlightServerInstances(String serverId) {
+    if (serverId == null) return;
+    
+    // Find and highlight all instances of this server
+    highlightServerInNavItem(serversRoot, serverId);
+  }
+  
+  /**
+   * Recursively searches for and highlights server instances in a nav item tree.
+   */
+  private void highlightServerInNavItem(SideNavItem navItem, String serverId) {
+    // Check if this item's path matches the server selection path
+    String path = navItem.getPath();
+    if (path != null && path.equals("/select/" + serverId)) {
+      Icon check = new Icon(VaadinIcon.CHECK);
+      check.setSize("16px");
+      check.getStyle().set("color", "var(--lumo-success-color)");
+      navItem.setSuffixComponent(check);
+    }
+    
+    // Recursively check children
+    for (SideNavItem child : navItem.getItems()) {
+      highlightServerInNavItem(child, serverId);
     }
   }
 
