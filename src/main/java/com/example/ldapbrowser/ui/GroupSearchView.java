@@ -7,6 +7,7 @@ import com.example.ldapbrowser.service.LdapService;
 import com.example.ldapbrowser.service.LoggingService;
 import com.example.ldapbrowser.service.ServerSelectionService;
 import com.example.ldapbrowser.ui.components.DirectorySearchTab;
+import com.example.ldapbrowser.ui.components.ExportTab;
 import com.example.ldapbrowser.ui.components.GroupSchemaTab;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -39,6 +40,7 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
   private TabSheet tabSheet;
   private DirectorySearchTab directorySearchTab;
   private GroupSchemaTab schemaTabContent;
+  private ExportTab reportsTab;
   private String groupName;
   
   /**
@@ -82,6 +84,11 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
     schemaTabContent = new GroupSchemaTab(ldapService);
     tabSheet.add(schemaTab, schemaTabContent);
 
+    // Reports tab for group-wide reporting
+    Tab reportsTabComponent = new Tab("Reports");
+    reportsTab = new ExportTab(ldapService, loggingService, configurationService, inMemoryLdapService);
+    tabSheet.add(reportsTabComponent, reportsTab);
+
     add(tabSheet);
     setFlexGrow(1, tabSheet);
   }
@@ -119,6 +126,13 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
     directorySearchTab.setEnvironmentSupplier(() -> groupServers);
     directorySearchTab.refreshEnvironments();
     schemaTabContent.setEnvironments(groupServers);
+    
+    // Set up reports tab - use the first available server as default
+    if (!groupServers.isEmpty()) {
+      LdapServerConfig firstServer = groupServers.iterator().next();
+      reportsTab.setServerConfig(firstServer);
+    }
+    reportsTab.refreshEnvironments();
   }
 
   /**
