@@ -127,11 +127,8 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
     directorySearchTab.refreshEnvironments();
     schemaTabContent.setEnvironments(groupServers);
     
-    // Set up reports tab - use the first available server as default
-    if (!groupServers.isEmpty()) {
-      LdapServerConfig firstServer = groupServers.iterator().next();
-      reportsTab.setServerConfig(firstServer);
-    }
+    // Set up reports tab - use all servers in the group for multi-server export
+    reportsTab.setGroupServers(groupServers);
     reportsTab.refreshEnvironments();
   }
 

@@ -41,6 +41,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -65,6 +66,7 @@ public class ExportTab extends VerticalLayout {
 
   // Server configuration
   private LdapServerConfig serverConfig;
+  private Set<LdapServerConfig> groupServers;
 
   // UI Components
   private ComboBox<String> itemSelectionMode;
@@ -428,7 +430,8 @@ public class ExportTab extends VerticalLayout {
   }
 
   private void performSearchExport() {
-    if (serverConfig == null) {
+    Set<LdapServerConfig> effectiveServers = getEffectiveServers();
+    if (effectiveServers.isEmpty()) {
       showError("Please connect to an LDAP server first");
       return;
     }
@@ -448,76 +451,98 @@ public class ExportTab extends VerticalLayout {
       return;
     }
 
-    loggingService.logInfo("EXPORT", "Starting search export - Server: " + serverConfig.getName() + ", Base: "
+    String serverNames = effectiveServers.stream()
+        .map(LdapServerConfig::getName)
+        .collect(Collectors.joining(", "));
+    loggingService.logInfo("EXPORT", "Starting search export - Servers: " + serverNames + ", Base: "
         + searchBase + ", Filter: " + searchFilter + ", Format: " + format);
 
     showProgress();
 
     try {
-      List<LdapEntry> ldapEntries = null;
-      List<String> dnList = null;
+      List<LdapEntry> allLdapEntries = new ArrayList<>();
+      List<String> allDnList = new ArrayList<>();
+      int totalEntries = 0;
 
-      // Use optimized DN-only search for DN List format
-      if ("DN List".equals(format)) {
-        dnList = ldapService.getDNsOnly(serverConfig.getId(), searchBase.trim(), searchFilter.trim(), SearchScope.SUB);
-      } else {
-        // Use regular search for other formats
-        if (returnAttrs != null && !returnAttrs.trim().isEmpty()) {
-          String[] attrs = returnAttrs.split(",");
-          for (int i = 0; i < attrs.length; i++) {
-            attrs[i] = attrs[i].trim();
+      // Search across all servers
+      for (LdapServerConfig server : effectiveServers) {
+        try {
+          // Ensure connection to each server before searching
+          if (!ldapService.isConnected(server.getId())) {
+            ldapService.connect(server);
           }
-          ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter.trim(),
-              SearchScope.SUB, attrs);
-        } else {
-          ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter.trim(),
-              SearchScope.SUB);
+
+          // Use optimized DN-only search for DN List format
+          if ("DN List".equals(format)) {
+            List<String> dnList = ldapService.getDNsOnly(server.getId(), searchBase.trim(), 
+                searchFilter.trim(), SearchScope.SUB);
+            allDnList.addAll(dnList);
+            totalEntries += dnList.size();
+          } else {
+            // Use regular search for other formats
+            List<LdapEntry> ldapEntries;
+            if (returnAttrs != null && !returnAttrs.trim().isEmpty()) {
+              String[] attrs = returnAttrs.split(",");
+              for (int i = 0; i < attrs.length; i++) {
+                attrs[i] = attrs[i].trim();
+              }
+              ldapEntries = ldapService.searchEntries(server.getId(), searchBase.trim(), 
+                  searchFilter.trim(), SearchScope.SUB, attrs);
+            } else {
+              ldapEntries = ldapService.searchEntries(server.getId(), searchBase.trim(), 
+                  searchFilter.trim(), SearchScope.SUB);
+            }
+            allLdapEntries.addAll(ldapEntries);
+            totalEntries += ldapEntries.size();
+          }
+
+        } catch (LDAPException e) {
+          loggingService.logError("EXPORT", "Search export failed for server: " + server.getName(), e.getMessage());
+          showError("Search failed for server " + server.getName() + ": " + e.getMessage());
+          // Continue with other servers
         }
       }
 
       String exportData;
       String fileName;
-      int entryCount;
 
       if ("DN List".equals(format)) {
         // Generate DN list export
-        exportData = generateDNListExport(dnList);
+        exportData = generateDNListExport(allDnList);
         fileName = generateFileName(format);
-        entryCount = dnList != null ? dnList.size() : 0;
       } else {
         // Convert LdapEntry to SearchResultEntry for export generation
         List<SearchResultEntry> entries = new ArrayList<>();
-        if (ldapEntries != null) {
-          for (LdapEntry ldapEntry : ldapEntries) {
-            // Create a SearchResultEntry from LdapEntry
-            Collection<Attribute> attributes = new ArrayList<>();
-            for (Map.Entry<String, List<String>> attr : ldapEntry.getAttributes().entrySet()) {
-              attributes.add(new Attribute(attr.getKey(), attr.getValue()));
-            }
-            SearchResultEntry entry = new SearchResultEntry(ldapEntry.getDn(), attributes);
-            entries.add(entry);
+        for (LdapEntry ldapEntry : allLdapEntries) {
+          // Create a SearchResultEntry from LdapEntry
+          Collection<Attribute> attributes = new ArrayList<>();
+          for (Map.Entry<String, List<String>> attr : ldapEntry.getAttributes().entrySet()) {
+            attributes.add(new Attribute(attr.getKey(), attr.getValue()));
           }
+          SearchResultEntry entry = new SearchResultEntry(ldapEntry.getDn(), attributes);
+          entries.add(entry);
         }
 
         exportData = generateExportData(entries, format, getReturnAttributesList(returnAttrs));
         fileName = generateFileName(format);
-        entryCount = entries.size();
       }
 
       createDownloadLink(exportData, fileName, format);
       hideProgress();
-      loggingService.logExport(serverConfig.getName(), fileName, entryCount);
-      showSuccess("Export completed successfully. " + entryCount + " entries exported.");
+      loggingService.logExport(serverNames, fileName, totalEntries);
+      showSuccess("Export completed successfully. " + totalEntries + " entries exported from " + 
+          effectiveServers.size() + " server(s).");
 
-    } catch (LDAPException e) {
+    } catch (Exception e) {
       hideProgress();
-      loggingService.logError("EXPORT", "Search export failed - Server: " + serverConfig.getName(), e.getMessage());
+      loggingService.logError("EXPORT", "Search export failed", e.getMessage());
       showError("Search failed: " + e.getMessage());
     }
   }
 
   private void performCsvExport() {
-    if (serverConfig == null) {
+    Set<LdapServerConfig> effectiveServers = getEffectiveServers();
+    if (effectiveServers.isEmpty()) {
       showError("Please connect to an LDAP server first");
       return;
     }
@@ -542,7 +567,10 @@ public class ExportTab extends VerticalLayout {
       return;
     }
 
-    loggingService.logInfo("EXPORT", "Starting CSV export - Server: " + serverConfig.getName() + ", CSV rows: "
+    String serverNames = effectiveServers.stream()
+        .map(LdapServerConfig::getName)
+        .collect(Collectors.joining(", "));
+    loggingService.logInfo("EXPORT", "Starting CSV export - Servers: " + serverNames + ", CSV rows: "
         + csvData.size() + ", Format: " + format);
 
     showProgress();
@@ -550,31 +578,45 @@ public class ExportTab extends VerticalLayout {
     try {
       List<SearchResultEntry> allEntries = new ArrayList<>();
 
-      // Process each row in CSV data
+      // Process each row in CSV data across all servers
       for (Map<String, String> row : csvData) {
         String searchFilter = substituteVariables(searchFilterTemplate, row);
 
-        List<LdapEntry> ldapEntries;
-        if (returnAttrs != null && !returnAttrs.trim().isEmpty()) {
-          String[] attrs = returnAttrs.split(",");
-          for (int i = 0; i < attrs.length; i++) {
-            attrs[i] = attrs[i].trim();
-          }
-          ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter,
-              SearchScope.SUB, attrs);
-        } else {
-          ldapEntries = ldapService.searchEntries(serverConfig.getId(), searchBase.trim(), searchFilter,
-              SearchScope.SUB);
-        }
+        for (LdapServerConfig server : effectiveServers) {
+          try {
+            // Ensure connection to each server before searching
+            if (!ldapService.isConnected(server.getId())) {
+              ldapService.connect(server);
+            }
 
-        // Convert LdapEntry to SearchResultEntry for export generation
-        for (LdapEntry ldapEntry : ldapEntries) {
-          Collection<Attribute> attributes = new ArrayList<>();
-          for (Map.Entry<String, List<String>> attr : ldapEntry.getAttributes().entrySet()) {
-            attributes.add(new Attribute(attr.getKey(), attr.getValue()));
+            List<LdapEntry> ldapEntries;
+            if (returnAttrs != null && !returnAttrs.trim().isEmpty()) {
+              String[] attrs = returnAttrs.split(",");
+              for (int i = 0; i < attrs.length; i++) {
+                attrs[i] = attrs[i].trim();
+              }
+              ldapEntries = ldapService.searchEntries(server.getId(), searchBase.trim(), searchFilter,
+                  SearchScope.SUB, attrs);
+            } else {
+              ldapEntries = ldapService.searchEntries(server.getId(), searchBase.trim(), searchFilter,
+                  SearchScope.SUB);
+            }
+
+            // Convert LdapEntry to SearchResultEntry for export generation
+            for (LdapEntry ldapEntry : ldapEntries) {
+              Collection<Attribute> attributes = new ArrayList<>();
+              for (Map.Entry<String, List<String>> attr : ldapEntry.getAttributes().entrySet()) {
+                attributes.add(new Attribute(attr.getKey(), attr.getValue()));
+              }
+              SearchResultEntry entry = new SearchResultEntry(ldapEntry.getDn(), attributes);
+              allEntries.add(entry);
+            }
+
+          } catch (LDAPException e) {
+            loggingService.logError("EXPORT", "CSV export failed for server: " + server.getName(), e.getMessage());
+            showError("Search failed for server " + server.getName() + ": " + e.getMessage());
+            // Continue with other servers
           }
-          SearchResultEntry entry = new SearchResultEntry(ldapEntry.getDn(), attributes);
-          allEntries.add(entry);
         }
       }
 
@@ -583,13 +625,13 @@ public class ExportTab extends VerticalLayout {
 
       createDownloadLink(exportData, fileName, format);
       hideProgress();
-      loggingService.logExport(serverConfig.getName(), fileName, allEntries.size());
-      showSuccess("Export completed successfully. " + allEntries.size() + " entries exported from " + csvData.size()
-          + " searches.");
+      loggingService.logExport(serverNames, fileName, allEntries.size());
+      showSuccess("Export completed successfully. " + allEntries.size() + " entries exported from " + 
+          csvData.size() + " searches across " + effectiveServers.size() + " server(s).");
 
-    } catch (LDAPException e) {
+    } catch (Exception e) {
       hideProgress();
-      loggingService.logError("EXPORT", "CSV export failed - Server: " + serverConfig.getName(), e.getMessage());
+      loggingService.logError("EXPORT", "CSV export failed", e.getMessage());
       showError("Search failed: " + e.getMessage());
     }
   }
@@ -878,6 +920,28 @@ public class ExportTab extends VerticalLayout {
 
   public void setServerConfig(LdapServerConfig serverConfig) {
     this.serverConfig = serverConfig;
+    this.groupServers = null; // Clear group servers when setting single server
+  }
+
+  /**
+   * Set multiple servers for group operations
+   */
+  public void setGroupServers(Set<LdapServerConfig> groupServers) {
+    this.groupServers = groupServers;
+    this.serverConfig = null; // Clear single server when setting group servers
+  }
+
+  /**
+   * Get the effective servers to operate on (either single server or group servers)
+   */
+  private Set<LdapServerConfig> getEffectiveServers() {
+    if (groupServers != null && !groupServers.isEmpty()) {
+      return groupServers;
+    } else if (serverConfig != null) {
+      return Set.of(serverConfig);
+    } else {
+      return Collections.emptySet();
+    }
   }
 
   public void clear() {
