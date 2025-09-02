@@ -210,13 +210,18 @@ public class MainLayout extends AppLayout {
           if (groupName != null && !groupName.trim().isEmpty()) {
             String trimmedGroup = groupName.trim();
             SideNavItem parent = groups.computeIfAbsent(trimmedGroup, g -> {
-              SideNavItem grp = new SideNavItem(g, (String) null);
+              String encodedGroup = URLEncoder.encode(g, StandardCharsets.UTF_8);
+              SideNavItem grp = new SideNavItem(g, "/servers/" + encodedGroup);
               grp.setPrefixComponent(new Icon(VaadinIcon.FOLDER_OPEN));
               return grp;
             });
 
             String name = cfg.getName() != null ? cfg.getName() : cfg.getHost();
-            SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
+            String encodedGroup = URLEncoder.encode(trimmedGroup, StandardCharsets.UTF_8);
+            SideNavItem item = new SideNavItem(
+                name,
+                "/servers/" + encodedGroup + "/" + cfg.getId()
+            );
             item.setPrefixComponent(new Icon(VaadinIcon.DATABASE));
             parent.addItem(item);
             // Only store in index once (use first group's item for highlighting)
@@ -246,13 +251,18 @@ public class MainLayout extends AppLayout {
             if (groupName != null && !groupName.trim().isEmpty()) {
               String trimmedGroup = groupName.trim();
               SideNavItem parent = groups.computeIfAbsent(trimmedGroup, g -> {
-                SideNavItem grp = new SideNavItem(g, (String) null);
+                String encodedGroup = URLEncoder.encode(g, StandardCharsets.UTF_8);
+                SideNavItem grp = new SideNavItem(g, "/servers/" + encodedGroup);
                 grp.setPrefixComponent(new Icon(VaadinIcon.FOLDER_OPEN));
                 return grp;
               });
 
               String name = (cfg.getName() != null ? cfg.getName() : cfg.getHost()) + " (internal)";
-              SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
+              String encodedGroup = URLEncoder.encode(trimmedGroup, StandardCharsets.UTF_8);
+              SideNavItem item = new SideNavItem(
+                    name,
+                    "/servers/" + encodedGroup + "/" + cfg.getId()
+                );
               item.setPrefixComponent(new Icon(VaadinIcon.CUBE));
               parent.addItem(item);
               // Only store in index once (use first group's item for highlighting)
@@ -300,10 +310,10 @@ public class MainLayout extends AppLayout {
       }
     }
 
-    // Add a nav item for each group; route to GroupSearchView
+    // Add a nav item for each group; route to group selection
     for (String group : groups) {
       String encoded = URLEncoder.encode(group, StandardCharsets.UTF_8);
-      SideNavItem item = new SideNavItem(group, "/group-search/" + encoded);
+      SideNavItem item = new SideNavItem(group, "/group/" + encoded);
       item.setPrefixComponent(new Icon(VaadinIcon.FOLDER_OPEN));
       root.addItem(item);
     }
@@ -334,7 +344,7 @@ public class MainLayout extends AppLayout {
         : "None";
     contextTitle.setText("Server: " + suffix);
     updateConnectionChip(cfg);
-    updateDrawerHighlight(cfg);
+    // Note: Manual highlighting removed - Vaadin handles navigation highlighting automatically
   }
 
   /**
@@ -369,74 +379,12 @@ public class MainLayout extends AppLayout {
   }
 
   /**
-   * Highlights the currently selected server in the drawer.
-   *
-   * @param cfg the currently selected server configuration
-   */
-  private void updateDrawerHighlight(LdapServerConfig cfg) {
-    // Clear previous highlights from all items
-    clearAllHighlights();
-    
-    if (cfg != null) {
-      // Find and highlight all instances of the selected server
-      highlightServerInstances(cfg.getId());
-    }
-  }
-  
-  /**
-   * Clears highlights from all server items in the drawer.
-   */
-  private void clearAllHighlights() {
-    // Clear highlights from main servers section
-    clearHighlightsFromNavItem(serversRoot);
-  }
-  
-  /**
-   * Recursively clears highlights from all items in a nav item tree.
-   */
-  private void clearHighlightsFromNavItem(SideNavItem navItem) {
-    navItem.setSuffixComponent(null);
-    for (SideNavItem child : navItem.getItems()) {
-      clearHighlightsFromNavItem(child);
-    }
-  }
-  
-  /**
-   * Highlights all instances of a server with the given ID in the drawer.
-   */
-  private void highlightServerInstances(String serverId) {
-    if (serverId == null) return;
-    
-    // Find and highlight all instances of this server
-    highlightServerInNavItem(serversRoot, serverId);
-  }
-  
-  /**
-   * Recursively searches for and highlights server instances in a nav item tree.
-   */
-  private void highlightServerInNavItem(SideNavItem navItem, String serverId) {
-    // Check if this item's path matches the server selection path
-    String path = navItem.getPath();
-    if (path != null && path.equals("/select/" + serverId)) {
-      Icon check = new Icon(VaadinIcon.CHECK);
-      check.setSize("16px");
-      check.getStyle().set("color", "var(--lumo-success-color)");
-      navItem.setSuffixComponent(check);
-    }
-    
-    // Recursively check children
-    for (SideNavItem child : navItem.getItems()) {
-      highlightServerInNavItem(child, serverId);
-    }
-  }
-
-  /**
    * Refreshes the server list and group list in the drawer.
    */
   public void refreshServerListInDrawer() {
     populateServers(serversRoot);
     populateGroups(groupSearchRoot);
-    // Re-apply highlight and connection chip based on current selection
+    // Re-apply selection state based on current selection
     updateSelectionUi(selectionService.getSelected());
   }
 }

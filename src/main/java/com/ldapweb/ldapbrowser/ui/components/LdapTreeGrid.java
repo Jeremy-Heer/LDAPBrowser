@@ -541,7 +541,7 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
             treeData.removeItem(child);
           }
           dataProvider.refreshItem(parent, true);
-          showNotification("No child entries found under " + parent.getDn(), NotificationVariant.LUMO_PRIMARY);
+          // showNotification("No child entries found under " + parent.getDn(), NotificationVariant.LUMO_PRIMARY);
         }));
         return;
       } // Show loading indicator
@@ -570,7 +570,7 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
           if (!shouldShowExpanderForEntry(parent)) {
             parent.setHasChildren(false);
           }
-          showNotification("No child entries found under " + parent.getDn(), NotificationVariant.LUMO_PRIMARY);
+          // showNotification("No child entries found under " + parent.getDn(), NotificationVariant.LUMO_PRIMARY);
         } else {
           // Add real children
           for (LdapEntry child : children) {
