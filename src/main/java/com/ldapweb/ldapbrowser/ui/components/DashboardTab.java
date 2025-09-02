@@ -61,7 +61,8 @@ public class DashboardTab extends VerticalLayout {
     this.inMemoryLdapService = inMemoryLdapService;
     initializeComponents();
     setupLayout();
-    selectionService.addListener(this::onEnvironmentSelected);
+    // Removed direct server selection listener to avoid redundant loading
+    // Server selection is now managed by ServersView
   }
 
   private void initializeComponents() {
@@ -204,38 +205,26 @@ public class DashboardTab extends VerticalLayout {
     setFlexGrow(1, mainHorizontalSplit);
   }
 
+  /**
+   * This method is no longer used since we've removed the direct ServerSelectionService listener
+   * to avoid redundant LDAP searches. Server config updates are now handled through setServerConfig().
+   * 
+   * @deprecated Use setServerConfig() instead
+   */
   private void onEnvironmentSelected(LdapServerConfig environment) {
-    this.serverConfig = environment;
-
-    // Update components with new environment
-    if (environment != null) {
-      treeGrid.setServerConfig(environment);
-      attributeEditor.setServerConfig(environment);
-      newEntryTab.setServerConfig(environment);
-      searchPanel.setServerConfig(environment);
-
-      // Auto-refresh the tree grid for the newly selected environment
-      // Schedule the refresh to happen after potential connection establishment
-      getUI().ifPresent(ui -> {
-        // Use a small delay to allow the connection to establish
-        ui.getElement().executeJs(
-            "setTimeout(() => { $0.$server.loadRootDSEForNewEnvironment(); }, 300)",
-            getElement());
-      });
-    } else {
-      clear();
-    }
+    // No-op - method kept for reference but not used
+    // Server selection is now managed by ServersView
   }
 
   /**
    * Public method callable from client-side JavaScript to load the tree for a new
-   * environment
+   * environment.
+   * 
+   * This method is kept but should no longer be needed as we now load data via the tab selection listener.
    */
   @ClientCallable
   public void loadRootDSEForNewEnvironment() {
-    if (serverConfig != null) {
-      loadRootDSEWithNamingContexts();
-    }
+    // No-op - automatic loading is now managed by ServersView's tab selection listener
   }
 
   /**

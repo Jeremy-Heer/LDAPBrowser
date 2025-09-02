@@ -77,6 +77,25 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
   private void initTabs() {
     tabSheet = new TabSheet();
     tabSheet.setSizeFull();
+    
+    // Add a tab selection listener to lazily load data only when a tab is selected
+    tabSheet.addSelectedChangeListener(event -> {
+      if (selectionService.getSelected() == null) {
+        return;
+      }
+      
+      Tab selectedTab = event.getSelectedTab();
+      if (selectedTab != null) {
+        String tabLabel = selectedTab.getLabel();
+        if ("LDAP Browser".equals(tabLabel)) {
+          dashboardTab.loadRootDSEWithNamingContexts();
+        } else if ("Access".equals(tabLabel)) {
+          accessControlsTab.loadData();
+        } else if ("Schema".equals(tabLabel)) {
+          schemaBrowser.loadSchema();
+        }
+      }
+    });
 
     Tab directorySearchTabComponent = new Tab("Directory Search");
     directorySearchTab = new DirectorySearchTab(ldapService, configurationService,
@@ -133,19 +152,31 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
       Notification n = Notification.show(
           "Failed to connect: " + e.getMessage(), 5000, Notification.Position.TOP_END);
       n.addThemeVariants(NotificationVariant.LUMO_ERROR);
+      return;
     }
 
-    // Update tabs that need the server config explicitly
+    // Update tabs that need the server config explicitly 
+    // but don't trigger immediate data loading
     dashboardTab.setServerConfig(config);
     schemaBrowser.setServerConfig(config);
     accessControlsTab.setServerConfig(config);
     reportsTab.setServerConfig(config);
     bulkOperationsTab.setServerConfig(config);
-
-    // Trigger refreshes where needed
-    dashboardTab.loadRootDSEWithNamingContexts();
     directorySearchTab.refreshEnvironments();
-    accessControlsTab.loadData();
+    
+    // Only load data for the currently active tab
+    Tab selectedTab = tabSheet.getSelectedTab();
+    if (selectedTab != null) {
+      String tabLabel = selectedTab.getLabel();
+      if ("LDAP Browser".equals(tabLabel)) {
+        dashboardTab.loadRootDSEWithNamingContexts();
+      } else if ("Access".equals(tabLabel)) {
+        accessControlsTab.loadData();
+      } else if ("Schema".equals(tabLabel)) {
+        // Load schema when the Schema tab is selected
+        schemaBrowser.loadSchema();
+      }
+    }
   }
 
   @Override

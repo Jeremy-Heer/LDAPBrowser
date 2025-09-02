@@ -109,7 +109,8 @@ public class SchemaBrowser extends VerticalLayout {
     this.inMemoryLdapService = inMemoryLdapService;
     initializeComponents();
     setupLayout();
-    selectionService.addListener(this::onEnvironmentSelected);
+    // Removed direct server selection listener to avoid redundant schema loading
+    // Server selection is now managed by ServersView
   }
 
   /**
@@ -544,21 +545,23 @@ public class SchemaBrowser extends VerticalLayout {
     setFlexGrow(1, mainHorizontalSplit);
   }
 
+  /**
+   * This method is no longer used since we've removed the direct ServerSelectionService listener
+   * to avoid redundant LDAP searches. Server config updates are now handled through setServerConfig().
+   * 
+   * @deprecated Use setServerConfig() instead
+   */
   private void onEnvironmentSelected(LdapServerConfig environment) {
-    this.serverConfig = environment;
-    if (environment != null) {
-      loadSchema();
-    } else {
-      clear();
-    }
+    // No-op - method kept for reference but not used
+    // Server selection is now managed by ServersView
   }
 
   public void setServerConfig(LdapServerConfig serverConfig) {
     this.serverConfig = serverConfig;
-    loadSchema();
+    // Don't automatically load schema - let the view decide when to load it
   }
 
-  private void loadSchema() {
+  public void loadSchema() {
     if (serverConfig == null) {
       showError("No server selected");
       return;
