@@ -23,6 +23,7 @@ public class PrivilegesTab extends VerticalLayout {
   private final LdapService ldapService;
   private LdapServerConfig serverConfig;
   private Grid<PrivilegeInfo> privilegesGrid;
+  private boolean dataLoaded = false;
 
   /**
    * Constructs a new PrivilegesTab.
@@ -72,12 +73,17 @@ public class PrivilegesTab extends VerticalLayout {
    */
   public void setServerConfig(LdapServerConfig config) {
     this.serverConfig = config;
+    this.dataLoaded = false; // Reset loading state when server changes
   }
 
   /**
    * Loads privileges data from the LDAP server.
    */
   public void loadData() {
+    if (dataLoaded) {
+      return; // Data already loaded
+    }
+    
     if (serverConfig == null) {
       showError("No server selected");
       return;
@@ -123,6 +129,8 @@ public class PrivilegesTab extends VerticalLayout {
       } else {
         showSuccess("Found " + privilegeInfoList.size() + " privilege assignment(s)");
       }
+      
+      dataLoaded = true; // Mark data as loaded
 
     } catch (LDAPException e) {
       showError("Failed to search for privileges: " + e.getMessage());

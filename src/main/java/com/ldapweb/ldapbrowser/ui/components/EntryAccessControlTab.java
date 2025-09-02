@@ -9,6 +9,7 @@ import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.SearchScope;
 import java.util.ArrayList;
@@ -23,6 +24,9 @@ public class EntryAccessControlTab extends VerticalLayout {
   private final LdapService ldapService;
   private LdapServerConfig serverConfig;
   private Grid<EntryAciInfo> aciGrid;
+  private ProgressBar progressBar;
+  private Div loadingContainer;
+  private boolean dataLoaded = false;
 
   /**
    * Constructs a new EntryAccessControlTab.
@@ -48,6 +52,18 @@ public class EntryAccessControlTab extends VerticalLayout {
         .set("margin-bottom", "var(--lumo-space-m)");
     add(description);
 
+    // Create loading indicator
+    progressBar = new ProgressBar();
+    progressBar.setIndeterminate(true);
+    progressBar.setVisible(false);
+    
+    loadingContainer = new Div();
+    loadingContainer.add(progressBar, new Div("Loading entry access control information..."));
+    loadingContainer.getStyle().set("text-align", "center");
+    loadingContainer.getStyle().set("padding", "20px");
+    loadingContainer.setVisible(false);
+    add(loadingContainer);
+
     // Grid for displaying entry DN and ACI values
     aciGrid = new Grid<>(EntryAciInfo.class, false);
     aciGrid.addColumn(EntryAciInfo::getDn)
@@ -72,6 +88,8 @@ public class EntryAccessControlTab extends VerticalLayout {
    */
   public void setServerConfig(LdapServerConfig config) {
     this.serverConfig = config;
+    this.dataLoaded = false; // Reset data loaded flag when server changes
+    aciGrid.setItems(new ArrayList<>()); // Clear existing data
   }
 
   /**
@@ -88,10 +106,21 @@ public class EntryAccessControlTab extends VerticalLayout {
       return;
     }
 
+    // Only load once per server configuration
+    if (dataLoaded) {
+      return;
+    }
+
+    // Show loading indicator
+    loadingContainer.setVisible(true);
+    aciGrid.setVisible(false);
+
     try {
       // Get the default search base from the server configuration
       String baseDn = getDefaultSearchBase();
       if (baseDn == null) {
+        loadingContainer.setVisible(false);
+        aciGrid.setVisible(true);
         showError("No default search base configured for server");
         return;
       }
@@ -116,7 +145,11 @@ public class EntryAccessControlTab extends VerticalLayout {
         }
       }
 
+      // Update UI
+      loadingContainer.setVisible(false);
+      aciGrid.setVisible(true);
       aciGrid.setItems(aciInfoList);
+      dataLoaded = true;
 
       if (aciInfoList.isEmpty()) {
         showInfo("No entry access control instructions found");
@@ -125,8 +158,10 @@ public class EntryAccessControlTab extends VerticalLayout {
       }
 
     } catch (LDAPException e) {
-      showError("Failed to search for entry ACIs: " + e.getMessage());
+      loadingContainer.setVisible(false);
+      aciGrid.setVisible(true);
       aciGrid.setItems(new ArrayList<>());
+      showError("Failed to search for entry ACIs: " + e.getMessage());
     }
   }
 

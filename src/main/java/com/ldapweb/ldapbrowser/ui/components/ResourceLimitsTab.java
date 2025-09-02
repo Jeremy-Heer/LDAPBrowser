@@ -23,6 +23,7 @@ public class ResourceLimitsTab extends VerticalLayout {
   private final LdapService ldapService;
   private LdapServerConfig serverConfig;
   private Grid<ResourceLimitInfo> limitsGrid;
+  private boolean dataLoaded = false;
 
   // Resource limit attributes to search for
   private static final String[] RESOURCE_LIMIT_ATTRIBUTES = {
@@ -86,6 +87,8 @@ public class ResourceLimitsTab extends VerticalLayout {
    */
   public void setServerConfig(LdapServerConfig config) {
     this.serverConfig = config;
+    this.dataLoaded = false; // Reset data loaded flag when server changes
+    limitsGrid.setItems(new ArrayList<>()); // Clear existing data
   }
 
   /**
@@ -99,6 +102,11 @@ public class ResourceLimitsTab extends VerticalLayout {
 
     if (!ldapService.isConnected(serverConfig.getId())) {
       showError("Not connected to server: " + serverConfig.getName());
+      return;
+    }
+
+    // Only load once per server configuration
+    if (dataLoaded) {
       return;
     }
 
@@ -141,6 +149,7 @@ public class ResourceLimitsTab extends VerticalLayout {
       }
 
       limitsGrid.setItems(limitInfoList);
+      dataLoaded = true;
 
       if (limitInfoList.isEmpty()) {
         showInfo("No resource limit configurations found");

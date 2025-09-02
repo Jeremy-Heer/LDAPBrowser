@@ -81,6 +81,24 @@ public class AccessControlsTab extends VerticalLayout {
     privilegesTab = new PrivilegesTab(ldapService);
     tabSheet.add(privilegesTabComponent, privilegesTab);
 
+    // Add selection listener to load data only when tab is selected
+    tabSheet.addSelectedChangeListener(event -> {
+      if (serverConfig == null) {
+        return;
+      }
+      
+      var selectedTab = event.getSelectedTab();
+      if (selectedTab == globalAccessControlTabComponent) {
+        globalAccessControlTab.loadData();
+      } else if (selectedTab == entryAccessControlTabComponent) {
+        entryAccessControlTab.loadData();
+      } else if (selectedTab == resourceLimitsTabComponent) {
+        resourceLimitsTab.loadData();
+      } else if (selectedTab == privilegesTabComponent) {
+        privilegesTab.loadData();
+      }
+    });
+
     add(tabSheet);
     setFlexGrow(1, tabSheet);
   }
@@ -101,17 +119,31 @@ public class AccessControlsTab extends VerticalLayout {
   }
 
   /**
-   * Loads data for all access control sub-tabs.
+   * Loads data for the currently selected access control sub-tab.
    */
   public void loadData() {
-    if (serverConfig == null) {
+    if (serverConfig == null || tabSheet == null) {
       return;
     }
 
-    // Trigger data loading for all sub-tabs
-    globalAccessControlTab.loadData();
-    entryAccessControlTab.loadData();
-    resourceLimitsTab.loadData();
-    privilegesTab.loadData();
+    // Only load data for the currently selected tab
+    var selectedTab = tabSheet.getSelectedTab();
+    if (selectedTab != null) {
+      String tabLabel = selectedTab.getLabel();
+      switch (tabLabel) {
+        case "Global Access Control":
+          globalAccessControlTab.loadData();
+          break;
+        case "Entry Access Control":
+          entryAccessControlTab.loadData();
+          break;
+        case "Resource Limits":
+          resourceLimitsTab.loadData();
+          break;
+        case "Privileges":
+          privilegesTab.loadData();
+          break;
+      }
+    }
   }
 }
