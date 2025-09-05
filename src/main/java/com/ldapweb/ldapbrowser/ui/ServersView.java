@@ -25,10 +25,10 @@ import com.vaadin.flow.server.auth.AnonymousAllowed;
 import java.util.Optional;
 
 /**
- * View for managing LDAP servers, including directory search, schema browsing, and bulk operations.
+ * View for managing a specific LDAP server, including directory search, schema browsing, and bulk operations.
  */
-@Route(value = "servers", layout = MainLayout.class)
-@PageTitle("Servers")
+@Route(value = "servers/:sid", layout = MainLayout.class)
+@PageTitle("Server Management")
 @AnonymousAllowed
 public class ServersView extends VerticalLayout implements BeforeEnterObserver {
 
@@ -181,10 +181,11 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
 
   @Override
   public void beforeEnter(BeforeEnterEvent event) {
-    Optional<String> sid = event.getLocation().getQueryParameters().getParameters()
-        .getOrDefault("sid", java.util.List.of()).stream().findFirst();
-    if (sid.isPresent()) {
-      String id = sid.get();
+    Optional<String> sidParam = event.getRouteParameters().get("sid");
+    System.out.println("ServersView: Processing route parameters: " + event.getRouteParameters());
+    if (sidParam.isPresent()) {
+      String id = sidParam.get();
+      System.out.println("ServersView: Processing server ID: " + id);
       // Try to resolve from external first
       LdapServerConfig cfg = configurationService.getAllConfigurations().stream()
           .filter(c -> id.equals(c.getId()))
@@ -195,7 +196,11 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
               .orElse(null));
       if (cfg != null) {
         selectionService.setSelected(cfg);
+      } else {
+        event.rerouteTo("servers");
       }
+    } else {
+      event.rerouteTo("servers");
     }
   }
 }

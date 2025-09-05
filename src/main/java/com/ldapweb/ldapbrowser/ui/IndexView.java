@@ -8,9 +8,9 @@ import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 
 /**
- * Default route that forwards to the ServersView.
+ * Legacy index route that forwards to the WelcomeView.
  */
-@Route(value = "", layout = MainLayout.class)
+@Route(value = "index", layout = MainLayout.class)
 @PageTitle("LDAP Browser")
 @AnonymousAllowed
 public class IndexView extends Div implements BeforeEnterObserver {
@@ -23,13 +23,13 @@ public class IndexView extends Div implements BeforeEnterObserver {
   }
 
   /**
-   * Handles the before-enter event to forward to ServersView by default.
+   * Handles the before-enter event to forward to WelcomeView by default.
    *
    * @param event the before-enter event
    */
   @Override
   public void beforeEnter(BeforeEnterEvent event) {
-    // Forward to servers view as the default
-    event.forwardTo(ServersView.class);
+    // Forward to welcome view as the default
+    event.forwardTo(WelcomeView.class);
   }
 }

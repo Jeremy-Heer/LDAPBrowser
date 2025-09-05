@@ -173,6 +173,15 @@ public class InMemoryLdapService {
   }
 
   /**
+   * Get all running in-memory server configurations
+   */
+  public List<LdapServerConfig> getRunningInMemoryServers() {
+    return getAllInMemoryServers().stream()
+        .filter(config -> isServerRunning(config.getId()))
+        .collect(java.util.stream.Collectors.toList());
+  }
+
+  /**
    * Save an in-memory server configuration
    */
   public void saveInMemoryServer(LdapServerConfig config) {

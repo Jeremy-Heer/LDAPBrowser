@@ -8,41 +8,35 @@ import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.router.BeforeEnterEvent;
-import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
+
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
- * View for displaying servers within a specific group under the Servers section.
- * This view shows all servers that belong to the specified group.
+ * View for displaying all available LDAP servers.
+ * This view shows cards for all configured external and internal servers.
  */
-@Route(value = "servers/:group", layout = MainLayout.class)
-@PageTitle("Server Group")
+@Route(value = "servers", layout = MainLayout.class)
+@PageTitle("All Servers")
 @AnonymousAllowed
-public class ServersGroupView extends VerticalLayout implements BeforeEnterObserver {
+public class AllServersView extends VerticalLayout {
 
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
   private final ServerSelectionService selectionService;
   
-  private String groupName;
-  private H2 groupTitle;
   private VerticalLayout serversList;
 
   /**
-   * Constructs the ServersGroupView with the required services.
+   * Constructs the AllServersView with the required services.
    *
    * @param configurationService the configuration service
    * @param inMemoryLdapService the in-memory LDAP service
    * @param selectionService the server selection service
    */
-  public ServersGroupView(ConfigurationService configurationService,
+  public AllServersView(ConfigurationService configurationService,
       InMemoryLdapService inMemoryLdapService,
       ServerSelectionService selectionService) {
     this.configurationService = configurationService;
@@ -50,6 +44,7 @@ public class ServersGroupView extends VerticalLayout implements BeforeEnterObser
     this.selectionService = selectionService;
     
     initializeComponents();
+    updateContent();
   }
 
   /**
@@ -60,79 +55,52 @@ public class ServersGroupView extends VerticalLayout implements BeforeEnterObser
     setPadding(true);
     setSpacing(true);
     
-    groupTitle = new H2();
+    H2 pageTitle = new H2("LDAP Servers");
     serversList = new VerticalLayout();
     serversList.setSpacing(true);
     serversList.setPadding(false);
     
-    add(groupTitle, serversList);
+    add(pageTitle, serversList);
   }
 
   /**
-   * Handles the before-enter event to extract the group name and display servers.
-   *
-   * @param event the before-enter event
-   */
-  @Override
-  public void beforeEnter(BeforeEnterEvent event) {
-    String encodedGroup = event.getRouteParameters().get("group").orElse("");
-    
-    if (encodedGroup.isEmpty()) {
-      event.forwardTo(ServersView.class);
-      return;
-    }
-    
-    try {
-      this.groupName = URLDecoder.decode(encodedGroup, StandardCharsets.UTF_8);
-    } catch (Exception e) {
-      this.groupName = encodedGroup;
-    }
-    
-    updateContent();
-  }
-
-  /**
-   * Updates the content to display servers in the specified group.
+   * Updates the content to display all available servers.
    */
   private void updateContent() {
-    groupTitle.setText("Server Group: " + groupName);
     serversList.removeAll();
     
-    // Get all servers in this group
-    List<LdapServerConfig> serversInGroup = configurationService.getAllConfigurations().stream()
-        .filter(cfg -> cfg.getGroups().contains(groupName))
-        .collect(Collectors.toList());
+    // Get all external servers
+    List<LdapServerConfig> externalServers = configurationService.getAllConfigurations();
     
-    // Add internal servers in this group
-    List<LdapServerConfig> internalServersInGroup = 
-        inMemoryLdapService.getAllInMemoryServers().stream()
-        .filter(cfg -> 
-          inMemoryLdapService.isServerRunning(cfg.getId()) && cfg.getGroups().contains(groupName)
-          ).collect(Collectors.toList());
-    if (serversInGroup.isEmpty() && internalServersInGroup.isEmpty()) {
-      serversList.add(new Paragraph("No servers found in group '" + groupName + "'."));
+    // Get all internal servers
+    List<LdapServerConfig> internalServers = inMemoryLdapService.getAllInMemoryServers().stream()
+        .filter(cfg -> inMemoryLdapService.isServerRunning(cfg.getId()))
+        .toList();
+    
+    if (externalServers.isEmpty() && internalServers.isEmpty()) {
+      serversList.add(new Paragraph("No servers configured. Please add a server configuration."));
       return;
     }
     
     // Display external servers
-    if (!serversInGroup.isEmpty()) {
+    if (!externalServers.isEmpty()) {
       H2 externalTitle = new H2("External Servers");
       externalTitle.getStyle().set("font-size", "var(--lumo-font-size-l)");
       serversList.add(externalTitle);
       
-      for (LdapServerConfig server : serversInGroup) {
+      for (LdapServerConfig server : externalServers) {
         Div serverCard = createServerCard(server, false);
         serversList.add(serverCard);
       }
     }
     
     // Display internal servers
-    if (!internalServersInGroup.isEmpty()) {
+    if (!internalServers.isEmpty()) {
       H2 internalTitle = new H2("Internal Servers");
       internalTitle.getStyle().set("font-size", "var(--lumo-font-size-l)");
       serversList.add(internalTitle);
       
-      for (LdapServerConfig server : internalServersInGroup) {
+      for (LdapServerConfig server : internalServers) {
         Div serverCard = createServerCard(server, true);
         serversList.add(serverCard);
       }
@@ -173,10 +141,11 @@ public class ServersGroupView extends VerticalLayout implements BeforeEnterObser
     
     card.add(serverName, details);
     
-    // Make card clickable to select server
+    // Make card clickable to navigate to server view
+    String serverId = server.getId();
     card.addClickListener(e -> {
       selectionService.setSelected(server);
-      getUI().ifPresent(ui -> ui.navigate(ServersView.class));
+      getUI().ifPresent(ui -> ui.navigate("servers/" + serverId));
     });
     
     // Hover effect
@@ -189,14 +158,5 @@ public class ServersGroupView extends VerticalLayout implements BeforeEnterObser
     });
     
     return card;
-  }
-
-  /**
-   * Gets the current group name.
-   *
-   * @return the group name
-   */
-  public String getGroupName() {
-    return groupName;
   }
 }

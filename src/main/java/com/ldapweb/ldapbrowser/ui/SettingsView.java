@@ -91,11 +91,11 @@ public class SettingsView extends VerticalLayout implements EnvironmentRefreshLi
     if (internalServersTab != null) {
       internalServersTab.refreshServerList();
     }
-    // Also refresh the drawer server list in MainLayout so changes are immediately
+    // Also refresh the ComboBox server list in MainLayout so changes are immediately
     // visible
     MainLayout mainLayout = findMainLayout();
     if (mainLayout != null) {
-      mainLayout.refreshServerListInDrawer();
+      mainLayout.refreshServerList();
     }
   }
 

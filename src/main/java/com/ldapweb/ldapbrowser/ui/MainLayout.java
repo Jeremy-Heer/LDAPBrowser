@@ -5,9 +5,13 @@ import com.ldapweb.ldapbrowser.service.ConfigurationService;
 import com.ldapweb.ldapbrowser.service.InMemoryLdapService;
 import com.ldapweb.ldapbrowser.service.LdapService;
 import com.ldapweb.ldapbrowser.service.ServerSelectionService;
+import com.ldapweb.ldapbrowser.ui.SettingsView;
+import com.ldapweb.ldapbrowser.ui.WelcomeView;
 import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
+import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
@@ -15,24 +19,24 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.Scroller;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
-import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.AfterNavigationEvent;
+import com.vaadin.flow.router.AfterNavigationObserver;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 import com.vaadin.flow.theme.lumo.LumoUtility;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 /**
  * Root application layout with a side drawer and a top navbar used as view
  * header.
  */
 @AnonymousAllowed
-public class MainLayout extends AppLayout {
+public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
   /**
    * Title of the current view displayed in the navbar.
@@ -50,14 +54,24 @@ public class MainLayout extends AppLayout {
   private final HorizontalLayout connectionChip = new HorizontalLayout();
 
   /**
+   * ComboBox for selecting external LDAP servers.
+   */
+  private final ComboBox<LdapServerConfig> serversComboBox = new ComboBox<>();
+
+  /**
+   * ComboBox for selecting server groups.
+   */
+  private final ComboBox<String> groupsComboBox = new ComboBox<>();
+
+  /**
+   * ComboBox for selecting running internal servers.
+   */
+  private final ComboBox<LdapServerConfig> internalServersComboBox = new ComboBox<>();
+
+  /**
    * Service for managing application configuration.
    */
   private final ConfigurationService configurationService;
-
-  /**
-   * Service for managing in-memory LDAP servers.
-   */
-  private final InMemoryLdapService inMemoryLdapService;
 
   /**
    * Service for managing server selection.
@@ -70,9 +84,9 @@ public class MainLayout extends AppLayout {
   private final LdapService ldapService;
 
   /**
-   * Index of server items in the drawer for quick access.
+   * Service for managing in-memory LDAP servers.
    */
-  private final Map<String, SideNavItem> serverItemIndex = new HashMap<>();
+  private final InMemoryLdapService inMemoryLdapService;
 
   /**
    * Side navigation component for the drawer.
@@ -80,31 +94,27 @@ public class MainLayout extends AppLayout {
   private final SideNav nav;
 
   /**
-   * Root item for the servers section in the drawer.
+   * Drawer content layout for dynamic updates.
    */
-  private final SideNavItem serversRoot;
+  private VerticalLayout drawerContent;
 
-  /**
-   * Root item for the group search section in the drawer.
-   */
-  private final SideNavItem groupSearchRoot;
 
   /**
    * Constructs the MainLayout with the required services.
    *
    * @param configurationService the configuration service
-   * @param inMemoryLdapService  the in-memory LDAP service
    * @param selectionService     the server selection service
    * @param ldapService          the LDAP service
+   * @param inMemoryLdapService  the in-memory LDAP service
    */
   public MainLayout(ConfigurationService configurationService,
-      InMemoryLdapService inMemoryLdapService,
       ServerSelectionService selectionService,
-      LdapService ldapService) {
+      LdapService ldapService,
+      InMemoryLdapService inMemoryLdapService) {
     this.configurationService = configurationService;
-    this.inMemoryLdapService = inMemoryLdapService;
     this.selectionService = selectionService;
     this.ldapService = ldapService;
+    this.inMemoryLdapService = inMemoryLdapService;
 
     // Navbar content (to the side of the drawer toggle)
     final DrawerToggle toggle = new DrawerToggle();
@@ -115,29 +125,45 @@ public class MainLayout extends AppLayout {
         .set("color", "var(--lumo-secondary-text-color)");
 
     setupConnectionChip();
+    setupServersComboBox();
+    setupGroupsComboBox();
+    setupInternalServersComboBox();
     addToNavbar(toggle, viewTitle, contextTitle, connectionChip);
 
     // Drawer content
+    drawerContent = new VerticalLayout();
+    drawerContent.setPadding(false);
+    drawerContent.setSpacing(false);
+    
     nav = new SideNav();
+    
+    // Home link
+    SideNavItem homeItem = new SideNavItem("Home", WelcomeView.class);
+    homeItem.setPrefixComponent(new Icon(VaadinIcon.HOME));
+    nav.addItem(homeItem);
 
-    // Servers accordion-like group
-    serversRoot = new SideNavItem("Servers", ServersView.class);
-    serversRoot.setPrefixComponent(new Icon(VaadinIcon.SERVER));
-    populateServers(serversRoot);
-    nav.addItem(serversRoot);
-
-    // Group Operations - shows only groups, clicking goes to group search view
-    groupSearchRoot = new SideNavItem("Group Operations", (String) null);
-    groupSearchRoot.setPrefixComponent(new Icon(VaadinIcon.SEARCH));
-    populateGroups(groupSearchRoot);
-    nav.addItem(groupSearchRoot);
-
+    // Add servers ComboBox after Home
+    serversComboBox.getStyle().set("margin", "var(--lumo-space-s)");
+    serversComboBox.setWidthFull();
+    
+    // Add groups ComboBox after servers
+    groupsComboBox.getStyle().set("margin", "var(--lumo-space-s)");
+    groupsComboBox.setWidthFull();
+    
+    // Add internal servers ComboBox conditionally
+    internalServersComboBox.getStyle().set("margin", "var(--lumo-space-s)");
+    internalServersComboBox.setWidthFull();
+    
     // Settings link
     SideNavItem settingsItem = new SideNavItem("Settings", SettingsView.class);
     settingsItem.setPrefixComponent(new Icon(VaadinIcon.COG));
     nav.addItem(settingsItem);
 
-    Scroller scroller = new Scroller(nav);
+    // Add combo boxes to drawer
+    drawerContent.add(nav, serversComboBox, groupsComboBox);
+    updateInternalServersVisibility();
+    
+    Scroller scroller = new Scroller(drawerContent);
     scroller.addClassName(LumoUtility.Padding.SMALL);
 
     addToDrawer(scroller);
@@ -146,176 +172,42 @@ public class MainLayout extends AppLayout {
   }
 
   /**
-   * Updates the view title and context title after navigation.
+   * Populates the servers ComboBox with external servers only.
    */
-  @Override
-  protected void afterNavigation() {
-    super.afterNavigation();
-    viewTitle.setText(getCurrentPageTitle());
-
-    // Update context title depending on current view
-    if (getContent() instanceof GroupSearchView gsv) {
-      String grp = gsv.getGroupName();
-      contextTitle.setText(grp != null && !grp.isBlank()
-          ? ("Group: " + grp)
-          : "Group Operations");
-      // In group mode, hide single-server connection chip to avoid confusion
-      connectionChip.setVisible(false);
-    } else {
-      connectionChip.setVisible(true);
-    }
+  private void populateServersComboBox() {
+    serversComboBox.setItems(configurationService.getAllConfigurations());
   }
 
   /**
-   * Retrieves the title of the current page.
-   *
-   * @return the current page title, or an empty string if none is set
+   * Populates the groups ComboBox with all available groups.
    */
-  private String getCurrentPageTitle() {
-    if (getContent() == null) {
-      return "";
-    }
-    PageTitle title = getContent().getClass().getAnnotation(PageTitle.class);
-    return title != null ? title.value() : "";
+  private void populateGroupsComboBox() {
+    groupsComboBox.setItems(configurationService.getAllGroups());
   }
 
   /**
-   * Populates the servers section in the drawer.
-   *
-   * @param root the root item for the servers section
+   * Populates the internal servers ComboBox with running internal servers.
    */
-  private void populateServers(SideNavItem root) {
-    root.removeAll();
-    serverItemIndex.clear();
-
-    // Unified groups map (external + internal)
-    Map<String, SideNavItem> groups = new HashMap<>();
-    SideNavItem ungrouped = new SideNavItem("Ungrouped", (String) null);
-    ungrouped.setPrefixComponent(new Icon(VaadinIcon.FOLDER));
-
-    // External servers
-    for (LdapServerConfig cfg : configurationService.getAllConfigurations()) {
-      Set<String> serverGroups = cfg.getGroups();
-      
-      if (serverGroups.isEmpty()) {
-        // Server belongs to no groups - add to ungrouped
-        String name = cfg.getName() != null ? cfg.getName() : cfg.getHost();
-        SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
-        item.setPrefixComponent(new Icon(VaadinIcon.DATABASE));
-        ungrouped.addItem(item);
-        serverItemIndex.put(cfg.getId(), item);
-      } else {
-        // Server belongs to one or more groups - add to each group
-        for (String groupName : serverGroups) {
-          if (groupName != null && !groupName.trim().isEmpty()) {
-            String trimmedGroup = groupName.trim();
-            SideNavItem parent = groups.computeIfAbsent(trimmedGroup, g -> {
-              String encodedGroup = URLEncoder.encode(g, StandardCharsets.UTF_8);
-              SideNavItem grp = new SideNavItem(g, "/servers/" + encodedGroup);
-              grp.setPrefixComponent(new Icon(VaadinIcon.FOLDER_OPEN));
-              return grp;
-            });
-
-            String name = cfg.getName() != null ? cfg.getName() : cfg.getHost();
-            String encodedGroup = URLEncoder.encode(trimmedGroup, StandardCharsets.UTF_8);
-            SideNavItem item = new SideNavItem(
-                name,
-                "/servers/" + encodedGroup + "/" + cfg.getId()
-            );
-            item.setPrefixComponent(new Icon(VaadinIcon.DATABASE));
-            parent.addItem(item);
-            // Only store in index once (use first group's item for highlighting)
-            if (!serverItemIndex.containsKey(cfg.getId())) {
-              serverItemIndex.put(cfg.getId(), item);
-            }
-          }
-        }
-      }
-    }
-
-    // Internal running servers
-    for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
-      if (inMemoryLdapService.isServerRunning(cfg.getId())) {
-        Set<String> serverGroups = cfg.getGroups();
-        
-        if (serverGroups.isEmpty()) {
-          // Server belongs to no groups - add to ungrouped
-          String name = (cfg.getName() != null ? cfg.getName() : cfg.getHost()) + " (internal)";
-          SideNavItem item = new SideNavItem(name, "/select/" + cfg.getId());
-          item.setPrefixComponent(new Icon(VaadinIcon.CUBE));
-          ungrouped.addItem(item);
-          serverItemIndex.put(cfg.getId(), item);
-        } else {
-          // Server belongs to one or more groups - add to each group
-          for (String groupName : serverGroups) {
-            if (groupName != null && !groupName.trim().isEmpty()) {
-              String trimmedGroup = groupName.trim();
-              SideNavItem parent = groups.computeIfAbsent(trimmedGroup, g -> {
-                String encodedGroup = URLEncoder.encode(g, StandardCharsets.UTF_8);
-                SideNavItem grp = new SideNavItem(g, "/servers/" + encodedGroup);
-                grp.setPrefixComponent(new Icon(VaadinIcon.FOLDER_OPEN));
-                return grp;
-              });
-
-              String name = (cfg.getName() != null ? cfg.getName() : cfg.getHost()) + " (internal)";
-              String encodedGroup = URLEncoder.encode(trimmedGroup, StandardCharsets.UTF_8);
-              SideNavItem item = new SideNavItem(
-                    name,
-                    "/servers/" + encodedGroup + "/" + cfg.getId()
-                );
-              item.setPrefixComponent(new Icon(VaadinIcon.CUBE));
-              parent.addItem(item);
-              // Only store in index once (use first group's item for highlighting)
-              if (!serverItemIndex.containsKey(cfg.getId())) {
-                serverItemIndex.put(cfg.getId(), item);
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Add groups sorted by name, then ungrouped if any
-    groups.keySet().stream().sorted().forEach(k -> root.addItem(groups.get(k)));
-    if (!ungrouped.getItems().isEmpty()) {
-      root.addItem(ungrouped);
-    }
+  private void populateInternalServersComboBox() {
+    internalServersComboBox.setItems(inMemoryLdapService.getRunningInMemoryServers());
   }
 
   /**
-   * Populates the groups section in the drawer.
-   *
-   * @param root the root item for the groups section
+   * Updates the visibility of the internal servers ComboBox based on running servers.
    */
-  private void populateGroups(SideNavItem root) {
-    root.removeAll();
-    // Collect groups from external and running internal servers
-    Set<String> groups = new TreeSet<>();
+  private void updateInternalServersVisibility() {
+    boolean hasRunningInternalServers = !inMemoryLdapService.getRunningInMemoryServers().isEmpty();
     
-    for (LdapServerConfig cfg : configurationService.getAllConfigurations()) {
-      cfg.getGroups().forEach(group -> {
-        if (group != null && !group.trim().isEmpty()) {
-          groups.add(group.trim());
-        }
-      });
-    }
+    // Check if the combo box is currently in the drawer
+    boolean isCurrentlyInDrawer = drawerContent.getChildren()
+        .anyMatch(component -> component == internalServersComboBox);
     
-    for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
-      if (inMemoryLdapService.isServerRunning(cfg.getId())) {
-        cfg.getGroups().forEach(group -> {
-          if (group != null && !group.trim().isEmpty()) {
-            groups.add(group.trim());
-          }
-        });
-      }
-    }
-
-    // Add a nav item for each group; route to group selection
-    for (String group : groups) {
-      String encoded = URLEncoder.encode(group, StandardCharsets.UTF_8);
-      SideNavItem item = new SideNavItem(group, "/group/" + encoded);
-      item.setPrefixComponent(new Icon(VaadinIcon.FOLDER_OPEN));
-      root.addItem(item);
+    if (hasRunningInternalServers && !isCurrentlyInDrawer) {
+      // Add the combo box after the groups combo box (index 3: nav, servers, groups, internal servers)
+      drawerContent.addComponentAtIndex(3, internalServersComboBox);
+    } else if (!hasRunningInternalServers && isCurrentlyInDrawer) {
+      // Remove the combo box
+      drawerContent.remove(internalServersComboBox);
     }
   }
 
@@ -361,6 +253,70 @@ public class MainLayout extends AppLayout {
   }
 
   /**
+   * Sets up the servers ComboBox for the drawer.
+   */
+  private void setupServersComboBox() {
+    serversComboBox.setPlaceholder("Select Server");
+    serversComboBox.setItemLabelGenerator(config -> 
+        config.getName() != null ? config.getName() : config.getHost());
+    serversComboBox.setClearButtonVisible(true);
+    
+    // Populate with external servers only
+    populateServersComboBox();
+    
+    // Handle selection changes
+    serversComboBox.addValueChangeListener(event -> {
+      LdapServerConfig selectedServer = event.getValue();
+      if (selectedServer != null) {
+        // Navigate to the server details view
+        UI.getCurrent().navigate("servers/" + selectedServer.getId());
+      }
+    });
+  }
+
+  /**
+   * Sets up the groups ComboBox for the drawer.
+   */
+  private void setupGroupsComboBox() {
+    groupsComboBox.setPlaceholder("Select Group");
+    groupsComboBox.setClearButtonVisible(true);
+    
+    // Populate with all available groups
+    populateGroupsComboBox();
+    
+    // Handle selection changes
+    groupsComboBox.addValueChangeListener(event -> {
+      String selectedGroup = event.getValue();
+      if (selectedGroup != null && !selectedGroup.trim().isEmpty()) {
+        // Navigate to the group search view
+        UI.getCurrent().navigate("group-search/" + selectedGroup);
+      }
+    });
+  }
+
+  /**
+   * Sets up the internal servers ComboBox for the drawer.
+   */
+  private void setupInternalServersComboBox() {
+    internalServersComboBox.setPlaceholder("Select Internal Server");
+    internalServersComboBox.setItemLabelGenerator(config -> 
+        config.getName() != null ? config.getName() : config.getHost());
+    internalServersComboBox.setClearButtonVisible(true);
+    
+    // Populate with running internal servers
+    populateInternalServersComboBox();
+    
+    // Handle selection changes
+    internalServersComboBox.addValueChangeListener(event -> {
+      LdapServerConfig selectedServer = event.getValue();
+      if (selectedServer != null) {
+        // Navigate to the server details view
+        UI.getCurrent().navigate("servers/" + selectedServer.getId());
+      }
+    });
+  }
+
+  /**
    * Updates the connection status chip based on the given server configuration.
    *
    * @param cfg the server configuration to update the chip for
@@ -379,12 +335,237 @@ public class MainLayout extends AppLayout {
   }
 
   /**
-   * Refreshes the server list and group list in the drawer.
+   * Updates the connection chip to show group connection status.
+   *
+   * @param location the current route location
    */
-  public void refreshServerListInDrawer() {
-    populateServers(serversRoot);
-    populateGroups(groupSearchRoot);
+  private void updateConnectionChipForGroup(String location) {
+    if (!location.startsWith("group-search/")) {
+      return;
+    }
+
+    String groupName = location.substring("group-search/".length());
+    // Decode URL encoding if needed (basic decoding for spaces)
+    groupName = groupName.replace("%20", " ").replace("+", " ");
+    // Normalize multiple spaces to single space and trim
+    groupName = groupName.trim().replaceAll("\\s+", " ");
+
+    // Get servers in this group using the same logic as GroupSearchView
+    Set<LdapServerConfig> groupServers = getServersInGroup(groupName);
+    
+    connectionChip.removeAll();
+    Icon dot = new Icon(VaadinIcon.CIRCLE);
+    dot.setSize("10px");
+    
+    if (groupServers.isEmpty()) {
+      // No servers in group
+      dot.getStyle().set("color", "var(--lumo-contrast-30pct)");
+      Span text = new Span("No Servers");
+      text.getStyle().set("font-size", "var(--lumo-font-size-s)")
+          .set("color", "var(--lumo-secondary-text-color)");
+      connectionChip.add(dot, text);
+      return;
+    }
+
+    // Count connected servers
+    int totalServers = groupServers.size();
+    int connectedServers = (int) groupServers.stream()
+        .filter(server -> ldapService.isConnected(server.getId()))
+        .count();
+
+    // Set status based on connection results
+    String statusText;
+    String color;
+    
+    if (connectedServers == 0) {
+      color = "var(--lumo-error-color)";
+      statusText = "None Connected";
+    } else if (connectedServers == totalServers) {
+      color = "var(--lumo-success-color)";
+      statusText = "All Connected";
+    } else {
+      color = "var(--lumo-warning-color)";
+      statusText = connectedServers + "/" + totalServers + " Connected";
+    }
+    
+    dot.getStyle().set("color", color);
+    Span text = new Span(statusText);
+    text.getStyle().set("font-size", "var(--lumo-font-size-s)")
+        .set("color", "var(--lumo-secondary-text-color)");
+    connectionChip.add(dot, text);
+  }
+
+  /**
+   * Gets all servers that belong to the specified group.
+   * Uses the same logic as GroupSearchView to find servers.
+   *
+   * @param groupName the name of the group
+   * @return set of servers in the group
+   */
+  private Set<LdapServerConfig> getServersInGroup(String groupName) {
+    Set<LdapServerConfig> groupServers = new HashSet<>();
+    final String normalized = normalizeGroup(groupName);
+    
+    // Check external servers - look at all groups each server belongs to
+    List<LdapServerConfig> external = configurationService.getAllConfigurations()
+        .stream()
+        .filter(c -> c.getGroups().stream()
+            .anyMatch(group -> normalized.equalsIgnoreCase(normalizeGroup(group))))
+        .collect(Collectors.toList());
+    groupServers.addAll(external);
+
+    // Add internal running servers matching the group - check all groups
+    for (LdapServerConfig cfg : inMemoryLdapService.getAllInMemoryServers()) {
+      if (inMemoryLdapService.isServerRunning(cfg.getId())
+          && cfg.getGroups().stream()
+              .anyMatch(group -> normalized.equalsIgnoreCase(normalizeGroup(group)))) {
+        groupServers.add(cfg);
+      }
+    }
+    
+    return groupServers;
+  }
+
+  /**
+   * Normalize group names for comparison.
+   * - URL-decode the incoming route parameter
+   * - Treat '+' as space
+   * - Collapse multiple whitespace to a single space
+   * - Trim
+   */
+  private String normalizeGroup(String s) {
+    if (s == null) {
+      return "";
+    }
+    String value = s;
+    try {
+      // URL decode in case the route segment contained encoded spaces (%20)
+      value = java.net.URLDecoder.decode(value, java.nio.charset.StandardCharsets.UTF_8.name());
+    } catch (Exception ignored) {
+      // ignore and continue with original value
+    }
+    // Replace '+' (common in some encodings) with space and collapse whitespace
+    value = value.replace('+', ' ').trim().replaceAll("\\s+", " ");
+    return value;
+  }
+
+  /**
+   * Refreshes the server list in the ComboBox.
+   */
+  public void refreshServerList() {
+    populateServersComboBox();
+    populateGroupsComboBox();
+    populateInternalServersComboBox();
+    updateInternalServersVisibility();
     // Re-apply selection state based on current selection
     updateSelectionUi(selectionService.getSelected());
+  }
+
+  /**
+   * Handles navigation events to clear server selection when navigating away from server routes.
+   *
+   * @param event the navigation event
+   */
+  @Override
+  public void afterNavigation(AfterNavigationEvent event) {
+    String location = event.getLocation().getPath();
+    
+    // Clear ComboBox selection if not on a server route
+    if (!location.startsWith("servers/")) {
+      // Temporarily disable the value change listener to prevent navigation loop
+      serversComboBox.setValue(null);
+      internalServersComboBox.setValue(null);
+    } else {
+      // If on a server route, try to set the ComboBox to match the current server
+      updateComboBoxFromRoute(location);
+    }
+    
+    // Clear group ComboBox selection if not on a group-search route
+    if (!location.startsWith("group-search/")) {
+      groupsComboBox.setValue(null);
+    } else {
+      // If on a group-search route, try to set the ComboBox to match the current group
+      updateGroupComboBoxFromRoute(location);
+      // Update context title for group view
+      updateContextTitleForGroup(location);
+    }
+    
+    // Update context title for server view if not on group-search route
+    if (!location.startsWith("group-search/")) {
+      // Restore server context title if we have a selected server
+      LdapServerConfig selectedServer = selectionService.getSelected();
+      updateSelectionUi(selectedServer);
+    } else {
+      // For group routes, update connection chip to show group status
+      updateConnectionChipForGroup(location);
+    }
+  }
+
+  /**
+   * Updates the context title for group view.
+   *
+   * @param location the current route location
+   */
+  private void updateContextTitleForGroup(String location) {
+    if (location.startsWith("group-search/")) {
+      String groupName = location.substring("group-search/".length());
+      // Decode URL encoding if needed (basic decoding for spaces)
+      groupName = groupName.replace("%20", " ").replace("+", " ");
+      // Normalize multiple spaces to single space and trim
+      groupName = groupName.trim().replaceAll("\\s+", " ");
+      
+      contextTitle.setText("Group: " + groupName);
+    }
+  }
+
+  /**
+   * Updates the ComboBox selection to match the current server route.
+   *
+   * @param location the current route location
+   */
+  private void updateComboBoxFromRoute(String location) {
+    if (location.startsWith("servers/")) {
+      String serverId = location.substring("servers/".length());
+      
+      // First try to find in external servers
+      configurationService.getAllConfigurations().stream()
+          .filter(config -> serverId.equals(config.getId()))
+          .findFirst()
+          .ifPresentOrElse(config -> {
+            // Only update if different to avoid triggering navigation
+            if (!config.equals(serversComboBox.getValue())) {
+              serversComboBox.setValue(config);
+            }
+          }, () -> {
+            // If not found in external servers, try internal servers
+            inMemoryLdapService.getRunningInMemoryServers().stream()
+                .filter(config -> serverId.equals(config.getId()))
+                .findFirst()
+                .ifPresent(config -> {
+                  // Only update if different to avoid triggering navigation
+                  if (!config.equals(internalServersComboBox.getValue())) {
+                    internalServersComboBox.setValue(config);
+                  }
+                });
+          });
+    }
+  }
+
+  /**
+   * Updates the group ComboBox selection to match the current group route.
+   *
+   * @param location the current route location
+   */
+  private void updateGroupComboBoxFromRoute(String location) {
+    if (location.startsWith("group-search/")) {
+      String groupName = location.substring("group-search/".length());
+      // Decode URL encoding if needed (basic decoding for spaces)
+      groupName = groupName.replace("%20", " ");
+      
+      // Only update if different to avoid triggering navigation
+      if (!groupName.equals(groupsComboBox.getValue())) {
+        groupsComboBox.setValue(groupName);
+      }
+    }
   }
 }

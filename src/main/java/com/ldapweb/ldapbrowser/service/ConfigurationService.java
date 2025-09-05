@@ -38,6 +38,18 @@ public class ConfigurationService {
   }
 
   /**
+   * Get all distinct groups from all server configurations
+   */
+  public List<String> getAllGroups() {
+    return configurations.values().stream()
+        .flatMap(config -> config.getGroups().stream())
+        .filter(group -> group != null && !group.trim().isEmpty())
+        .distinct()
+        .sorted()
+        .collect(java.util.stream.Collectors.toList());
+  }
+
+  /**
    * Get configuration by ID
    */
   public LdapServerConfig getConfiguration(String id) {

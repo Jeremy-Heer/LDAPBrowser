@@ -12,25 +12,25 @@ import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 
 /**
- * Lightweight route used to select a server by id within a group and forward to ServersView.
+ * Lightweight route used to select a server by id and forward to ServersView.
  */
-@Route(value = "group/:group/:sid", layout = MainLayout.class)
-@PageTitle("Select Server")
+@Route(value = "server-details/:sid", layout = MainLayout.class)
+@PageTitle("Server Details")
 @AnonymousAllowed
-public class SelectGroupServerView extends Div implements BeforeEnterObserver {
+public class ServerDetailsView extends Div implements BeforeEnterObserver {
 
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
   private final ServerSelectionService selectionService;
 
   /**
-   * Constructs a new SelectGroupServerView.
+   * Constructs a new ServerDetailsView.
    *
    * @param configurationService the configuration service
    * @param inMemoryLdapService  the in-memory LDAP service
    * @param selectionService     the server selection service
    */
-  public SelectGroupServerView(ConfigurationService configurationService,
+  public ServerDetailsView(ConfigurationService configurationService,
       InMemoryLdapService inMemoryLdapService,
       ServerSelectionService selectionService) {
     this.configurationService = configurationService;
@@ -40,32 +40,37 @@ public class SelectGroupServerView extends Div implements BeforeEnterObserver {
   }
 
   /**
-   * Handles the before-enter event to select a server by ID within a group and
-   * forward to ServersView.
+   * Handles the before-enter event to select a server by ID and forward to
+   * ServersView.
    *
    * @param event the before-enter event
    */
   @Override
-  @SuppressWarnings("unused")
   public void beforeEnter(BeforeEnterEvent event) {
-    String group = event.getRouteParameters().get("group").orElse(null);
-    String sid = event.getRouteParameters().get("sid").orElse(null);
+    String id = event.getRouteParameters().get("sid").orElse(null);
+    System.out.println("ServerDetailsView: Processing server ID: " + id);
     
-    if (sid != null) {
-      // Find and select the server
+    if (id != null) {
       LdapServerConfig cfg = configurationService.getAllConfigurations().stream()
-          .filter(c -> sid.equals(c.getId()))
+          .filter(c -> id.equals(c.getId()))
           .findFirst()
           .orElseGet(() -> inMemoryLdapService.getAllInMemoryServers().stream()
-              .filter(c -> sid.equals(c.getId()))
+              .filter(c -> id.equals(c.getId()))
               .findFirst()
               .orElse(null));
+      
       if (cfg != null) {
         selectionService.setSelected(cfg);
+        // Navigate to "servers/:sid" route to show the specific server
+        // Instead of just going to the "servers" base route
+        event.forwardTo("servers/" + id);
+      } else {
+        // If server not found, forward to the servers list view
+        event.forwardTo("servers");
       }
+    } else {
+      // If no id is provided, forward to the servers list view
+      event.forwardTo("servers");
     }
-    
-    // Always forward to servers view after selection
-    event.forwardTo(ServersView.class);
   }
 }

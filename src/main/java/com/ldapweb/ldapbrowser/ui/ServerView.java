@@ -1,7 +1,6 @@
 package com.ldapweb.ldapbrowser.ui;
 
 import com.ldapweb.ldapbrowser.model.LdapServerConfig;
-
 import com.ldapweb.ldapbrowser.service.ConfigurationService;
 import com.ldapweb.ldapbrowser.service.InMemoryLdapService;
 import com.ldapweb.ldapbrowser.service.ServerSelectionService;
@@ -15,23 +14,23 @@ import com.vaadin.flow.server.auth.AnonymousAllowed;
 /**
  * Lightweight route used to select a server by id and forward to ServersView.
  */
-@Route(value = "select/:sid", layout = MainLayout.class)
-@PageTitle("Select Server")
+@Route(value = "server/:sid", layout = MainLayout.class)
+@PageTitle("Server")
 @AnonymousAllowed
-public class SelectServerView extends Div implements BeforeEnterObserver {
+public class ServerView extends Div implements BeforeEnterObserver {
 
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
   private final ServerSelectionService selectionService;
 
   /**
-   * Constructs a new SelectServerView.
+   * Constructs a new ServerView.
    *
    * @param configurationService the configuration service
    * @param inMemoryLdapService  the in-memory LDAP service
    * @param selectionService     the server selection service
    */
-  public SelectServerView(ConfigurationService configurationService,
+  public ServerView(ConfigurationService configurationService,
       InMemoryLdapService inMemoryLdapService,
       ServerSelectionService selectionService) {
     this.configurationService = configurationService;
@@ -49,7 +48,8 @@ public class SelectServerView extends Div implements BeforeEnterObserver {
   @Override
   public void beforeEnter(BeforeEnterEvent event) {
     String id = event.getRouteParameters().get("sid").orElse(null);
-    System.out.println("SelectServerView: Processing server ID: " + id);
+    System.out.println("ServerView: Processing server ID: " + id);
+    
     if (id != null) {
       LdapServerConfig cfg = configurationService.getAllConfigurations().stream()
           .filter(c -> id.equals(c.getId()))
@@ -58,10 +58,11 @@ public class SelectServerView extends Div implements BeforeEnterObserver {
               .filter(c -> id.equals(c.getId()))
               .findFirst()
               .orElse(null));
+      
       if (cfg != null) {
         selectionService.setSelected(cfg);
-        // Use the correct path to forward to the ServerDetailsView with the server ID parameter
-        event.forwardTo("server-details/" + id);
+        // Forward directly to the ServersView with the server ID parameter
+        event.forwardTo("servers/" + id);
       } else {
         // If server not found, forward to the servers list view
         event.forwardTo("servers");
