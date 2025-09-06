@@ -188,6 +188,8 @@ public class GroupSchemaTab extends VerticalLayout {
   private Grid<RowModel> createGrid() {
     Grid<RowModel> grid = new Grid<>(RowModel.class, false);
     grid.setSizeFull();
+  // Allow users to reorder columns and resize column widths for better UX
+  grid.setColumnReorderingAllowed(true);
     
     // Add selection listener to show details
     grid.asSingleSelect().addValueChangeListener(e -> {
@@ -349,23 +351,26 @@ public class GroupSchemaTab extends VerticalLayout {
     grid.addColumn(RowModel::getName)
         .setHeader("Name")
         .setAutoWidth(true)
+  .setResizable(true)
         .setFrozen(true)
         .setSortable(true)
         .setComparator(Comparator.comparing(RowModel::getName));
         
     for (String server : serverNames) {
-      grid.addColumn(row -> row.getChecksum(server))
-          .setHeader(server)
-          .setAutoWidth(true)
-          .setSortable(true)
-          .setComparator(Comparator.comparing(row -> row.getChecksum(server)));
+    grid.addColumn(row -> row.getChecksum(server))
+      .setHeader(server)
+      .setAutoWidth(true)
+      .setResizable(true)
+      .setSortable(true)
+      .setComparator(Comparator.comparing(row -> row.getChecksum(server)));
     }
     
-    grid.addColumn(row -> row.isEqualAcross(serverNames) ? "Equal" : "Unequal")
-        .setHeader("Status")
-        .setAutoWidth(true)
-        .setSortable(true)
-        .setComparator(Comparator.comparing(row -> row.isEqualAcross(serverNames)));
+  grid.addColumn(row -> row.isEqualAcross(serverNames) ? "Equal" : "Unequal")
+    .setHeader("Status")
+    .setAutoWidth(true)
+    .setResizable(true)
+    .setSortable(true)
+    .setComparator(Comparator.comparing(row -> row.isEqualAcross(serverNames)));
   }
 
   private enum ComponentType {
@@ -600,13 +605,16 @@ public class GroupSchemaTab extends VerticalLayout {
     Grid<SchemaPropertyRow> comparisonGrid = new Grid<>();
     comparisonGrid.setSizeFull();
     comparisonGrid.setHeight("400px");
+  // Allow users to reorder and resize columns in details comparison
+  comparisonGrid.setColumnReorderingAllowed(true);
     
     // Property column
     comparisonGrid.addColumn(SchemaPropertyRow::getProperty)
         .setHeader("Property")
         .setAutoWidth(true)
-        .setFrozen(true)
-        .setSortable(true);
+  .setFrozen(true)
+  .setResizable(true)
+  .setSortable(true);
     
     // Add columns for each server
     for (String serverName : sortedServers.stream().map(this::displayName).toList()) {
