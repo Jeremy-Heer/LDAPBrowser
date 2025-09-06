@@ -2,6 +2,7 @@ package com.ldapweb.ldapbrowser.ui.components;
 
 import com.ldapweb.ldapbrowser.model.LdapServerConfig;
 import com.ldapweb.ldapbrowser.service.LdapService;
+import com.ldapweb.ldapbrowser.service.LoggingService;
 import com.ldapweb.ldapbrowser.util.SchemaCompareUtil;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.schema.AttributeSyntaxDefinition;
@@ -12,6 +13,7 @@ import com.unboundid.ldap.sdk.schema.ObjectClassDefinition;
 import com.unboundid.ldap.sdk.schema.Schema;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
@@ -49,11 +51,13 @@ import java.util.TreeSet;
 public class GroupSchemaTab extends VerticalLayout {
 
   private final LdapService ldapService;
+  private final LoggingService loggingService;
 
   private final TabSheet tabSheet = new TabSheet();
   private final Button refreshButton = new Button("Refresh", new Icon(VaadinIcon.REFRESH));
   private final Span statusLabel = new Span();
   private final TextField searchField = new TextField();
+  private final Checkbox ignoreExtensionsCheckbox = new Checkbox("Ignore Extensions", true);
 
   private Set<LdapServerConfig> environments = new HashSet<>();
   private List<LdapServerConfig> sortedServers = new ArrayList<>();
@@ -92,9 +96,11 @@ public class GroupSchemaTab extends VerticalLayout {
    * </p>
    *
    * @param ldapService the service used to retrieve LDAP schema information
+   * @param loggingService the service used for logging schema comparison debug information
    */
-  public GroupSchemaTab(LdapService ldapService) {
+  public GroupSchemaTab(LdapService ldapService, LoggingService loggingService) {
     this.ldapService = ldapService;
+    this.loggingService = loggingService;
     setSizeFull();
     setPadding(true);
     setSpacing(true);
@@ -118,9 +124,12 @@ public class GroupSchemaTab extends VerticalLayout {
     refreshButton.addThemeVariants(ButtonVariant.LUMO_SMALL);
     refreshButton.addClickListener(e -> loadAndRender());
 
+    // Ignore Extensions checkbox
+    ignoreExtensionsCheckbox.addValueChangeListener(e -> loadAndRender());
+
     statusLabel.getStyle().set("font-style", "italic").set("color", "#666");
 
-    HorizontalLayout controls = new HorizontalLayout(searchField, refreshButton, statusLabel);
+    HorizontalLayout controls = new HorizontalLayout(searchField, ignoreExtensionsCheckbox, refreshButton, statusLabel);
     controls.setDefaultVerticalComponentAlignment(Alignment.CENTER);
     controls.setWidthFull();
     controls.setJustifyContentMode(JustifyContentMode.BETWEEN);
@@ -200,6 +209,9 @@ public class GroupSchemaTab extends VerticalLayout {
     }
 
     statusLabel.setText("Loading schema from " + sortedServers.size() + " servers...");
+    
+    // Log the start of schema comparison process
+    loggingService.logDebug("SCHEMA", "Starting group schema comparison for " + sortedServers.size() + " servers");
 
     Map<String, Schema> schemas = new LinkedHashMap<>(); // serverName -> Schema
     int errors = 0;
@@ -223,6 +235,9 @@ public class GroupSchemaTab extends VerticalLayout {
       }
     }
 
+    loggingService.logDebug("SCHEMA", "Extended schema info control " + 
+        (allSupportExtended ? "enabled" : "disabled") + " for all servers in group");
+
     // Fetch schemas with an all-or-none decision: if any server lacks support,
     // don't use the control
     for (LdapServerConfig cfg : sortedServers) {
@@ -232,13 +247,16 @@ public class GroupSchemaTab extends VerticalLayout {
         // decision
         Schema schema = ldapService.getSchema(cfg.getId(), allSupportExtended);
         schemas.put(serverName, schema);
+        loggingService.logDebug("SCHEMA", "Successfully loaded schema from " + serverName);
       } catch (LDAPException e) {
         errors++;
         schemas.put(serverName, null);
+        loggingService.logError("SCHEMA", "Failed to load schema from " + serverName, e.getMessage());
       }
     }
 
     // Build data for each component
+    loggingService.logDebug("SCHEMA", "Processing schema elements for comparison across servers");
     renderObjectClasses(schemas);
     renderAttributeTypes(schemas);
     renderMatchingRules(schemas);
@@ -251,6 +269,7 @@ public class GroupSchemaTab extends VerticalLayout {
               (allSupportExtended ? "used" : "disabled for consistency") + ".");
       Notification n = Notification.show("Some servers failed to load schema.");
       n.addThemeVariants(NotificationVariant.LUMO_ERROR);
+      loggingService.logError("SCHEMA", "Group schema comparison completed with " + errors + " errors");
     } else {
       statusLabel.setText(
           "Schema loaded. Extended schema info control " +
@@ -261,6 +280,8 @@ public class GroupSchemaTab extends VerticalLayout {
                       : "disabled for consistency"))
               +
               ".");
+      loggingService.logInfo("SCHEMA", "Group schema comparison completed successfully for " + 
+          sortedServers.size() + " servers");
     }
   }
 
@@ -356,46 +377,59 @@ public class GroupSchemaTab extends VerticalLayout {
     // name -> (serverName -> checksum or "MISSING"/"ERROR")
     Map<String, Map<String, String>> rows = new LinkedHashMap<>();
     Set<String> allNames = new TreeSet<>();
+    String elementTypeName = type.name().toLowerCase().replace('_', ' ');
 
+    // First pass: collect all element names across all schemas
     for (Map.Entry<String, Schema> e : schemas.entrySet()) {
+      String serverName = e.getKey();
       Schema schema = e.getValue();
       if (schema == null) {
         continue;
       }
+      
+      int elementCount = 0;
       switch (type) {
         case OBJECT_CLASS -> {
           for (ObjectClassDefinition d : schema.getObjectClasses()) {
             String name = d.getNameOrOID();
             allNames.add(name);
+            elementCount++;
           }
         }
         case ATTRIBUTE_TYPE -> {
           for (AttributeTypeDefinition d : schema.getAttributeTypes()) {
             String name = d.getNameOrOID();
             allNames.add(name);
+            elementCount++;
           }
         }
         case MATCHING_RULE -> {
           for (MatchingRuleDefinition d : schema.getMatchingRules()) {
             String name = d.getNameOrOID();
             allNames.add(name);
+            elementCount++;
           }
         }
         case MATCHING_RULE_USE -> {
           for (MatchingRuleUseDefinition d : schema.getMatchingRuleUses()) {
             String name = d.getNameOrOID();
             allNames.add(name);
+            elementCount++;
           }
         }
         case SYNTAX -> {
           for (AttributeSyntaxDefinition d : schema.getAttributeSyntaxes()) {
             String name = d.getOID();
             allNames.add(name);
+            elementCount++;
           }
         }
       }
+      
+      loggingService.logSchemaComparisonStart(serverName, elementTypeName, elementCount);
     }
 
+    // Second pass: process each element and generate checksums
     for (String name : allNames) {
       Map<String, String> checksums = new LinkedHashMap<>();
       for (Map.Entry<String, Schema> e : schemas.entrySet()) {
@@ -403,33 +437,97 @@ public class GroupSchemaTab extends VerticalLayout {
         Schema schema = e.getValue();
         if (schema == null) {
           checksums.put(server, "ERROR");
+          loggingService.logSchemaError(server, elementTypeName, name, "Schema not available");
           continue;
         }
-        String sum = switch (type) {
-          case OBJECT_CLASS -> {
-            ObjectClassDefinition d = schema.getObjectClass(name);
-            yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
-          }
-          case ATTRIBUTE_TYPE -> {
-            AttributeTypeDefinition d = schema.getAttributeType(name);
-            yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
-          }
-          case MATCHING_RULE -> {
-            MatchingRuleDefinition d = schema.getMatchingRule(name);
-            yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
-          }
-          case MATCHING_RULE_USE -> {
-            MatchingRuleUseDefinition d = schema.getMatchingRuleUse(name);
-            yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
-          }
-          case SYNTAX -> {
-            AttributeSyntaxDefinition d = schema.getAttributeSyntax(name);
-            yield d != null ? checksum(SchemaCompareUtil.canonical(d)) : "MISSING";
-          }
-        };
-        checksums.put(server, sum);
+        
+        try {
+          boolean includeExtensions = !ignoreExtensionsCheckbox.getValue();
+          String sum = switch (type) {
+            case OBJECT_CLASS -> {
+              ObjectClassDefinition d = schema.getObjectClass(name);
+              if (d != null) {
+                String originalValue = d.toString();
+                String canonicalValue = SchemaCompareUtil.canonical(d, includeExtensions);
+                String checksum = checksum(canonicalValue);
+                loggingService.logSchemaElement(server, elementTypeName, name, originalValue, canonicalValue, checksum);
+                yield checksum;
+              } else {
+                yield "MISSING";
+              }
+            }
+            case ATTRIBUTE_TYPE -> {
+              AttributeTypeDefinition d = schema.getAttributeType(name);
+              if (d != null) {
+                String originalValue = d.toString();
+                String canonicalValue = SchemaCompareUtil.canonical(d, includeExtensions);
+                String checksum = checksum(canonicalValue);
+                loggingService.logSchemaElement(server, elementTypeName, name, originalValue, canonicalValue, checksum);
+                yield checksum;
+              } else {
+                yield "MISSING";
+              }
+            }
+            case MATCHING_RULE -> {
+              MatchingRuleDefinition d = schema.getMatchingRule(name);
+              if (d != null) {
+                String originalValue = d.toString();
+                String canonicalValue = SchemaCompareUtil.canonical(d, includeExtensions);
+                String checksum = checksum(canonicalValue);
+                loggingService.logSchemaElement(server, elementTypeName, name, originalValue, canonicalValue, checksum);
+                yield checksum;
+              } else {
+                yield "MISSING";
+              }
+            }
+            case MATCHING_RULE_USE -> {
+              MatchingRuleUseDefinition d = schema.getMatchingRuleUse(name);
+              if (d != null) {
+                String originalValue = d.toString();
+                String canonicalValue = SchemaCompareUtil.canonical(d, includeExtensions);
+                String checksum = checksum(canonicalValue);
+                loggingService.logSchemaElement(server, elementTypeName, name, originalValue, canonicalValue, checksum);
+                yield checksum;
+              } else {
+                yield "MISSING";
+              }
+            }
+            case SYNTAX -> {
+              AttributeSyntaxDefinition d = schema.getAttributeSyntax(name);
+              if (d != null) {
+                String originalValue = d.toString();
+                String canonicalValue = SchemaCompareUtil.canonical(d, includeExtensions);
+                String checksum = checksum(canonicalValue);
+                loggingService.logSchemaElement(server, elementTypeName, name, originalValue, canonicalValue, checksum);
+                yield checksum;
+              } else {
+                yield "MISSING";
+              }
+            }
+          };
+          checksums.put(server, sum);
+        } catch (Exception ex) {
+          checksums.put(server, "ERROR");
+          loggingService.logSchemaError(server, elementTypeName, name, ex.getMessage());
+        }
       }
       rows.put(name, checksums);
+    }
+
+    // Log completion summary for each server
+    for (Map.Entry<String, Schema> e : schemas.entrySet()) {
+      String serverName = e.getKey();
+      Schema schema = e.getValue();
+      if (schema != null) {
+        int processedCount = (int) rows.values().stream()
+            .filter(checksums -> !checksums.getOrDefault(serverName, "").equals("ERROR") 
+                              && !checksums.getOrDefault(serverName, "").equals("MISSING"))
+            .count();
+        int errorCount = (int) rows.values().stream()
+            .filter(checksums -> checksums.getOrDefault(serverName, "").equals("ERROR"))
+            .count();
+        loggingService.logSchemaComparisonEnd(serverName, elementTypeName, processedCount, errorCount);
+      }
     }
 
     return rows;
@@ -656,6 +754,22 @@ public class GroupSchemaTab extends VerticalLayout {
           return def != null && def.getOptionalAttributes() != null ? 
               def.getOptionalAttributes() : new String[0];
         });
+    
+    // Add Extensions
+    addProperty(propertyRows, "Extensions", elementName, schemas,
+        (schema, name) -> {
+          ObjectClassDefinition def = schema.getObjectClass(name);
+          if (def != null && def.getExtensions() != null && !def.getExtensions().isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<String, String[]> entry : def.getExtensions().entrySet()) {
+              if (sb.length() > 0) sb.append(", ");
+              sb.append(entry.getKey()).append("=[")
+                .append(String.join(", ", entry.getValue())).append("]");
+            }
+            return sb.toString();
+          }
+          return "N/A";
+        });
   }
 
   private void addAttributeTypeProperties(List<SchemaPropertyRow> propertyRows, String elementName, Map<String, Schema> schemas) {
@@ -703,6 +817,22 @@ public class GroupSchemaTab extends VerticalLayout {
           return def != null ? (def.getEqualityMatchingRule() != null ? 
               def.getEqualityMatchingRule() : "N/A") : "N/A";
         });
+    
+    // Add Extensions
+    addProperty(propertyRows, "Extensions", elementName, schemas,
+        (schema, name) -> {
+          AttributeTypeDefinition def = schema.getAttributeType(name);
+          if (def != null && def.getExtensions() != null && !def.getExtensions().isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<String, String[]> entry : def.getExtensions().entrySet()) {
+              if (sb.length() > 0) sb.append(", ");
+              sb.append(entry.getKey()).append("=[")
+                .append(String.join(", ", entry.getValue())).append("]");
+            }
+            return sb.toString();
+          }
+          return "N/A";
+        });
   }
 
   private void addMatchingRuleProperties(List<SchemaPropertyRow> propertyRows, String elementName, Map<String, Schema> schemas) {
@@ -729,6 +859,22 @@ public class GroupSchemaTab extends VerticalLayout {
         (schema, name) -> {
           MatchingRuleDefinition def = schema.getMatchingRule(name);
           return def != null ? (def.getSyntaxOID() != null ? def.getSyntaxOID() : "N/A") : "N/A";
+        });
+    
+    // Add Extensions
+    addProperty(propertyRows, "Extensions", elementName, schemas,
+        (schema, name) -> {
+          MatchingRuleDefinition def = schema.getMatchingRule(name);
+          if (def != null && def.getExtensions() != null && !def.getExtensions().isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<String, String[]> entry : def.getExtensions().entrySet()) {
+              if (sb.length() > 0) sb.append(", ");
+              sb.append(entry.getKey()).append("=[")
+                .append(String.join(", ", entry.getValue())).append("]");
+            }
+            return sb.toString();
+          }
+          return "N/A";
         });
   }
 
@@ -758,6 +904,22 @@ public class GroupSchemaTab extends VerticalLayout {
           return def != null && def.getApplicableAttributeTypes() != null ? 
               String.join(", ", def.getApplicableAttributeTypes()) : "N/A";
         });
+    
+    // Add Extensions
+    addProperty(propertyRows, "Extensions", elementName, schemas,
+        (schema, name) -> {
+          MatchingRuleUseDefinition def = schema.getMatchingRuleUse(name);
+          if (def != null && def.getExtensions() != null && !def.getExtensions().isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<String, String[]> entry : def.getExtensions().entrySet()) {
+              if (sb.length() > 0) sb.append(", ");
+              sb.append(entry.getKey()).append("=[")
+                .append(String.join(", ", entry.getValue())).append("]");
+            }
+            return sb.toString();
+          }
+          return "N/A";
+        });
   }
 
   private void addSyntaxProperties(List<SchemaPropertyRow> propertyRows, String elementName, Map<String, Schema> schemas) {
@@ -771,6 +933,22 @@ public class GroupSchemaTab extends VerticalLayout {
         (schema, name) -> {
           AttributeSyntaxDefinition def = schema.getAttributeSyntax(name);
           return def != null ? (def.getDescription() != null ? def.getDescription() : "N/A") : "N/A";
+        });
+    
+    // Add Extensions
+    addProperty(propertyRows, "Extensions", elementName, schemas,
+        (schema, name) -> {
+          AttributeSyntaxDefinition def = schema.getAttributeSyntax(name);
+          if (def != null && def.getExtensions() != null && !def.getExtensions().isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<String, String[]> entry : def.getExtensions().entrySet()) {
+              if (sb.length() > 0) sb.append(", ");
+              sb.append(entry.getKey()).append("=[")
+                .append(String.join(", ", entry.getValue())).append("]");
+            }
+            return sb.toString();
+          }
+          return "N/A";
         });
   }
 

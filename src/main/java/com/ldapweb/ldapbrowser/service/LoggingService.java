@@ -78,8 +78,8 @@ public class LoggingService {
   private final List<LogEntry> logs = new CopyOnWriteArrayList<>();
   private final List<Runnable> logUpdateListeners = new CopyOnWriteArrayList<>();
 
-  // Maximum number of log entries to keep in memory
-  private static final int MAX_LOG_ENTRIES = 1000;
+  // Maximum number of log entries to keep in memory (configurable)
+  private volatile int maxLogEntries = 1000;
 
   // Debug capture state and original streams
   private volatile boolean debugCaptureEnabled = false;
@@ -94,7 +94,7 @@ public class LoggingService {
     logs.add(entry);
 
     // Keep only the most recent entries
-    if (logs.size() > MAX_LOG_ENTRIES) {
+    if (logs.size() > maxLogEntries) {
       logs.remove(0);
     }
 
@@ -196,6 +196,50 @@ public class LoggingService {
     String message = String.format("Export from %s to %s: %d entries exported",
         serverName, destination, entriesExported);
     logInfo("EXPORT", message);
+  }
+
+  /**
+   * Schema comparison related logging methods
+   */
+  public void logSchemaElement(String serverName, String elementType, String elementName, String originalValue, String canonicalValue, String checksum) {
+    if (debugCaptureEnabled) {
+      String message = String.format("Schema %s '%s' from %s", elementType, elementName, serverName);
+      String details = String.format("Original: %s%nCanonical: %s%nChecksum: %s", 
+          truncateForLog(originalValue), truncateForLog(canonicalValue), checksum);
+      logDebug("SCHEMA", message, details);
+    }
+  }
+
+  public void logSchemaComparisonStart(String serverName, String elementType, int elementCount) {
+    if (debugCaptureEnabled) {
+      String message = String.format("Starting schema %s comparison for %s (%d elements)", 
+          elementType, serverName, elementCount);
+      logDebug("SCHEMA", message);
+    }
+  }
+
+  public void logSchemaComparisonEnd(String serverName, String elementType, int processedCount, int errorCount) {
+    if (debugCaptureEnabled) {
+      String message = String.format("Completed schema %s comparison for %s: %d processed, %d errors", 
+          elementType, serverName, processedCount, errorCount);
+      logDebug("SCHEMA", message);
+    }
+  }
+
+  public void logSchemaError(String serverName, String elementType, String elementName, String error) {
+    if (debugCaptureEnabled) {
+      String message = String.format("Error processing schema %s '%s' from %s", elementType, elementName, serverName);
+      logDebug("SCHEMA", message, error);
+    }
+  }
+
+  /**
+   * Truncate long strings for log display to prevent excessive log size
+   */
+  private String truncateForLog(String value) {
+    if (value == null) return "null";
+    if (value.length() <= 500) return value;
+    return value.substring(0, 497) + "...";
   }
 
   /**
@@ -405,5 +449,33 @@ public class LoggingService {
     public int getDebugCount() {
       return debugCount;
     }
+  }
+
+  /**
+   * Get the maximum number of log entries to keep in memory
+   */
+  public int getMaxLogEntries() {
+    return maxLogEntries;
+  }
+
+  /**
+   * Set the maximum number of log entries to keep in memory.
+   * If the new limit is lower than the current number of logs,
+   * older logs will be removed immediately.
+   */
+  public void setMaxLogEntries(int maxLogEntries) {
+    if (maxLogEntries < 1) {
+      throw new IllegalArgumentException("Max log entries must be at least 1");
+    }
+    
+    this.maxLogEntries = maxLogEntries;
+    
+    // If we now have too many logs, remove the oldest ones
+    while (logs.size() > maxLogEntries) {
+      logs.remove(0);
+    }
+    
+    // Notify listeners of the change
+    notifyLogUpdateListeners();
   }
 }

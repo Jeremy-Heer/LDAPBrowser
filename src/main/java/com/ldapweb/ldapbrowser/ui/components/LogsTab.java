@@ -9,6 +9,7 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
+import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.H4;
 import com.vaadin.flow.component.html.Span;
@@ -21,6 +22,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.value.ValueChangeMode;
+import com.vaadin.flow.server.StreamResource;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -52,6 +54,8 @@ public class LogsTab extends VerticalLayout {
   private Button refreshButton;
   private Button clearLogsButton;
   private Button exportLogsButton;
+  private Button configButton;
+  private Anchor downloadLink;
   // Debug capture toggle
   private com.vaadin.flow.component.checkbox.Checkbox debugCaptureCheckbox;
   // Listener runnable to refresh when logs update
@@ -184,6 +188,14 @@ public class LogsTab extends VerticalLayout {
     exportLogsButton = new Button("Export Logs", new Icon(VaadinIcon.DOWNLOAD));
     exportLogsButton.addClickListener(e -> exportLogs());
 
+    // Download link (hidden initially)
+    downloadLink = new Anchor();
+    downloadLink.setVisible(false);
+    downloadLink.getElement().setAttribute("download", true);
+
+    configButton = new Button("Settings", new Icon(VaadinIcon.COG));
+    configButton.addClickListener(e -> showConfigDialog());
+
     // Debug capture checkbox (initialize to current service state so it remains
     // checked when the tab is recreated) and avoid showing a notification
     // when the state didn't actually change.
@@ -265,7 +277,7 @@ public class LogsTab extends VerticalLayout {
     controlsLayout.setSpacing(true);
     controlsLayout.addClassName("logs-controls");
 
-    controlsLayout.add(refreshButton, clearLogsButton, exportLogsButton, debugCaptureCheckbox);
+    controlsLayout.add(refreshButton, clearLogsButton, exportLogsButton, downloadLink, configButton, debugCaptureCheckbox);
 
     // Combine filters and controls
     HorizontalLayout topActionsLayout = new HorizontalLayout();
@@ -361,6 +373,89 @@ public class LogsTab extends VerticalLayout {
     dialog.open();
   }
 
+  private void showConfigDialog() {
+    com.vaadin.flow.component.dialog.Dialog dialog = new com.vaadin.flow.component.dialog.Dialog();
+    dialog.setHeaderTitle("Log Settings");
+    dialog.setWidth("400px");
+    dialog.setModal(true);
+    dialog.setCloseOnEsc(true);
+    dialog.setCloseOnOutsideClick(false);
+
+    // Create form layout
+    com.vaadin.flow.component.formlayout.FormLayout formLayout = 
+        new com.vaadin.flow.component.formlayout.FormLayout();
+    formLayout.setResponsiveSteps(new com.vaadin.flow.component.formlayout.FormLayout.ResponsiveStep("0", 1));
+
+    // Max log entries field
+    com.vaadin.flow.component.textfield.IntegerField maxEntriesField = 
+        new com.vaadin.flow.component.textfield.IntegerField("Maximum Log Entries");
+    maxEntriesField.setValue(loggingService.getMaxLogEntries());
+    maxEntriesField.setMin(1);
+    maxEntriesField.setMax(100000);
+    maxEntriesField.setStep(100);
+    maxEntriesField.setWidth("100%");
+    maxEntriesField.setHelperText("Controls how many log entries are kept in memory. Older entries are automatically removed.");
+
+    formLayout.add(maxEntriesField);
+
+    // Current statistics info
+    LogStats stats = loggingService.getLogStats();
+    com.vaadin.flow.component.html.Div statsDiv = new com.vaadin.flow.component.html.Div();
+    statsDiv.getStyle().set("margin-top", "16px").set("padding", "12px")
+        .set("background-color", "var(--lumo-contrast-5pct)")
+        .set("border-radius", "var(--lumo-border-radius-m)");
+    
+    com.vaadin.flow.component.html.Span statsLabel = new com.vaadin.flow.component.html.Span("Current Status:");
+    statsLabel.getStyle().set("font-weight", "bold").set("display", "block");
+    
+    com.vaadin.flow.component.html.Span currentCount = new com.vaadin.flow.component.html.Span(
+        "• Log entries in memory: " + stats.getTotalLogs());
+    currentCount.getStyle().set("display", "block");
+    
+    com.vaadin.flow.component.html.Span currentLimit = new com.vaadin.flow.component.html.Span(
+        "• Current limit: " + loggingService.getMaxLogEntries());
+    currentLimit.getStyle().set("display", "block");
+
+    statsDiv.add(statsLabel, currentCount, currentLimit);
+
+    VerticalLayout content = new VerticalLayout(formLayout, statsDiv);
+    content.setPadding(false);
+    content.setSpacing(true);
+    dialog.add(content);
+
+    // Buttons
+    Button saveButton = new Button("Save", e -> {
+      try {
+        Integer newValue = maxEntriesField.getValue();
+        if (newValue != null && newValue > 0) {
+          int oldValue = loggingService.getMaxLogEntries();
+          loggingService.setMaxLogEntries(newValue);
+          
+          // Refresh logs and stats to reflect any changes
+          refreshLogs();
+          updateStatistics();
+          
+          showSuccess(String.format("Max log entries updated: %d → %d", oldValue, newValue));
+          dialog.close();
+        } else {
+          showWarning("Please enter a valid number greater than 0");
+        }
+      } catch (Exception ex) {
+        showWarning("Invalid value: " + ex.getMessage());
+      }
+    });
+    saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+    Button cancelButton = new Button("Cancel", e -> dialog.close());
+
+    HorizontalLayout buttonLayout = new HorizontalLayout(cancelButton, saveButton);
+    buttonLayout.setJustifyContentMode(JustifyContentMode.END);
+    buttonLayout.getStyle().set("margin-top", "16px");
+
+    dialog.getFooter().add(buttonLayout);
+    dialog.open();
+  }
+
   private void exportLogs() {
     List<LogEntry> logs = loggingService.getAllLogs();
     if (logs.isEmpty()) {
@@ -390,26 +485,30 @@ public class LogsTab extends VerticalLayout {
       sb.append("\n");
     }
 
-    // Create download link
-    com.vaadin.flow.server.StreamResource resource =
-        new com.vaadin.flow.server.StreamResource("logs_export.csv",
-            () -> new java.io.ByteArrayInputStream(
+    try {
+      // Create download link with timestamp in filename
+      String timestamp = java.time.LocalDateTime.now()
+          .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+      String filename = "logs_export_" + timestamp + ".csv";
+      
+      StreamResource resource = new StreamResource(filename,
+          () -> new java.io.ByteArrayInputStream(
+              sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+      
+      resource.setContentType("text/csv");
+      resource.setCacheTime(0);
 
-                sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-    resource.setContentType("text/csv");
+      // Update download link
+      downloadLink.setHref(resource);
+      downloadLink.getElement().setAttribute("download", filename);
+      downloadLink.setText("Download " + filename);
+      downloadLink.setVisible(true);
 
-    com.vaadin.flow.component.html.Anchor downloadLink =
-        new com.vaadin.flow.component.html.Anchor(resource,
-
-            "");
-    downloadLink.getElement().setAttribute("download", true);
-    downloadLink.getElement().setAttribute("style", "display: none");
-
-    add(downloadLink);
-    downloadLink.getElement().callJsFunction("click");
-    remove(downloadLink);
-
-    showSuccess("Logs exported successfully");
+      showSuccess("Logs exported successfully (" + logs.size() + " entries). Click the download link to save the file.");
+      
+    } catch (Exception e) {
+      showWarning("Failed to export logs: " + e.getMessage());
+    }
   }
 
   /**

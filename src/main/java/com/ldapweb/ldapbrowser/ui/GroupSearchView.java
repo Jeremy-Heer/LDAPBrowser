@@ -81,7 +81,7 @@ public class GroupSearchView extends VerticalLayout implements BeforeEnterObserv
 
     // Schema tab for group-wide schema comparison
     Tab schemaTab = new Tab("Schema");
-    schemaTabContent = new GroupSchemaTab(ldapService);
+    schemaTabContent = new GroupSchemaTab(ldapService, loggingService);
     tabSheet.add(schemaTab, schemaTabContent);
 
     // Reports tab for group-wide reporting

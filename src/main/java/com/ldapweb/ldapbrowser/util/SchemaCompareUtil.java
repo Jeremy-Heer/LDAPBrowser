@@ -36,6 +36,17 @@ public final class SchemaCompareUtil {
    * @return the canonical string representation
    */
   public static String canonical(ObjectClassDefinition definition) {
+    return canonical(definition, true);
+  }
+
+  /**
+   * Generates a canonical string representation of an ObjectClassDefinition.
+   *
+   * @param definition the ObjectClassDefinition to canonicalize
+   * @param includeExtensions whether to include extensions in the canonical representation
+   * @return the canonical string representation
+   */
+  public static String canonical(ObjectClassDefinition definition, boolean includeExtensions) {
     if (definition == null) {
       return "";
     }
@@ -50,7 +61,9 @@ public final class SchemaCompareUtil {
     appendList(sb, "sup", toLowerSorted(definition.getSuperiorClasses()));
     appendList(sb, "must", toLowerSorted(definition.getRequiredAttributes()));
     appendList(sb, "may", toLowerSorted(definition.getOptionalAttributes()));
-    appendExtensions(sb, definition.getExtensions());
+    if (includeExtensions) {
+      appendExtensions(sb, definition.getExtensions());
+    }
     sb.append('}');
     return sb.toString();
   }
@@ -62,6 +75,17 @@ public final class SchemaCompareUtil {
    * @return the canonical string representation
    */
   public static String canonical(AttributeTypeDefinition definition) {
+    return canonical(definition, true);
+  }
+
+  /**
+   * Generates a canonical string representation of an AttributeTypeDefinition.
+   *
+   * @param definition the AttributeTypeDefinition to canonicalize
+   * @param includeExtensions whether to include extensions in the canonical representation
+   * @return the canonical string representation
+   */
+  public static String canonical(AttributeTypeDefinition definition, boolean includeExtensions) {
     if (definition == null) {
       return "";
     }
@@ -90,7 +114,9 @@ public final class SchemaCompareUtil {
     if (definition.getUsage() != null) {
       sb.append(";usage=").append(definition.getUsage().name().toLowerCase(Locale.ROOT));
     }
-    appendExtensions(sb, definition.getExtensions());
+    if (includeExtensions) {
+      appendExtensions(sb, definition.getExtensions());
+    }
     sb.append('}');
     return sb.toString();
   }
@@ -102,6 +128,17 @@ public final class SchemaCompareUtil {
    * @return the canonical string representation
    */
   public static String canonical(MatchingRuleDefinition definition) {
+    return canonical(definition, true);
+  }
+
+  /**
+   * Generates a canonical string representation of a MatchingRuleDefinition.
+   *
+   * @param definition the MatchingRuleDefinition to canonicalize
+   * @param includeExtensions whether to include extensions in the canonical representation
+   * @return the canonical string representation
+   */
+  public static String canonical(MatchingRuleDefinition definition, boolean includeExtensions) {
     if (definition == null) {
       return "";
     }
@@ -112,7 +149,9 @@ public final class SchemaCompareUtil {
       sb.append(";syntax=").append(definition.getSyntaxOID());
     }
     sb.append(";obsolete=").append(definition.isObsolete());
-    appendExtensions(sb, definition.getExtensions());
+    if (includeExtensions) {
+      appendExtensions(sb, definition.getExtensions());
+    }
     sb.append('}');
     return sb.toString();
   }
@@ -124,6 +163,17 @@ public final class SchemaCompareUtil {
    * @return the canonical string representation
    */
   public static String canonical(MatchingRuleUseDefinition definition) {
+    return canonical(definition, true);
+  }
+
+  /**
+   * Generates a canonical string representation of a MatchingRuleUseDefinition.
+   *
+   * @param definition the MatchingRuleUseDefinition to canonicalize
+   * @param includeExtensions whether to include extensions in the canonical representation
+   * @return the canonical string representation
+   */
+  public static String canonical(MatchingRuleUseDefinition definition, boolean includeExtensions) {
     if (definition == null) {
       return "";
     }
@@ -132,7 +182,9 @@ public final class SchemaCompareUtil {
     appendOidAndNames(sb, definition.getOID(), definition.getNames());
     appendList(sb, "applies", toLowerSorted(definition.getApplicableAttributeTypes()));
     sb.append(";obsolete=").append(definition.isObsolete());
-    appendExtensions(sb, definition.getExtensions());
+    if (includeExtensions) {
+      appendExtensions(sb, definition.getExtensions());
+    }
     sb.append('}');
     return sb.toString();
   }
@@ -144,6 +196,17 @@ public final class SchemaCompareUtil {
    * @return the canonical string representation
    */
   public static String canonical(AttributeSyntaxDefinition definition) {
+    return canonical(definition, true);
+  }
+
+  /**
+   * Generates a canonical string representation of an AttributeSyntaxDefinition.
+   *
+   * @param definition the AttributeSyntaxDefinition to canonicalize
+   * @param includeExtensions whether to include extensions in the canonical representation
+   * @return the canonical string representation
+   */
+  public static String canonical(AttributeSyntaxDefinition definition, boolean includeExtensions) {
     if (definition == null) {
       return "";
     }
@@ -154,7 +217,9 @@ public final class SchemaCompareUtil {
       sb.append(";desc=")
           .append(definition.getDescription().trim().toLowerCase(Locale.ROOT));
     }
-    appendExtensions(sb, definition.getExtensions());
+    if (includeExtensions) {
+      appendExtensions(sb, definition.getExtensions());
+    }
     sb.append('}');
     return sb.toString();
   }
