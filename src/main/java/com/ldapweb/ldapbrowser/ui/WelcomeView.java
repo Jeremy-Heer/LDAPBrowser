@@ -1,13 +1,13 @@
 package com.ldapweb.ldapbrowser.ui;
 
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Paragraph;
-import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
@@ -38,13 +38,10 @@ public class WelcomeView extends VerticalLayout {
 
     // Introduction paragraph
     Paragraph intro = new Paragraph(
-        "LDAP Browser is a comprehensive web application for browsing, searching, " +
-            "and managing LDAP directories. Navigate through your directory structure, " +
-            "search for entries, and manage your LDAP data all from one central interface.");
+        "LDAP Browser is a comprehensive web application for browsing, searching, "
+        + "and managing LDAP directories. Navigate through your directory structure, "
+        + "search for entries, and manage your LDAP data all from one central interface.");
     intro.getStyle().set("max-width", "800px");
-
-    // Getting started section
-    H2 gettingStarted = new H2("Getting Started");
 
     // Feature cards section
     HorizontalLayout featureCards = new HorizontalLayout();
@@ -64,9 +61,6 @@ public class WelcomeView extends VerticalLayout {
             "Browse Schema",
             "Explore object classes, attributes, and other schema elements."));
 
-    // Tips section
-    H2 tipsHeader = new H2("Quick Tips");
-
     VerticalLayout tipsList = new VerticalLayout();
     tipsList.setSpacing(false);
     tipsList.setPadding(false);
@@ -75,6 +69,12 @@ public class WelcomeView extends VerticalLayout {
         createTipItem("The schema browser allows you to explore LDAP schema components."),
         createTipItem("Select a group from the sidebar to focus on servers in that group."),
         createTipItem("Click on an entry in the tree to view and edit its attributes."));
+
+    // Getting started section (moved closer to usage)
+    H2 gettingStarted = new H2("Getting Started");
+
+    // Tips section (moved closer to usage)
+    H2 tipsHeader = new H2("Quick Tips");
 
     // Add all components
     add(
@@ -87,12 +87,13 @@ public class WelcomeView extends VerticalLayout {
   }
 
   /**
-   * Creates a feature card with an icon, title, and description.
-   * 
-   * @param icon        The Vaadin icon for the feature
-   * @param title       The feature title
-   * @param description A short description of the feature
-   * @return A div component representing the feature card
+    * Creates a feature card with an icon, title, and description.
+    * 
+    *
+    * @param icon        The Vaadin icon for the feature
+    * @param title       The feature title
+    * @param description A short description of the feature
+    * @return A div component representing the feature card
    */
   private Div createFeatureCard(VaadinIcon icon, String title, String description) {
     Div card = new Div();
@@ -124,10 +125,11 @@ public class WelcomeView extends VerticalLayout {
   }
 
   /**
-   * Creates a tip list item with a bullet point.
-   * 
-   * @param tipText The text of the tip
-   * @return A horizontal layout representing the tip item
+    * Creates a tip list item with a bullet point.
+    * 
+    *
+    * @param tipText The text of the tip
+    * @return A horizontal layout representing the tip item
    */
   private HorizontalLayout createTipItem(String tipText) {
     HorizontalLayout tipItem = new HorizontalLayout();

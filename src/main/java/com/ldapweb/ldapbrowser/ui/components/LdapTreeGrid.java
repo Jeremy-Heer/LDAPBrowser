@@ -1,5 +1,9 @@
 package com.ldapweb.ldapbrowser.ui.components;
 
+import com.ldapweb.ldapbrowser.model.LdapEntry;
+import com.ldapweb.ldapbrowser.model.LdapServerConfig;
+import com.ldapweb.ldapbrowser.service.LdapService;
+import com.unboundid.ldap.sdk.LDAPException;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -8,11 +12,6 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.treegrid.TreeGrid;
 import com.vaadin.flow.data.provider.hierarchy.TreeData;
 import com.vaadin.flow.data.provider.hierarchy.TreeDataProvider;
-import com.ldapweb.ldapbrowser.model.LdapEntry;
-import com.ldapweb.ldapbrowser.model.LdapServerConfig;
-import com.ldapweb.ldapbrowser.service.LdapService;
-import com.unboundid.ldap.sdk.LDAPException;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

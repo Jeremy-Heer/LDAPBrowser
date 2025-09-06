@@ -1,5 +1,9 @@
 package com.ldapweb.ldapbrowser.ui.components;
 
+import com.ldapweb.ldapbrowser.model.LdapEntry;
+import com.ldapweb.ldapbrowser.model.LdapServerConfig;
+import com.ldapweb.ldapbrowser.service.LdapService;
+import com.unboundid.ldap.sdk.LDAPException;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -15,15 +19,10 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.theme.lumo.LumoUtility;
-import com.ldapweb.ldapbrowser.model.LdapEntry;
-import com.ldapweb.ldapbrowser.model.LdapServerConfig;
-import com.ldapweb.ldapbrowser.service.LdapService;
-import com.unboundid.ldap.sdk.LDAPException;
-
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.LinkedHashMap;
 
 /**
  * New Entry tab for creating new LDAP entries

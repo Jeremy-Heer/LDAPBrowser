@@ -1,5 +1,15 @@
 package com.ldapweb.ldapbrowser.ui.components;
 
+import com.ldapweb.ldapbrowser.model.LdapEntry;
+import com.ldapweb.ldapbrowser.model.LdapServerConfig;
+import com.ldapweb.ldapbrowser.service.ConfigurationService;
+import com.ldapweb.ldapbrowser.service.InMemoryLdapService;
+import com.ldapweb.ldapbrowser.service.LdapService;
+import com.ldapweb.ldapbrowser.service.LoggingService;
+import com.unboundid.ldap.sdk.Attribute;
+import com.unboundid.ldap.sdk.LDAPException;
+import com.unboundid.ldap.sdk.SearchResultEntry;
+import com.unboundid.ldap.sdk.SearchScope;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
@@ -22,17 +32,6 @@ import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import com.vaadin.flow.server.StreamResource;
 import com.vaadin.flow.theme.lumo.LumoUtility;
-import com.unboundid.ldap.sdk.LDAPException;
-import com.unboundid.ldap.sdk.SearchResultEntry;
-import com.unboundid.ldap.sdk.SearchScope;
-import com.ldapweb.ldapbrowser.model.LdapEntry;
-import com.ldapweb.ldapbrowser.model.LdapServerConfig;
-import com.ldapweb.ldapbrowser.service.ConfigurationService;
-import com.ldapweb.ldapbrowser.service.InMemoryLdapService;
-import com.ldapweb.ldapbrowser.service.LdapService;
-import com.ldapweb.ldapbrowser.service.LoggingService;
-import com.unboundid.ldap.sdk.Attribute;
-
 import java.io.ByteArrayInputStream;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;

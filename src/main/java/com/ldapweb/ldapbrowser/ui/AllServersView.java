@@ -11,7 +11,6 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
-
 import java.util.List;
 
 /**
@@ -55,7 +54,7 @@ public class AllServersView extends VerticalLayout {
     setPadding(true);
     setSpacing(true);
     
-    H2 pageTitle = new H2("LDAP Servers");
+    final H2 pageTitle = new H2("LDAP Servers");
     serversList = new VerticalLayout();
     serversList.setSpacing(true);
     serversList.setPadding(false);

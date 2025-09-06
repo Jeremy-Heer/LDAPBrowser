@@ -3,14 +3,14 @@ package com.ldapweb.ldapbrowser.ui.components;
 import com.ldapweb.ldapbrowser.model.LdapEntry;
 import com.ldapweb.ldapbrowser.model.LdapServerConfig;
 import com.ldapweb.ldapbrowser.service.LdapService;
+import com.unboundid.ldap.sdk.LDAPException;
+import com.unboundid.ldap.sdk.SearchScope;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.unboundid.ldap.sdk.LDAPException;
-import com.unboundid.ldap.sdk.SearchScope;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,10 +41,10 @@ public class ResourceLimitsTab extends VerticalLayout {
    */
   public ResourceLimitsTab(LdapService ldapService) {
     this.ldapService = ldapService;
-    initUI();
+    initUi();
   }
 
-  private void initUI() {
+  private void initUi() {
     setSizeFull();
     setPadding(true);
     setSpacing(true);
@@ -53,7 +53,10 @@ public class ResourceLimitsTab extends VerticalLayout {
     add(title);
 
     Div description = new Div();
-    description.setText("Entries with resource limit configurations (size, time, lookthrough, idle time, join size limits).");
+    description.setText(
+        "Entries with resource limit configurations (size, time, lookthrough, idle time, "
+        + "join size limits)."
+    );
     description.getStyle().set("color", "var(--lumo-secondary-text-color)")
         .set("margin-bottom", "var(--lumo-space-m)");
     add(description);
@@ -216,6 +219,15 @@ public class ResourceLimitsTab extends VerticalLayout {
     private final String attributeName;
     private final String attributeValue;
 
+    /**
+     * Constructs a new {@code ResourceLimitInfo} instance with the specified
+     * distinguished name (DN), attribute name, and attribute value.
+     *
+     * @param dn the distinguished name associated with the resource limit
+     * @param attributeName the name of the attribute representing the resource
+     *                      limit
+     * @param attributeValue the value of the resource limit attribute
+     */
     public ResourceLimitInfo(String dn, String attributeName, String attributeValue) {
       this.dn = dn;
       this.attributeName = attributeName;

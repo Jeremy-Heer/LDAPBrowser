@@ -1,5 +1,10 @@
 package com.ldapweb.ldapbrowser.ui.components;
 
+import com.ldapweb.ldapbrowser.model.LdapEntry;
+import com.ldapweb.ldapbrowser.model.LdapServerConfig;
+import com.ldapweb.ldapbrowser.service.LdapService;
+import com.unboundid.ldap.sdk.LDAPException;
+import com.unboundid.ldap.sdk.SearchScope;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -10,12 +15,6 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
-import com.ldapweb.ldapbrowser.model.LdapEntry;
-import com.ldapweb.ldapbrowser.model.LdapServerConfig;
-import com.ldapweb.ldapbrowser.service.LdapService;
-import com.unboundid.ldap.sdk.LDAPException;
-import com.unboundid.ldap.sdk.SearchScope;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
