@@ -35,6 +35,7 @@ import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.theme.lumo.LumoUtility;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -831,7 +832,10 @@ public class SchemaBrowser extends VerticalLayout {
       addDetailRow(details, "Extensions", extensions.toString());
     }
 
-    detailsPanel.add(details);
+  // Add raw schema definition at the bottom
+  addRawDefinition(details, objectClass);
+
+  detailsPanel.add(details);
   }
 
   private void showAttributeTypeDetails(AttributeTypeDefinition attributeType) {
@@ -886,7 +890,10 @@ public class SchemaBrowser extends VerticalLayout {
       addDetailRow(details, "Substring Matching Rule", attributeType.getSubstringMatchingRule());
     }
 
-    detailsPanel.add(details);
+  // Add raw schema definition at the bottom
+  addRawDefinition(details, attributeType);
+
+  detailsPanel.add(details);
   }
 
   // Helper to read the X-Schema-file extension (supports common casings)
@@ -925,7 +932,10 @@ public class SchemaBrowser extends VerticalLayout {
     addDetailRow(details, "Syntax OID", matchingRule.getSyntaxOID());
     addDetailRow(details, "Obsolete", matchingRule.isObsolete() ? "Yes" : "No");
 
-    detailsPanel.add(details);
+  // Add raw schema definition at the bottom
+  addRawDefinition(details, matchingRule);
+
+  detailsPanel.add(details);
   }
 
   private void showMatchingRuleUseDetails(MatchingRuleUseDefinition matchingRuleUse) {
@@ -954,7 +964,10 @@ public class SchemaBrowser extends VerticalLayout {
           String.join(", ", matchingRuleUse.getApplicableAttributeTypes()));
     }
 
-    detailsPanel.add(details);
+  // Add raw schema definition at the bottom
+  addRawDefinition(details, matchingRuleUse);
+
+  detailsPanel.add(details);
   }
 
   private void showSyntaxDetails(AttributeSyntaxDefinition syntax) {
@@ -973,7 +986,61 @@ public class SchemaBrowser extends VerticalLayout {
     addDetailRow(details, "OID", syntax.getOID());
     addDetailRow(details, "Description", syntax.getDescription());
 
+    // Add raw schema definition at the bottom
+    addRawDefinition(details, syntax);
+
     detailsPanel.add(details);
+  }
+
+  /**
+   * Attempts to retrieve the raw schema definition string from a schema element
+   * using common methods via reflection, falling back to toString().
+   */
+  private String getRawDefinitionString(Object schemaElement) {
+    if (schemaElement == null) {
+      return "";
+    }
+
+    String[] candidateMethods = new String[] {"getDefinition", "getDefinitionString", "getDefinitionOrString", "getOriginalString"};
+    for (String methodName : candidateMethods) {
+      try {
+        Method m = schemaElement.getClass().getMethod(methodName);
+        Object res = m.invoke(schemaElement);
+        if (res instanceof String) {
+          return (String) res;
+        }
+      } catch (NoSuchMethodException ns) {
+        // ignore, try next
+      } catch (Exception ignored) {
+        // ignore any invocation issues and try next
+      }
+    }
+
+    // Fallback to toString() which should at least provide a usable representation
+    try {
+      return schemaElement.toString();
+    } catch (Exception e) {
+      return "";
+    }
+  }
+
+  /**
+   * Adds a read-only, monospace TextArea containing the raw schema definition
+   * to the provided details layout.
+   */
+  private void addRawDefinition(VerticalLayout details, Object schemaElement) {
+    String raw = getRawDefinitionString(schemaElement);
+    if (raw != null && !raw.trim().isEmpty()) {
+      TextArea rawArea = new TextArea("Raw Definition");
+      rawArea.setValue(raw);
+      rawArea.setReadOnly(true);
+      rawArea.setWidthFull();
+      rawArea.setHeight("140px");
+      // Use monospace and preserve whitespace
+      rawArea.getStyle().set("font-family", "monospace");
+      rawArea.getElement().getStyle().set("white-space", "pre");
+      details.add(rawArea);
+    }
   }
 
   private void addDetailRow(VerticalLayout parent, String label, String value) {
