@@ -51,7 +51,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Export tab for exporting LDAP search results in various formats
+ * Export tab for exporting LDAP search results in various formats.
  */
 public class ExportTab extends VerticalLayout {
 
@@ -102,6 +102,14 @@ public class ExportTab extends VerticalLayout {
   private VerticalLayout progressContainer;
   private Anchor downloadLink;
 
+  /**
+   * Create a new ExportTab.
+   *
+   * @param ldapService          LDAP service used to run searches
+   * @param loggingService       logging service for export events
+   * @param configurationService configuration service
+   * @param inMemoryLdapService  in-memory LDAP service
+   */
   public ExportTab(LdapService ldapService, LoggingService loggingService,
       ConfigurationService configurationService, InMemoryLdapService inMemoryLdapService) {
     this.ldapService = ldapService;
@@ -164,7 +172,7 @@ public class ExportTab extends VerticalLayout {
 
     returnAttributesField = new TextField("Return Attributes");
     returnAttributesField.setWidthFull();
-    returnAttributesField.setPlaceholder("cn,mail,telephoneNumber (comma-separated, leave empty for all)");
+    returnAttributesField.setPlaceholder("cn,mail,telephoneNumber");
 
     outputFormatCombo = new ComboBox<>("Output Format");
     outputFormatCombo.setItems("CSV", "JSON", "LDIF", "DN List");
@@ -217,11 +225,11 @@ public class ExportTab extends VerticalLayout {
     csvSearchFilterField.setWidthFull();
     csvSearchFilterField.setHeight("100px");
     csvSearchFilterField.setPlaceholder("(&(objectClass=person)(uid={C1})(sn={C2}))");
-    csvSearchFilterField.setHelperText("Use {C1}, {C2}, {C3}, etc. to reference CSV columns");
+    csvSearchFilterField.setHelperText("Use {C1}, {C2}, ... to reference CSV columns");
 
     csvReturnAttributesField = new TextField("Return Attributes");
     csvReturnAttributesField.setWidthFull();
-    csvReturnAttributesField.setPlaceholder("cn,mail,telephoneNumber (comma-separated, leave empty for all)");
+    csvReturnAttributesField.setPlaceholder("cn,mail,telephoneNumber");
 
     csvOutputFormatCombo = new ComboBox<>("Output Format");
     csvOutputFormatCombo.setItems("CSV", "JSON", "LDIF", "DN List");
@@ -354,7 +362,7 @@ public class ExportTab extends VerticalLayout {
       content = rawCsvContent;
     }
 
-    String[] lines = content.split("\n");
+    final String[] lines = content.split("\n");
 
     csvData.clear();
     csvColumnOrder.clear();
@@ -373,10 +381,11 @@ public class ExportTab extends VerticalLayout {
     boolean isFirstRow = true;
     for (int i = startIndex; i < lines.length; i++) {
       String line = lines[i].trim();
-      if (line.isEmpty())
+      if (line.isEmpty()) {
         continue;
+      }
 
-      List<String> values = parseCSVLine(line, removeQuotes);
+      List<String> values = parseCsvLine(line, removeQuotes);
       Map<String, String> row = new LinkedHashMap<>();
 
       // On the first row, establish the column order
@@ -411,10 +420,12 @@ public class ExportTab extends VerticalLayout {
           .setComparator((row1, row2) -> {
             String value1 = row1.get(columnName);
             String value2 = row2.get(columnName);
-            if (value1 == null)
+            if (value1 == null) {
               value1 = "";
-            if (value2 == null)
+            }
+            if (value2 == null) {
               value2 = "";
+            }
             return value1.compareToIgnoreCase(value2);
           });
     }
@@ -425,7 +436,9 @@ public class ExportTab extends VerticalLayout {
 
     String excludeText = excludeHeaderCheckbox.getValue() ? " (header row excluded)" : "";
     String quoteText = quotedValuesCheckbox.getValue() ? " (quotes removed)" : "";
-    showSuccess("CSV file processed successfully. " + csvData.size() + " rows loaded" + excludeText + quoteText + ".");
+    String successMsg = "CSV file processed successfully. " + csvData.size() + " rows loaded"
+        + excludeText + quoteText + ".";
+    showSuccess(successMsg);
   }
 
   private void performSearchExport() {
@@ -453,8 +466,10 @@ public class ExportTab extends VerticalLayout {
     String serverNames = effectiveServers.stream()
         .map(LdapServerConfig::getName)
         .collect(Collectors.joining(", "));
-    loggingService.logInfo("EXPORT", "Starting search export - Servers: " + serverNames + ", Base: "
-        + searchBase + ", Filter: " + searchFilter + ", Format: " + format);
+    String startMsg = String.format(
+        "Starting search export - Servers: %s, Base: %s, Filter: %s, Format: %s",
+        serverNames, searchBase, searchFilter, format);
+    loggingService.logInfo("EXPORT", startMsg);
 
     showProgress();
 
@@ -473,7 +488,7 @@ public class ExportTab extends VerticalLayout {
 
           // Use optimized DN-only search for DN List format
           if ("DN List".equals(format)) {
-            List<String> dnList = ldapService.getDNsOnly(server.getId(), searchBase.trim(), 
+            List<String> dnList = ldapService.getDNsOnly(server.getId(), searchBase.trim(),
                 searchFilter.trim(), SearchScope.SUB);
             allDnList.addAll(dnList);
             totalEntries += dnList.size();
@@ -485,10 +500,10 @@ public class ExportTab extends VerticalLayout {
               for (int i = 0; i < attrs.length; i++) {
                 attrs[i] = attrs[i].trim();
               }
-              ldapEntries = ldapService.searchEntries(server.getId(), searchBase.trim(), 
+              ldapEntries = ldapService.searchEntries(server.getId(), searchBase.trim(),
                   searchFilter.trim(), SearchScope.SUB, attrs);
             } else {
-              ldapEntries = ldapService.searchEntries(server.getId(), searchBase.trim(), 
+              ldapEntries = ldapService.searchEntries(server.getId(), searchBase.trim(),
                   searchFilter.trim(), SearchScope.SUB);
             }
             allLdapEntries.addAll(ldapEntries);
@@ -496,8 +511,10 @@ public class ExportTab extends VerticalLayout {
           }
 
         } catch (LDAPException e) {
-          loggingService.logError("EXPORT", "Search export failed for server: " + server.getName(), e.getMessage());
-          showError("Search failed for server " + server.getName() + ": " + e.getMessage());
+          String errMsg = "Search export failed for server: " + server.getName();
+          loggingService.logError("EXPORT", errMsg, e.getMessage());
+          showError("Search failed for server " + server.getName() + ": "
+              + e.getMessage());
           // Continue with other servers
         }
       }
@@ -507,7 +524,7 @@ public class ExportTab extends VerticalLayout {
 
       if ("DN List".equals(format)) {
         // Generate DN list export
-        exportData = generateDNListExport(allDnList);
+        exportData = generateDnListExport(allDnList);
         fileName = generateFileName(format);
       } else {
         // Convert LdapEntry to SearchResultEntry for export generation
@@ -529,8 +546,10 @@ public class ExportTab extends VerticalLayout {
       createDownloadLink(exportData, fileName, format);
       hideProgress();
       loggingService.logExport(serverNames, fileName, totalEntries);
-      showSuccess("Export completed successfully. " + totalEntries + " entries exported from " + 
-          effectiveServers.size() + " server(s).");
+      String searchSuccessMsg = String.format(
+          "Export completed successfully. %d entries exported from %d server(s).",
+          totalEntries, effectiveServers.size());
+      showSuccess(searchSuccessMsg);
 
     } catch (Exception e) {
       hideProgress();
@@ -569,8 +588,10 @@ public class ExportTab extends VerticalLayout {
     String serverNames = effectiveServers.stream()
         .map(LdapServerConfig::getName)
         .collect(Collectors.joining(", "));
-    loggingService.logInfo("EXPORT", "Starting CSV export - Servers: " + serverNames + ", CSV rows: "
-        + csvData.size() + ", Format: " + format);
+    String csvStartMsg = String.format(
+        "Starting CSV export - Servers: %s, CSV rows: %d, Format: %s",
+        serverNames, csvData.size(), format);
+    loggingService.logInfo("EXPORT", csvStartMsg);
 
     showProgress();
 
@@ -589,15 +610,24 @@ public class ExportTab extends VerticalLayout {
             }
 
             List<LdapEntry> ldapEntries;
+            String base = searchBase.trim();
+            String filterVar = searchFilter;
             if (returnAttrs != null && !returnAttrs.trim().isEmpty()) {
               String[] attrs = returnAttrs.split(",");
               for (int i = 0; i < attrs.length; i++) {
                 attrs[i] = attrs[i].trim();
               }
-              ldapEntries = ldapService.searchEntries(server.getId(), searchBase.trim(), searchFilter,
-                  SearchScope.SUB, attrs);
+              ldapEntries = ldapService.searchEntries(
+                  server.getId(),
+                  base,
+                  filterVar,
+                  SearchScope.SUB,
+                  attrs);
             } else {
-              ldapEntries = ldapService.searchEntries(server.getId(), searchBase.trim(), searchFilter,
+              ldapEntries = ldapService.searchEntries(
+                  server.getId(),
+                  base,
+                  filterVar,
                   SearchScope.SUB);
             }
 
@@ -612,21 +642,29 @@ public class ExportTab extends VerticalLayout {
             }
 
           } catch (LDAPException e) {
-            loggingService.logError("EXPORT", "CSV export failed for server: " + server.getName(), e.getMessage());
-            showError("Search failed for server " + server.getName() + ": " + e.getMessage());
+            String errMsg = "CSV export failed for server: " + server.getName();
+            loggingService.logError("EXPORT", errMsg, e.getMessage());
+            showError("Search failed for server " + server.getName() + ": "
+                + e.getMessage());
             // Continue with other servers
           }
         }
       }
 
-      String exportData = generateExportData(allEntries, format, getReturnAttributesList(returnAttrs));
+      List<String> requestedAttrList = getReturnAttributesList(returnAttrs);
+      String exportData = generateExportData(allEntries, format, requestedAttrList);
       String fileName = generateFileName(format);
 
       createDownloadLink(exportData, fileName, format);
       hideProgress();
       loggingService.logExport(serverNames, fileName, allEntries.size());
-      showSuccess("Export completed successfully. " + allEntries.size() + " entries exported from " + 
-          csvData.size() + " searches across " + effectiveServers.size() + " server(s).");
+      String csvSuccessMsg = String.format(
+          "Export completed successfully. %d entries exported from %d searches "
+          + "across %d server(s).",
+          allEntries.size(),
+          csvData.size(),
+          effectiveServers.size());
+      showSuccess(csvSuccessMsg);
 
     } catch (Exception e) {
       hideProgress();
@@ -652,9 +690,9 @@ public class ExportTab extends VerticalLayout {
   }
 
   /**
-   * Parse a CSV line properly handling quoted values that may contain commas
+   * Parse a CSV line properly handling quoted values that may contain commas.
    */
-  private List<String> parseCSVLine(String line, boolean removeQuotes) {
+  private List<String> parseCsvLine(String line, boolean removeQuotes) {
     List<String> values = new ArrayList<>();
     boolean inQuotes = false;
     StringBuilder currentValue = new StringBuilder();
@@ -700,7 +738,10 @@ public class ExportTab extends VerticalLayout {
         .collect(Collectors.toList());
   }
 
-  private String generateExportData(List<SearchResultEntry> entries, String format, List<String> requestedAttrs) {
+  private String generateExportData(
+      List<SearchResultEntry> entries,
+      String format,
+      List<String> requestedAttrs) {
     switch (format.toUpperCase()) {
       case "CSV":
         return generateCsvData(entries, requestedAttrs);
@@ -714,9 +755,9 @@ public class ExportTab extends VerticalLayout {
   }
 
   /**
-   * Generate DN-only export - optimized for bulk operations
+   * Generate DN-only export - optimized for bulk operations.
    */
-  private String generateDNListExport(List<String> dnList) {
+  private String generateDnListExport(List<String> dnList) {
     StringBuilder sb = new StringBuilder();
     for (String dn : dnList) {
       sb.append(dn).append("\n");
@@ -791,8 +832,9 @@ public class ExportTab extends VerticalLayout {
           } else {
             writer.write("[");
             for (int j = 0; j < values.length; j++) {
-              if (j > 0)
+              if (j > 0) {
                 writer.write(", ");
+              }
               writer.write("\"" + values[j] + "\"");
             }
             writer.write("]");
@@ -809,8 +851,9 @@ public class ExportTab extends VerticalLayout {
             } else {
               writer.write("[");
               for (int j = 0; j < values.length; j++) {
-                if (j > 0)
+                if (j > 0) {
                   writer.write(", ");
+                }
                 writer.write("\"" + values[j] + "\"");
               }
               writer.write("]");
@@ -820,8 +863,9 @@ public class ExportTab extends VerticalLayout {
       }
 
       writer.write("\n  }");
-      if (i < entries.size() - 1)
+      if (i < entries.size() - 1) {
         writer.write(",");
+      }
       writer.write("\n");
     }
 
@@ -923,7 +967,9 @@ public class ExportTab extends VerticalLayout {
   }
 
   /**
-   * Set multiple servers for group operations
+   * Set multiple servers for group operations.
+   *
+   * @param groupServers set of server configurations to use for group operations
    */
   public void setGroupServers(Set<LdapServerConfig> groupServers) {
     this.groupServers = groupServers;
@@ -931,7 +977,10 @@ public class ExportTab extends VerticalLayout {
   }
 
   /**
-   * Get the effective servers to operate on (either single server or group servers)
+   * Get the effective servers to operate on (either single server or group
+   * servers).
+   *
+   * @return set of server configurations to use for operations
    */
   private Set<LdapServerConfig> getEffectiveServers() {
     if (groupServers != null && !groupServers.isEmpty()) {
@@ -943,6 +992,9 @@ public class ExportTab extends VerticalLayout {
     }
   }
 
+  /**
+   * Clear the form and reset the export tab state.
+   */
   public void clear() {
     searchBaseField.clear();
     searchFilterField.clear();
@@ -972,7 +1024,7 @@ public class ExportTab extends VerticalLayout {
   }
 
   /**
-   * Refresh the environment dropdown when environments change
+   * Refresh the environment dropdown when environments change.
    */
   public void refreshEnvironments() {
     // No environment dropdown to refresh here

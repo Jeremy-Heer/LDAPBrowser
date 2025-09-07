@@ -1,7 +1,10 @@
 package com.ldapweb.ldapbrowser.ui.components;
 
+import com.ldapweb.ldapbrowser.model.LdapEntry;
 import com.ldapweb.ldapbrowser.model.LdapServerConfig;
 import com.ldapweb.ldapbrowser.service.LdapService;
+import com.unboundid.ldap.sdk.LDAPException;
+import com.unboundid.ldap.sdk.SearchScope;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
@@ -9,9 +12,6 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
-import com.ldapweb.ldapbrowser.model.LdapEntry;
-import com.unboundid.ldap.sdk.LDAPException;
-import com.unboundid.ldap.sdk.SearchScope;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,10 +35,10 @@ public class GlobalAccessControlTab extends VerticalLayout {
    */
   public GlobalAccessControlTab(LdapService ldapService) {
     this.ldapService = ldapService;
-    initUI();
+    initUi();
   }
 
-  private void initUI() {
+  private void initUi() {
     setSizeFull();
     setPadding(true);
     setSpacing(true);
@@ -47,7 +47,7 @@ public class GlobalAccessControlTab extends VerticalLayout {
     add(title);
 
     Div description = new Div();
-    description.setText("Global Access Control Instructions (ACIs) from the Access Control Handler configuration.");
+    description.setText("Global Access Control Instructions (ACIs) from Access Control Handler.");
     description.getStyle().set("color", "var(--lumo-secondary-text-color)")
         .set("margin-bottom", "var(--lumo-space-m)");
     add(description);

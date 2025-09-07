@@ -199,7 +199,8 @@ public class LogsTab extends VerticalLayout {
     // Debug capture checkbox (initialize to current service state so it remains
     // checked when the tab is recreated) and avoid showing a notification
     // when the state didn't actually change.
-    debugCaptureCheckbox = new com.vaadin.flow.component.checkbox.Checkbox("Debug");
+    debugCaptureCheckbox = new com.vaadin.flow.component.checkbox.Checkbox("Debug LDAP & System");
+    debugCaptureCheckbox.getElement().setProperty("title", "Enable detailed LDAP modification logging and system error capture");
     // set initial value from the service before wiring the listener to avoid
     // triggering the listener on construction
     debugCaptureCheckbox.setValue(loggingService.isDebugCaptureEnabled());
@@ -213,7 +214,7 @@ public class LogsTab extends VerticalLayout {
       }
       loggingService.setDebugCaptureEnabled(enabled);
       updateStatistics();
-      showSuccess(enabled ? "Debug capture enabled" : "Debug capture disabled");
+      showSuccess(enabled ? "Debug logging enabled (LDAP modifications & system errors)" : "Debug logging disabled");
     });
 
     // Statistics spans

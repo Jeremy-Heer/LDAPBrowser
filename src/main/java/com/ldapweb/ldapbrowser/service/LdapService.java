@@ -640,6 +640,24 @@ public class LdapService {
       loggingService.logDebug("MODIFY",
           "Modifying entry - Server: " + serverId + ", DN: " + dn + ", Modifications: " + modifications.size() +
               (controls != null ? ", Controls: " + controls.size() : ""));
+
+      // Log detailed modification debug information when debug capture is enabled
+      if (loggingService.isDebugCaptureEnabled()) {
+        for (Modification mod : modifications) {
+          String operation = mod.getModificationType().toString();
+          String attributeName = mod.getAttributeName();
+          String[] newValues = mod.getValues();
+          
+          if (newValues != null && newValues.length > 0) {
+            loggingService.logModificationDebug("Server " + serverId, dn, operation, 
+                attributeName, null, String.join(", ", newValues));
+          } else {
+            loggingService.logModificationDebug("Server " + serverId, dn, operation, 
+                attributeName, null, null);
+          }
+        }
+      }
+
       ModifyRequest modifyRequest = new ModifyRequest(dn, modifications);
 
       if (controls != null && !controls.isEmpty()) {
@@ -662,6 +680,18 @@ public class LdapService {
 
     try {
       loggingService.logDebug("MODIFY", "Adding entry - Server: " + serverId + ", DN: " + entry.getDn());
+      
+      // Log detailed add debug information when debug capture is enabled
+      if (loggingService.isDebugCaptureEnabled()) {
+        StringBuilder details = new StringBuilder();
+        details.append("DN: ").append(entry.getDn()).append("\n");
+        details.append("Attributes:\n");
+        for (Map.Entry<String, List<String>> attr : entry.getAttributes().entrySet()) {
+          details.append("  ").append(attr.getKey()).append(": ").append(String.join(", ", attr.getValue())).append("\n");
+        }
+        loggingService.logDebug("MODIFY", "ADD operation on Server " + serverId, details.toString());
+      }
+      
       Collection<Attribute> attributes = entry.getAttributes().entrySet().stream()
           .map(attr -> new Attribute(attr.getKey(), attr.getValue()))
           .collect(Collectors.toList());
@@ -683,6 +713,12 @@ public class LdapService {
 
     try {
       loggingService.logDebug("MODIFY", "Deleting entry - Server: " + serverId + ", DN: " + dn);
+      
+      // Log detailed delete debug information when debug capture is enabled
+      if (loggingService.isDebugCaptureEnabled()) {
+        loggingService.logModificationDebug("Server " + serverId, dn, "DELETE", "entry", null, null);
+      }
+      
       DeleteRequest deleteRequest = new DeleteRequest(dn);
       connection.delete(deleteRequest);
       loggingService.logModification("Server " + serverId, dn, "DELETE");
@@ -855,6 +891,70 @@ public class LdapService {
       return false;
     } catch (Exception e) {
       return false;
+    }
+  }
+
+  /**
+   * Modify an existing object class in the schema of an external LDAP server
+   */
+  public void modifyObjectClassInSchema(String serverId, String oldObjectClassDefinition, String newObjectClassDefinition) throws LDAPException {
+    LDAPConnection connection = getConnection(serverId);
+
+    try {
+      // Get the schema subentry DN from root DSE
+      String schemaDN = getSchemaSubentryDN(serverId);
+      if (schemaDN == null) {
+        throw new LDAPException(ResultCode.NO_SUCH_OBJECT, "Cannot determine schema subentry DN");
+      }
+
+      // Log debug information if debug capture is enabled
+      loggingService.logSchemaModificationDebug("Server " + serverId, schemaDN, "MODIFY_OBJECT_CLASS", 
+          "objectClass", oldObjectClassDefinition, newObjectClassDefinition);
+
+      // Create modifications to delete the old object class and add the new one
+      Modification deleteModification = new Modification(ModificationType.DELETE, "objectClasses", oldObjectClassDefinition);
+      Modification addModification = new Modification(ModificationType.ADD, "objectClasses", newObjectClassDefinition);
+
+      // Apply both modifications in a single operation
+      ModifyRequest modifyRequest = new ModifyRequest(schemaDN, deleteModification, addModification);
+      connection.modify(modifyRequest);
+
+      loggingService.logModification("Server " + serverId, schemaDN, "MODIFY_OBJECT_CLASS");
+    } catch (LDAPException e) {
+      loggingService.logModificationError("Server " + serverId, "schema", "MODIFY_OBJECT_CLASS", e.getMessage());
+      throw e;
+    }
+  }
+
+  /**
+   * Modify an existing attribute type in the schema of an external LDAP server
+   */
+  public void modifyAttributeTypeInSchema(String serverId, String oldAttributeTypeDefinition, String newAttributeTypeDefinition) throws LDAPException {
+    LDAPConnection connection = getConnection(serverId);
+
+    try {
+      // Get the schema subentry DN from root DSE
+      String schemaDN = getSchemaSubentryDN(serverId);
+      if (schemaDN == null) {
+        throw new LDAPException(ResultCode.NO_SUCH_OBJECT, "Cannot determine schema subentry DN");
+      }
+
+      // Log debug information if debug capture is enabled
+      loggingService.logSchemaModificationDebug("Server " + serverId, schemaDN, "MODIFY_ATTRIBUTE_TYPE", 
+          "attributeType", oldAttributeTypeDefinition, newAttributeTypeDefinition);
+
+      // Create modifications to delete the old attribute type and add the new one
+      Modification deleteModification = new Modification(ModificationType.DELETE, "attributeTypes", oldAttributeTypeDefinition);
+      Modification addModification = new Modification(ModificationType.ADD, "attributeTypes", newAttributeTypeDefinition);
+
+      // Apply both modifications in a single operation
+      ModifyRequest modifyRequest = new ModifyRequest(schemaDN, deleteModification, addModification);
+      connection.modify(modifyRequest);
+
+      loggingService.logModification("Server " + serverId, schemaDN, "MODIFY_ATTRIBUTE_TYPE");
+    } catch (LDAPException e) {
+      loggingService.logModificationError("Server " + serverId, "schema", "MODIFY_ATTRIBUTE_TYPE", e.getMessage());
+      throw e;
     }
   }
 

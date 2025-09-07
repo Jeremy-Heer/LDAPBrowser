@@ -184,6 +184,44 @@ public class LoggingService {
   }
 
   /**
+   * Log detailed LDAP modification debug information when debug capture is enabled
+   */
+  public void logModificationDebug(String serverName, String dn, String operation, String attributeName, String oldValue, String newValue) {
+    if (isDebugCaptureEnabled()) {
+      String message = String.format("%s on %s", operation, serverName);
+      StringBuilder details = new StringBuilder();
+      details.append("DN: ").append(dn).append("\n");
+      details.append("Attribute: ").append(attributeName).append("\n");
+      if (oldValue != null) {
+        details.append("Old Value: ").append(oldValue).append("\n");
+      }
+      if (newValue != null) {
+        details.append("New Value: ").append(newValue);
+      }
+      logDebug("MODIFY", message, details.toString());
+    }
+  }
+
+  /**
+   * Log detailed LDAP modification debug information for schema operations when debug capture is enabled
+   */
+  public void logSchemaModificationDebug(String serverName, String schemaDN, String operation, String schemaElementType, String oldDefinition, String newDefinition) {
+    if (isDebugCaptureEnabled()) {
+      String message = String.format("Schema %s on %s", operation, serverName);
+      StringBuilder details = new StringBuilder();
+      details.append("Schema DN: ").append(schemaDN).append("\n");
+      details.append("Element Type: ").append(schemaElementType).append("\n");
+      if (oldDefinition != null) {
+        details.append("Old Definition: ").append(oldDefinition).append("\n");
+      }
+      if (newDefinition != null) {
+        details.append("New Definition: ").append(newDefinition);
+      }
+      logDebug("SCHEMA", message, details.toString());
+    }
+  }
+
+  /**
    * Import/Export related logging methods
    */
   public void logImport(String serverName, String source, int entriesProcessed) {

@@ -38,6 +38,7 @@ import com.vaadin.flow.theme.lumo.LumoUtility;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.regex.Matcher;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -547,8 +548,10 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
-   * This method is no longer used since we've removed the direct ServerSelectionService listener
-   * to avoid redundant LDAP searches. Server config updates are now handled through setServerConfig().
+   * This method is no longer used since we've removed the direct
+   * ServerSelectionService listener
+   * to avoid redundant LDAP searches. Server config updates are now handled
+   * through setServerConfig().
    * 
    * @deprecated Use setServerConfig() instead
    */
@@ -584,7 +587,7 @@ public class SchemaBrowser extends VerticalLayout {
     try {
       schema = ldapService.getSchema(serverConfig.getId());
       if (schema != null) {
-        showObjectClasses(); // Default view
+        filterCurrentView(); // Show current tab's content
         updateAddButtons();
         showSuccess("Schema loaded successfully");
       } else {
@@ -595,6 +598,35 @@ public class SchemaBrowser extends VerticalLayout {
       showError("Failed to load schema: " + e.getMessage());
       schema = null;
       updateAddButtons();
+    }
+  }
+
+  /**
+   * Load schema without the Extended Schema Info Request Control for editing operations.
+   * This prevents additional extension properties from being included that should not
+   * be present in subsequent modify operations.
+   */
+  private void loadSchemaForEditing() {
+    if (serverConfig == null) {
+      return;
+    }
+
+    // Check if connected to the server
+    if (!ldapService.isConnected(serverConfig.getId())) {
+      // Try to connect first
+      try {
+        ldapService.connect(serverConfig);
+      } catch (Exception e) {
+        schema = null;
+        return;
+      }
+    }
+
+    try {
+      // Load schema without the Extended Schema Info Request Control
+      schema = ldapService.getSchema(serverConfig.getId(), false);
+    } catch (LDAPException e) {
+      schema = null;
     }
   }
 
@@ -783,10 +815,23 @@ public class SchemaBrowser extends VerticalLayout {
     details.setSpacing(true);
     details.setPadding(true);
 
-    // Header
+    // Header with edit button
+    HorizontalLayout headerLayout = new HorizontalLayout();
+    headerLayout.setAlignItems(HorizontalLayout.Alignment.CENTER);
+    headerLayout.setJustifyContentMode(HorizontalLayout.JustifyContentMode.BETWEEN);
+    headerLayout.setWidth("100%");
+
     H3 header = new H3("Object Class: " + objectClass.getNameOrOID());
-    header.getStyle().set("margin-bottom", "16px");
-    details.add(header);
+    header.getStyle().set("margin", "0");
+
+    Button editButton = new Button("Edit", new Icon(VaadinIcon.EDIT));
+    editButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+    editButton.addClickListener(e -> openEditObjectClassDialog(objectClass));
+    editButton.setEnabled(serverConfig != null);
+
+    headerLayout.add(header, editButton);
+    headerLayout.getStyle().set("margin-bottom", "16px");
+    details.add(headerLayout);
 
     // Basic information
     addDetailRow(details, "OID", objectClass.getOID());
@@ -832,10 +877,10 @@ public class SchemaBrowser extends VerticalLayout {
       addDetailRow(details, "Extensions", extensions.toString());
     }
 
-  // Add raw schema definition at the bottom
-  addRawDefinition(details, objectClass);
+    // Add raw schema definition at the bottom
+    addRawDefinition(details, objectClass);
 
-  detailsPanel.add(details);
+    detailsPanel.add(details);
   }
 
   private void showAttributeTypeDetails(AttributeTypeDefinition attributeType) {
@@ -845,10 +890,23 @@ public class SchemaBrowser extends VerticalLayout {
     details.setSpacing(true);
     details.setPadding(true);
 
-    // Header
+    // Header with edit button
+    HorizontalLayout headerLayout = new HorizontalLayout();
+    headerLayout.setAlignItems(HorizontalLayout.Alignment.CENTER);
+    headerLayout.setJustifyContentMode(HorizontalLayout.JustifyContentMode.BETWEEN);
+    headerLayout.setWidth("100%");
+
     H3 header = new H3("Attribute Type: " + attributeType.getNameOrOID());
-    header.getStyle().set("margin-bottom", "16px");
-    details.add(header);
+    header.getStyle().set("margin", "0");
+
+    Button editButton = new Button("Edit", new Icon(VaadinIcon.EDIT));
+    editButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+    editButton.addClickListener(e -> openEditAttributeTypeDialog(attributeType));
+    editButton.setEnabled(serverConfig != null);
+
+    headerLayout.add(header, editButton);
+    headerLayout.getStyle().set("margin-bottom", "16px");
+    details.add(headerLayout);
 
     // Basic information
     addDetailRow(details, "OID", attributeType.getOID());
@@ -890,10 +948,10 @@ public class SchemaBrowser extends VerticalLayout {
       addDetailRow(details, "Substring Matching Rule", attributeType.getSubstringMatchingRule());
     }
 
-  // Add raw schema definition at the bottom
-  addRawDefinition(details, attributeType);
+    // Add raw schema definition at the bottom
+    addRawDefinition(details, attributeType);
 
-  detailsPanel.add(details);
+    detailsPanel.add(details);
   }
 
   // Helper to read the X-Schema-file extension (supports common casings)
@@ -932,10 +990,10 @@ public class SchemaBrowser extends VerticalLayout {
     addDetailRow(details, "Syntax OID", matchingRule.getSyntaxOID());
     addDetailRow(details, "Obsolete", matchingRule.isObsolete() ? "Yes" : "No");
 
-  // Add raw schema definition at the bottom
-  addRawDefinition(details, matchingRule);
+    // Add raw schema definition at the bottom
+    addRawDefinition(details, matchingRule);
 
-  detailsPanel.add(details);
+    detailsPanel.add(details);
   }
 
   private void showMatchingRuleUseDetails(MatchingRuleUseDefinition matchingRuleUse) {
@@ -964,10 +1022,10 @@ public class SchemaBrowser extends VerticalLayout {
           String.join(", ", matchingRuleUse.getApplicableAttributeTypes()));
     }
 
-  // Add raw schema definition at the bottom
-  addRawDefinition(details, matchingRuleUse);
+    // Add raw schema definition at the bottom
+    addRawDefinition(details, matchingRuleUse);
 
-  detailsPanel.add(details);
+    detailsPanel.add(details);
   }
 
   private void showSyntaxDetails(AttributeSyntaxDefinition syntax) {
@@ -1001,7 +1059,8 @@ public class SchemaBrowser extends VerticalLayout {
       return "";
     }
 
-    String[] candidateMethods = new String[] {"getDefinition", "getDefinitionString", "getDefinitionOrString", "getOriginalString"};
+    String[] candidateMethods = new String[] { "getDefinition", "getDefinitionString", "getDefinitionOrString",
+        "getOriginalString" };
     for (String methodName : candidateMethods) {
       try {
         Method m = schemaElement.getClass().getMethod(methodName);
@@ -1093,9 +1152,31 @@ public class SchemaBrowser extends VerticalLayout {
     notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
   }
 
+  private void showInfo(String message) {
+    Notification notification = Notification.show(message, 3000, Notification.Position.TOP_END);
+    notification.addThemeVariants(NotificationVariant.LUMO_PRIMARY);
+  }
+
   private void showError(String message) {
     Notification notification = Notification.show(message, 5000, Notification.Position.TOP_END);
     notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+  }
+
+  /**
+   * Normalize schema definition for comparison by removing extra whitespace
+   * and standardizing format.
+   */
+  private String normalizeSchemaDefinition(String definition) {
+    if (definition == null) {
+      return "";
+    }
+    
+    // Remove extra whitespace and normalize the definition
+    return definition.trim()
+        .replaceAll("\\s+", " ") // Replace multiple spaces with single space
+        .replaceAll("\\(\\s+", "(") // Remove space after opening parenthesis
+        .replaceAll("\\s+\\)", ")") // Remove space before closing parenthesis
+        .replaceAll("\\s*\\$\\s*", Matcher.quoteReplacement(" $ ")); // Normalize separator formatting
   }
 
   public void refreshEnvironments() {
@@ -1235,6 +1316,74 @@ public class SchemaBrowser extends VerticalLayout {
   }
 
   /**
+   * Get available syntax OIDs with descriptions for selectors.
+   */
+  private List<String> getAvailableSyntaxOIDsWithDescriptions() {
+    List<String> syntaxOIDsWithDescriptions = new ArrayList<>();
+    if (schema != null) {
+      try {
+        Collection<AttributeSyntaxDefinition> syntaxes = schema.getAttributeSyntaxes();
+        for (AttributeSyntaxDefinition syn : syntaxes) {
+          String oid = syn.getOID();
+          if (oid != null && !oid.trim().isEmpty()) {
+            String description = syn.getDescription();
+            if (description != null && !description.trim().isEmpty()) {
+              syntaxOIDsWithDescriptions.add(oid + " - " + description);
+            } else {
+              syntaxOIDsWithDescriptions.add(oid);
+            }
+          }
+        }
+        syntaxOIDsWithDescriptions.sort(String.CASE_INSENSITIVE_ORDER);
+      } catch (Exception e) {
+        // If schema access fails, return empty list
+      }
+    }
+    return syntaxOIDsWithDescriptions;
+  }
+
+  /**
+   * Get available matching rules with descriptions for selectors.
+   */
+  private List<String> getAvailableMatchingRulesWithDescriptions() {
+    List<String> matchingRulesWithDescriptions = new ArrayList<>();
+    if (schema != null) {
+      try {
+        Collection<MatchingRuleDefinition> matchingRules = schema.getMatchingRules();
+        for (MatchingRuleDefinition mr : matchingRules) {
+          String name = mr.getNameOrOID();
+          if (name != null && !name.trim().isEmpty()) {
+            String description = mr.getDescription();
+            if (description != null && !description.trim().isEmpty()) {
+              matchingRulesWithDescriptions.add(name + " - " + description);
+            } else {
+              matchingRulesWithDescriptions.add(name);
+            }
+          }
+        }
+        matchingRulesWithDescriptions.sort(String.CASE_INSENSITIVE_ORDER);
+      } catch (Exception e) {
+        // If schema access fails, return empty list
+      }
+    }
+    return matchingRulesWithDescriptions;
+  }
+
+  /**
+   * Extract the OID/name from a dropdown option that may include description.
+   */
+  private String extractOidOrName(String optionValue) {
+    if (optionValue == null) {
+      return null;
+    }
+    int dashIndex = optionValue.indexOf(" - ");
+    if (dashIndex > 0) {
+      return optionValue.substring(0, dashIndex).trim();
+    }
+    return optionValue.trim();
+  }
+
+  /**
    * Create a multi-select component with existing items from schema.
    */
   private MultiSelectComboBox<String> createSchemaMultiSelect(String label, String placeholder,
@@ -1309,56 +1458,48 @@ public class SchemaBrowser extends VerticalLayout {
     List<String> availableObjectClasses = getAvailableObjectClassNames();
     List<String> availableAttributes = getAvailableAttributeTypeNames();
 
-    // Superior classes - enhanced with selector
+    // Superior classes
     MultiSelectComboBox<String> superiorClassesSelector = createSchemaMultiSelect(
-        "Superior Classes (Select)",
+        "Superior Classes",
         "Choose from existing object classes...",
         availableObjectClasses);
     superiorClassesSelector.setHelperText("Select from existing object classes or type new ones");
 
-    TextArea superiorClassesField = new TextArea("Superior Classes (Manual Entry)");
-    superiorClassesField.setHelperText(
-        "One per line (e.g., top, person) - Alternative to selector above");
-    superiorClassesField.setHeight("60px");
-
-    // Required attributes - enhanced with selector
+    // Required attributes
     MultiSelectComboBox<String> requiredAttributesSelector = createSchemaMultiSelect(
-        "Required Attributes (MUST) - Select",
+        "Required Attributes (MUST)",
         "Choose from existing attributes...",
         availableAttributes);
     requiredAttributesSelector.setHelperText(
         "Select from existing attribute types or type new ones");
 
-    TextArea requiredAttributesField = new TextArea("Required Attributes (MUST) - Manual Entry");
-    requiredAttributesField.setHelperText(
-        "One per line (e.g., cn, sn, objectClass) - Alternative to selector above");
-    requiredAttributesField.setHeight("80px");
-
-    // Optional attributes - enhanced with selector
+    // Optional attributes
     MultiSelectComboBox<String> optionalAttributesSelector = createSchemaMultiSelect(
-        "Optional Attributes (MAY) - Select",
+        "Optional Attributes (MAY)",
         "Choose from existing attributes...",
         availableAttributes);
     optionalAttributesSelector.setHelperText(
         "Select from existing attribute types or type new ones");
 
-    TextArea optionalAttributesField = new TextArea("Optional Attributes (MAY) - Manual Entry");
-    optionalAttributesField.setHelperText(
-        "One per line (e.g., mail, telephoneNumber) - Alternative to selector above");
-    optionalAttributesField.setHeight("80px");
+    // Schema File field
+    TextField schemaFileField = new TextField("Schema File");
+    schemaFileField.setValue("99-user.ldif");
+    schemaFileField.setHelperText("Schema file name for X-SCHEMA-FILE extension");
 
     formLayout.add(nameField, oidField, descriptionField, typeComboBox, obsoleteCheckbox,
-        superiorClassesSelector, superiorClassesField,
-        requiredAttributesSelector, requiredAttributesField,
-        optionalAttributesSelector, optionalAttributesField);
+        superiorClassesSelector,
+        requiredAttributesSelector,
+        optionalAttributesSelector,
+        schemaFileField);
 
     // Buttons
     Button saveButton = new Button("Add Object Class", e -> {
       if (validateAndSaveObjectClass(dialog, nameField, oidField, descriptionField,
           typeComboBox, obsoleteCheckbox,
-          superiorClassesSelector, superiorClassesField,
-          requiredAttributesSelector, requiredAttributesField,
-          optionalAttributesSelector, optionalAttributesField)) {
+          superiorClassesSelector,
+          requiredAttributesSelector,
+          optionalAttributesSelector,
+          schemaFileField)) {
         dialog.close();
       }
     });
@@ -1406,36 +1547,31 @@ public class SchemaBrowser extends VerticalLayout {
     TextField descriptionField = new TextField("Description");
 
     // Get available schema elements for selectors
-    List<String> availableSyntaxes = getAvailableSyntaxOIDs();
+    List<String> availableSyntaxes = getAvailableSyntaxOIDsWithDescriptions();
     List<String> availableAttributes = getAvailableAttributeTypeNames();
-    List<String> availableMatchingRules = getAvailableMatchingRuleNames();
+    List<String> availableMatchingRules = getAvailableMatchingRulesWithDescriptions();
 
     // Syntax OID - enhanced with selector
     ComboBox<String> syntaxOidSelector = createSchemaComboBox(
-        "Syntax OID* (Select)",
+        "Syntax OID*",
         "Choose from available syntaxes...",
         availableSyntaxes);
     syntaxOidSelector.setRequired(true);
-    syntaxOidSelector.setValue("1.3.6.1.4.1.1466.115.121.1.15"); // DirectoryString
+    // Set default to DirectoryString with description if available
+    String defaultSyntax = availableSyntaxes.stream()
+        .filter(s -> s.startsWith("1.3.6.1.4.1.1466.115.121.1.15"))
+        .findFirst()
+        .orElse("1.3.6.1.4.1.1466.115.121.1.15");
+    syntaxOidSelector.setValue(defaultSyntax);
     syntaxOidSelector.setHelperText("Select from existing syntaxes or enter custom OID");
-
-    TextField syntaxOidField = new TextField("Syntax OID* (Manual Entry)");
-    syntaxOidField.setRequired(true);
-    syntaxOidField.setValue("1.3.6.1.4.1.1466.115.121.1.15"); // DirectoryString
-    syntaxOidField.setHelperText(
-        "Common: 1.3.6.1.4.1.1466.115.121.1.15 (Directory String) - Alternative to selector above");
 
     // Superior Type - enhanced with selector
     ComboBox<String> superiorTypeSelector = createSchemaComboBox(
-        "Superior Type (Select)",
+        "Superior Type",
         "Choose from existing attribute types...",
         availableAttributes);
     superiorTypeSelector.setHelperText(
         "Select from existing attribute types or enter custom name");
-
-    TextField superiorTypeField = new TextField("Superior Type (Manual Entry)");
-    superiorTypeField.setHelperText(
-        "Inherited attribute type (optional) - Alternative to selector above");
 
     ComboBox<String> usageComboBox = new ComboBox<>("Usage");
     usageComboBox.setItems("USER_APPLICATIONS", "DIRECTORY_OPERATION", "DISTRIBUTED_OPERATION",
@@ -1450,54 +1586,52 @@ public class SchemaBrowser extends VerticalLayout {
 
     // Matching rules - enhanced with selectors
     ComboBox<String> equalityMatchingRuleSelector = createSchemaComboBox(
-        "Equality Matching Rule (Select)",
+        "Equality Matching Rule",
         "Choose from existing matching rules...",
         availableMatchingRules);
     equalityMatchingRuleSelector.setHelperText(
         "Select from existing matching rules or enter custom name");
 
-    TextField equalityMatchingRuleField = new TextField("Equality Matching Rule (Manual Entry)");
-    equalityMatchingRuleField.setHelperText("Alternative to selector above");
-
     ComboBox<String> orderingMatchingRuleSelector = createSchemaComboBox(
-        "Ordering Matching Rule (Select)",
+        "Ordering Matching Rule",
         "Choose from existing matching rules...",
         availableMatchingRules);
     orderingMatchingRuleSelector.setHelperText(
         "Select from existing matching rules or enter custom name");
 
-    TextField orderingMatchingRuleField = new TextField("Ordering Matching Rule (Manual Entry)");
-    orderingMatchingRuleField.setHelperText("Alternative to selector above");
-
     ComboBox<String> substringMatchingRuleSelector = createSchemaComboBox(
-        "Substring Matching Rule (Select)",
+        "Substring Matching Rule",
         "Choose from existing matching rules...",
         availableMatchingRules);
     substringMatchingRuleSelector.setHelperText(
         "Select from existing matching rules or enter custom name");
 
-    TextField substringMatchingRuleField = new TextField("Substring Matching Rule (Manual Entry)");
-    substringMatchingRuleField.setHelperText("Alternative to selector above");
+    // Schema File field
+    TextField schemaFileField = new TextField("Schema File");
+    schemaFileField.setValue("99-user.ldif");
+    schemaFileField.setHelperText("Schema file name for X-SCHEMA-FILE extension");
 
     formLayout.add(nameField, oidField, descriptionField,
-        syntaxOidSelector, syntaxOidField,
-        superiorTypeSelector, superiorTypeField,
+        syntaxOidSelector,
+        superiorTypeSelector,
         usageComboBox, singleValuedCheckbox, obsoleteCheckbox, collectiveCheckbox,
         noUserModificationCheckbox,
-        equalityMatchingRuleSelector, equalityMatchingRuleField,
-        orderingMatchingRuleSelector, orderingMatchingRuleField,
-        substringMatchingRuleSelector, substringMatchingRuleField);
+        equalityMatchingRuleSelector,
+        orderingMatchingRuleSelector,
+        substringMatchingRuleSelector,
+        schemaFileField);
 
     // Buttons
     Button saveButton = new Button("Add Attribute Type", e -> {
       if (validateAndSaveAttributeType(dialog, nameField, oidField, descriptionField,
-          syntaxOidSelector, syntaxOidField,
-          superiorTypeSelector, superiorTypeField, usageComboBox,
+          syntaxOidSelector,
+          superiorTypeSelector, usageComboBox,
           singleValuedCheckbox, obsoleteCheckbox, collectiveCheckbox,
           noUserModificationCheckbox,
-          equalityMatchingRuleSelector, equalityMatchingRuleField,
-          orderingMatchingRuleSelector, orderingMatchingRuleField,
-          substringMatchingRuleSelector, substringMatchingRuleField)) {
+          equalityMatchingRuleSelector,
+          orderingMatchingRuleSelector,
+          substringMatchingRuleSelector,
+          schemaFileField)) {
         dialog.close();
       }
     });
@@ -1515,9 +1649,10 @@ public class SchemaBrowser extends VerticalLayout {
    */
   private boolean validateAndSaveObjectClass(Dialog dialog, TextField nameField, TextField oidField,
       TextField descriptionField, ComboBox<String> typeComboBox, Checkbox obsoleteCheckbox,
-      MultiSelectComboBox<String> superiorClassesSelector, TextArea superiorClassesField,
-      MultiSelectComboBox<String> requiredAttributesSelector, TextArea requiredAttributesField,
-      MultiSelectComboBox<String> optionalAttributesSelector, TextArea optionalAttributesField) {
+      MultiSelectComboBox<String> superiorClassesSelector,
+      MultiSelectComboBox<String> requiredAttributesSelector,
+      MultiSelectComboBox<String> optionalAttributesSelector,
+      TextField schemaFileField) {
     // Validate required fields
     if (nameField.getValue() == null || nameField.getValue().trim().isEmpty()) {
       showError("Name is required");
@@ -1559,24 +1694,13 @@ public class SchemaBrowser extends VerticalLayout {
         objectClassDef.append(" OBSOLETE");
       }
 
-      // Superior classes - combine selector and manual entry
+      // Superior classes - from selector only
       Set<String> allSuperiorClasses = new HashSet<>();
 
       // Add from selector
       if (superiorClassesSelector.getValue() != null && !superiorClassesSelector.getValue()
           .isEmpty()) {
         allSuperiorClasses.addAll(superiorClassesSelector.getValue());
-      }
-
-      // Add from manual entry
-      String manualSuperiorClasses = superiorClassesField.getValue();
-      if (manualSuperiorClasses != null && !manualSuperiorClasses.trim().isEmpty()) {
-        String[] manualSuperiors = manualSuperiorClasses.split("\n");
-        for (String superior : manualSuperiors) {
-          if (superior.trim().length() > 0) {
-            allSuperiorClasses.add(superior.trim());
-          }
-        }
       }
 
       if (!allSuperiorClasses.isEmpty()) {
@@ -1600,24 +1724,13 @@ public class SchemaBrowser extends VerticalLayout {
         objectClassDef.append(" ").append(typeComboBox.getValue());
       }
 
-      // Required attributes - combine selector and manual entry
+      // Required attributes - from selector only
       Set<String> allRequiredAttributes = new HashSet<>();
 
       // Add from selector
       if (requiredAttributesSelector.getValue() != null && !requiredAttributesSelector.getValue()
           .isEmpty()) {
         allRequiredAttributes.addAll(requiredAttributesSelector.getValue());
-      }
-
-      // Add from manual entry
-      String manualRequiredAttributes = requiredAttributesField.getValue();
-      if (manualRequiredAttributes != null && !manualRequiredAttributes.trim().isEmpty()) {
-        String[] manualMusts = manualRequiredAttributes.split("\n");
-        for (String must : manualMusts) {
-          if (must.trim().length() > 0) {
-            allRequiredAttributes.add(must.trim());
-          }
-        }
       }
 
       if (!allRequiredAttributes.isEmpty()) {
@@ -1636,24 +1749,13 @@ public class SchemaBrowser extends VerticalLayout {
         }
       }
 
-      // Optional attributes - combine selector and manual entry
+      // Optional attributes - from selector only
       Set<String> allOptionalAttributes = new HashSet<>();
 
       // Add from selector
       if (optionalAttributesSelector.getValue() != null && !optionalAttributesSelector.getValue()
           .isEmpty()) {
         allOptionalAttributes.addAll(optionalAttributesSelector.getValue());
-      }
-
-      // Add from manual entry
-      String manualOptionalAttributes = optionalAttributesField.getValue();
-      if (manualOptionalAttributes != null && !manualOptionalAttributes.trim().isEmpty()) {
-        String[] manualMays = manualOptionalAttributes.split("\n");
-        for (String may : manualMays) {
-          if (may.trim().length() > 0) {
-            allOptionalAttributes.add(may.trim());
-          }
-        }
       }
 
       if (!allOptionalAttributes.isEmpty()) {
@@ -1670,6 +1772,11 @@ public class SchemaBrowser extends VerticalLayout {
           }
           objectClassDef.append(" )");
         }
+      }
+
+      // Add X-SCHEMA-FILE extension if schema file is provided
+      if (schemaFileField.getValue() != null && !schemaFileField.getValue().trim().isEmpty()) {
+        objectClassDef.append(" X-SCHEMA-FILE '").append(schemaFileField.getValue().trim()).append("'");
       }
 
       objectClassDef.append(" )");
@@ -1701,14 +1808,15 @@ public class SchemaBrowser extends VerticalLayout {
   private boolean validateAndSaveAttributeType(Dialog dialog, TextField nameField,
       TextField oidField,
       TextField descriptionField,
-      ComboBox<String> syntaxOidSelector, TextField syntaxOidField,
-      ComboBox<String> superiorTypeSelector, TextField superiorTypeField,
+      ComboBox<String> syntaxOidSelector,
+      ComboBox<String> superiorTypeSelector,
       ComboBox<String> usageComboBox,
       Checkbox singleValuedCheckbox, Checkbox obsoleteCheckbox,
       Checkbox collectiveCheckbox, Checkbox noUserModificationCheckbox,
-      ComboBox<String> equalityMatchingRuleSelector, TextField equalityMatchingRuleField,
-      ComboBox<String> orderingMatchingRuleSelector, TextField orderingMatchingRuleField,
-      ComboBox<String> substringMatchingRuleSelector, TextField substringMatchingRuleField) {
+      ComboBox<String> equalityMatchingRuleSelector,
+      ComboBox<String> orderingMatchingRuleSelector,
+      ComboBox<String> substringMatchingRuleSelector,
+      TextField schemaFileField) {
     // Validate required fields
     if (nameField.getValue() == null || nameField.getValue().trim().isEmpty()) {
       showError("Name is required");
@@ -1722,11 +1830,8 @@ public class SchemaBrowser extends VerticalLayout {
       return false;
     }
 
-    // Get syntax OID from selector or manual field
-    String syntaxOid = syntaxOidSelector.getValue();
-    if (syntaxOid == null || syntaxOid.trim().isEmpty()) {
-      syntaxOid = syntaxOidField.getValue();
-    }
+    // Get syntax OID from selector (extract OID from description if present)
+    String syntaxOid = extractOidOrName(syntaxOidSelector.getValue());
 
     if (syntaxOid == null || syntaxOid.trim().isEmpty()) {
       showError("Syntax OID is required");
@@ -1763,38 +1868,26 @@ public class SchemaBrowser extends VerticalLayout {
         attributeDef.append(" OBSOLETE");
       }
 
-      // Superior type - combine selector and manual entry
-      String superiorType = superiorTypeSelector.getValue();
-      if (superiorType == null || superiorType.trim().isEmpty()) {
-        superiorType = superiorTypeField.getValue();
-      }
+      // Superior type (extract name from description if present)
+      String superiorType = extractOidOrName(superiorTypeSelector.getValue());
       if (superiorType != null && !superiorType.trim().isEmpty()) {
         attributeDef.append(" SUP ").append(superiorType.trim());
       }
 
-      // Equality matching rule - combine selector and manual entry
-      String equalityMatchingRule = equalityMatchingRuleSelector.getValue();
-      if (equalityMatchingRule == null || equalityMatchingRule.trim().isEmpty()) {
-        equalityMatchingRule = equalityMatchingRuleField.getValue();
-      }
+      // Equality matching rule (extract name from description if present)
+      String equalityMatchingRule = extractOidOrName(equalityMatchingRuleSelector.getValue());
       if (equalityMatchingRule != null && !equalityMatchingRule.trim().isEmpty()) {
         attributeDef.append(" EQUALITY ").append(equalityMatchingRule.trim());
       }
 
-      // Ordering matching rule - combine selector and manual entry
-      String orderingMatchingRule = orderingMatchingRuleSelector.getValue();
-      if (orderingMatchingRule == null || orderingMatchingRule.trim().isEmpty()) {
-        orderingMatchingRule = orderingMatchingRuleField.getValue();
-      }
+      // Ordering matching rule (extract name from description if present)
+      String orderingMatchingRule = extractOidOrName(orderingMatchingRuleSelector.getValue());
       if (orderingMatchingRule != null && !orderingMatchingRule.trim().isEmpty()) {
         attributeDef.append(" ORDERING ").append(orderingMatchingRule.trim());
       }
 
-      // Substring matching rule - combine selector and manual entry
-      String substringMatchingRule = substringMatchingRuleSelector.getValue();
-      if (substringMatchingRule == null || substringMatchingRule.trim().isEmpty()) {
-        substringMatchingRule = substringMatchingRuleField.getValue();
-      }
+      // Substring matching rule (extract name from description if present)
+      String substringMatchingRule = extractOidOrName(substringMatchingRuleSelector.getValue());
       if (substringMatchingRule != null && !substringMatchingRule.trim().isEmpty()) {
         attributeDef.append(" SUBSTR ").append(substringMatchingRule.trim());
       }
@@ -1819,6 +1912,11 @@ public class SchemaBrowser extends VerticalLayout {
             .replace("_", ""));
       }
 
+      // Add X-SCHEMA-FILE extension if schema file is provided
+      if (schemaFileField.getValue() != null && !schemaFileField.getValue().trim().isEmpty()) {
+        attributeDef.append(" X-SCHEMA-FILE '").append(schemaFileField.getValue().trim()).append("'");
+      }
+
       attributeDef.append(" )");
 
       // Add to appropriate server type
@@ -1838,6 +1936,548 @@ public class SchemaBrowser extends VerticalLayout {
 
     } catch (Exception e) {
       showError("Failed to add attribute type: " + e.getMessage());
+      return false;
+    }
+  }
+
+  /**
+   * Open dialog for editing an existing object class.
+   */
+  private void openEditObjectClassDialog(ObjectClassDefinition objectClass) {
+    Dialog dialog = new Dialog();
+    dialog.setHeaderTitle("Edit Object Class");
+    dialog.setWidth("700px");
+    dialog.setHeight("800px");
+
+    FormLayout formLayout = new FormLayout();
+    formLayout.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1));
+
+    // Add warning for external servers.
+    if (serverConfig != null && !inMemoryLdapService.isInMemoryServer(serverConfig.getId())) {
+      Span warningSpan = new Span(
+          "⚠️ Schema modifications will be applied to the external LDAP server. This operation "
+              + "may require administrator privileges and could affect production systems. "
+              + "Please ensure you have proper authorization and backup procedures in place.");
+      warningSpan.getStyle().set("color", "#ff6b35");
+      warningSpan.getStyle().set("font-size", "0.875rem");
+      warningSpan.getStyle().set("margin-bottom", "1rem");
+      warningSpan.getStyle().set("display", "block");
+      formLayout.add(warningSpan);
+    }
+
+    // Basic fields - pre-populated with current values
+    TextField nameField = new TextField("Name*");
+    nameField.setRequired(true);
+    nameField.setValue(objectClass.getNames() != null && objectClass.getNames().length > 0 
+        ? objectClass.getNames()[0] : "");
+
+    TextField oidField = new TextField("OID*");
+    oidField.setRequired(true);
+    oidField.setValue(objectClass.getOID() != null ? objectClass.getOID() : "");
+    oidField.setHelperText("Object identifier (e.g., 1.2.3.4.5.6.7.8)");
+
+    TextField descriptionField = new TextField("Description");
+    descriptionField.setValue(objectClass.getDescription() != null ? objectClass.getDescription() : "");
+
+    ComboBox<String> typeComboBox = new ComboBox<>("Type");
+    typeComboBox.setItems("STRUCTURAL", "AUXILIARY", "ABSTRACT");
+    typeComboBox.setValue(objectClass.getObjectClassType() != null 
+        ? objectClass.getObjectClassType().getName() : "STRUCTURAL");
+
+    Checkbox obsoleteCheckbox = new Checkbox("Obsolete");
+    obsoleteCheckbox.setValue(objectClass.isObsolete());
+
+    // Get available schema elements for selectors
+    List<String> availableObjectClasses = getAvailableObjectClassNames();
+    List<String> availableAttributes = getAvailableAttributeTypeNames();
+
+    // Superior classes
+    MultiSelectComboBox<String> superiorClassesSelector = createSchemaMultiSelect(
+        "Superior Classes",
+        "Choose from existing object classes...",
+        availableObjectClasses);
+    superiorClassesSelector.setHelperText("Select from existing object classes or type new ones");
+    if (objectClass.getSuperiorClasses() != null) {
+      superiorClassesSelector.setValue(Set.of(objectClass.getSuperiorClasses()));
+    }
+
+    // Required attributes
+    MultiSelectComboBox<String> requiredAttributesSelector = createSchemaMultiSelect(
+        "Required Attributes (MUST)",
+        "Choose from existing attributes...",
+        availableAttributes);
+    requiredAttributesSelector.setHelperText(
+        "Select from existing attribute types or type new ones");
+    if (objectClass.getRequiredAttributes() != null) {
+      requiredAttributesSelector.setValue(Set.of(objectClass.getRequiredAttributes()));
+    }
+
+    // Optional attributes
+    MultiSelectComboBox<String> optionalAttributesSelector = createSchemaMultiSelect(
+        "Optional Attributes (MAY)",
+        "Choose from existing attributes...",
+        availableAttributes);
+    optionalAttributesSelector.setHelperText(
+        "Select from existing attribute types or type new ones");
+    if (objectClass.getOptionalAttributes() != null) {
+      optionalAttributesSelector.setValue(Set.of(objectClass.getOptionalAttributes()));
+    }
+
+    // Schema File field
+    TextField schemaFileField = new TextField("Schema File");
+    String currentSchemaFile = getSchemaFileFromExtensions(objectClass.getExtensions());
+    schemaFileField.setValue(currentSchemaFile != null ? currentSchemaFile : "99-user.ldif");
+    schemaFileField.setHelperText("Schema file name for X-SCHEMA-FILE extension");
+
+    formLayout.add(nameField, oidField, descriptionField, typeComboBox, obsoleteCheckbox,
+        superiorClassesSelector,
+        requiredAttributesSelector,
+        optionalAttributesSelector,
+        schemaFileField);
+
+    // Buttons
+    Button saveButton = new Button("Update Object Class", e -> {
+      if (validateAndUpdateObjectClass(dialog, objectClass, nameField, oidField, descriptionField,
+          typeComboBox, obsoleteCheckbox,
+          superiorClassesSelector,
+          requiredAttributesSelector,
+          optionalAttributesSelector,
+          schemaFileField)) {
+        dialog.close();
+      }
+    });
+    saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+    Button cancelButton = new Button("Cancel", e -> dialog.close());
+
+    dialog.add(formLayout);
+    dialog.getFooter().add(cancelButton, saveButton);
+    dialog.open();
+  }
+
+  /**
+   * Open dialog for editing an existing attribute type.
+   */
+  private void openEditAttributeTypeDialog(AttributeTypeDefinition attributeType) {
+    Dialog dialog = new Dialog();
+    dialog.setHeaderTitle("Edit Attribute Type");
+    dialog.setWidth("700px");
+    dialog.setHeight("750px");
+
+    FormLayout formLayout = new FormLayout();
+    formLayout.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1));
+
+    // Add warning for external servers
+    if (serverConfig != null && !inMemoryLdapService.isInMemoryServer(serverConfig.getId())) {
+      Span warningSpan = new Span(
+          "⚠️ Schema modifications will be applied to the external LDAP server. This operation "
+              + "may require administrator privileges and could affect production systems. "
+              + "Please ensure you have proper authorization and backup procedures in place.");
+      warningSpan.getStyle().set("color", "#ff6b35");
+      warningSpan.getStyle().set("font-size", "0.875rem");
+      warningSpan.getStyle().set("margin-bottom", "1rem");
+      warningSpan.getStyle().set("display", "block");
+      formLayout.add(warningSpan);
+    }
+
+    // Basic fields - pre-populated with current values
+    TextField nameField = new TextField("Name*");
+    nameField.setRequired(true);
+    nameField.setValue(attributeType.getNames() != null && attributeType.getNames().length > 0 
+        ? attributeType.getNames()[0] : "");
+
+    TextField oidField = new TextField("OID*");
+    oidField.setRequired(true);
+    oidField.setValue(attributeType.getOID() != null ? attributeType.getOID() : "");
+    oidField.setHelperText("Object identifier (e.g., 1.2.3.4.5.6.7.8)");
+
+    TextField descriptionField = new TextField("Description");
+    descriptionField.setValue(attributeType.getDescription() != null ? attributeType.getDescription() : "");
+
+    // Get available schema elements for selectors
+    List<String> availableSyntaxes = getAvailableSyntaxOIDsWithDescriptions();
+    List<String> availableAttributes = getAvailableAttributeTypeNames();
+    List<String> availableMatchingRules = getAvailableMatchingRulesWithDescriptions();
+
+    // Syntax OID - enhanced with selector
+    ComboBox<String> syntaxOidSelector = createSchemaComboBox(
+        "Syntax OID*",
+        "Choose from available syntaxes...",
+        availableSyntaxes);
+    syntaxOidSelector.setRequired(true);
+    syntaxOidSelector.setValue(attributeType.getSyntaxOID() != null ? attributeType.getSyntaxOID() : "");
+    syntaxOidSelector.setHelperText("Select from existing syntaxes or enter custom OID");
+
+    // Superior Type - enhanced with selector
+    ComboBox<String> superiorTypeSelector = createSchemaComboBox(
+        "Superior Type",
+        "Choose from existing attribute types...",
+        availableAttributes);
+    superiorTypeSelector.setValue(attributeType.getSuperiorType() != null ? attributeType.getSuperiorType() : "");
+    superiorTypeSelector.setHelperText(
+        "Select from existing attribute types or enter custom name");
+
+    ComboBox<String> usageComboBox = new ComboBox<>("Usage");
+    usageComboBox.setItems("USER_APPLICATIONS", "DIRECTORY_OPERATION", "DISTRIBUTED_OPERATION",
+        "DSA_OPERATION");
+    usageComboBox.setValue(attributeType.getUsage() != null ? attributeType.getUsage().getName() : "USER_APPLICATIONS");
+
+    // Checkboxes - pre-populated with current values
+    Checkbox singleValuedCheckbox = new Checkbox("Single Valued");
+    singleValuedCheckbox.setValue(attributeType.isSingleValued());
+    
+    Checkbox obsoleteCheckbox = new Checkbox("Obsolete");
+    obsoleteCheckbox.setValue(attributeType.isObsolete());
+    
+    Checkbox collectiveCheckbox = new Checkbox("Collective");
+    collectiveCheckbox.setValue(attributeType.isCollective());
+    
+    Checkbox noUserModificationCheckbox = new Checkbox("No User Modification");
+    noUserModificationCheckbox.setValue(attributeType.isNoUserModification());
+
+    // Matching rules - enhanced with selectors
+    ComboBox<String> equalityMatchingRuleSelector = createSchemaComboBox(
+        "Equality Matching Rule",
+        "Choose from existing matching rules...",
+        availableMatchingRules);
+    equalityMatchingRuleSelector.setValue(attributeType.getEqualityMatchingRule() != null 
+        ? attributeType.getEqualityMatchingRule() : "");
+    equalityMatchingRuleSelector.setHelperText(
+        "Select from existing matching rules or enter custom name");
+
+    ComboBox<String> orderingMatchingRuleSelector = createSchemaComboBox(
+        "Ordering Matching Rule",
+        "Choose from existing matching rules...",
+        availableMatchingRules);
+    orderingMatchingRuleSelector.setValue(attributeType.getOrderingMatchingRule() != null 
+        ? attributeType.getOrderingMatchingRule() : "");
+    orderingMatchingRuleSelector.setHelperText(
+        "Select from existing matching rules or enter custom name");
+
+    ComboBox<String> substringMatchingRuleSelector = createSchemaComboBox(
+        "Substring Matching Rule",
+        "Choose from existing matching rules...",
+        availableMatchingRules);
+    substringMatchingRuleSelector.setValue(attributeType.getSubstringMatchingRule() != null 
+        ? attributeType.getSubstringMatchingRule() : "");
+    substringMatchingRuleSelector.setHelperText(
+        "Select from existing matching rules or enter custom name");
+
+    // Schema File field
+    TextField schemaFileField = new TextField("Schema File");
+    String currentSchemaFile = getSchemaFileFromExtensions(attributeType.getExtensions());
+    schemaFileField.setValue(currentSchemaFile != null ? currentSchemaFile : "99-user.ldif");
+    schemaFileField.setHelperText("Schema file name for X-SCHEMA-FILE extension");
+
+    formLayout.add(nameField, oidField, descriptionField,
+        syntaxOidSelector,
+        superiorTypeSelector,
+        usageComboBox, singleValuedCheckbox, obsoleteCheckbox, collectiveCheckbox,
+        noUserModificationCheckbox,
+        equalityMatchingRuleSelector,
+        orderingMatchingRuleSelector,
+        substringMatchingRuleSelector,
+        schemaFileField);
+
+    // Buttons
+    Button saveButton = new Button("Update Attribute Type", e -> {
+      if (validateAndUpdateAttributeType(dialog, attributeType, nameField, oidField, descriptionField,
+          syntaxOidSelector,
+          superiorTypeSelector, usageComboBox,
+          singleValuedCheckbox, obsoleteCheckbox, collectiveCheckbox,
+          noUserModificationCheckbox,
+          equalityMatchingRuleSelector,
+          orderingMatchingRuleSelector,
+          substringMatchingRuleSelector,
+          schemaFileField)) {
+        dialog.close();
+      }
+    });
+    saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+    Button cancelButton = new Button("Cancel", e -> dialog.close());
+
+    dialog.add(formLayout);
+    dialog.getFooter().add(cancelButton, saveButton);
+    dialog.open();
+  }
+
+  /**
+   * Validate and update existing object class.
+   */
+  private boolean validateAndUpdateObjectClass(Dialog dialog, ObjectClassDefinition originalObjectClass,
+      TextField nameField, TextField oidField,
+      TextField descriptionField, ComboBox<String> typeComboBox, Checkbox obsoleteCheckbox,
+      MultiSelectComboBox<String> superiorClassesSelector,
+      MultiSelectComboBox<String> requiredAttributesSelector,
+      MultiSelectComboBox<String> optionalAttributesSelector,
+      TextField schemaFileField) {
+    try {
+      // Validate required fields
+      if (nameField.isEmpty() || oidField.isEmpty()) {
+        showError("Name and OID are required fields");
+        return false;
+      }
+
+      // Step 1: Build the new object class definition
+      StringBuilder objectClassDef = new StringBuilder();
+      objectClassDef.append("( ").append(oidField.getValue().trim());
+
+      if (!nameField.isEmpty()) {
+        objectClassDef.append(" NAME '").append(nameField.getValue().trim()).append("'");
+      }
+
+      if (!descriptionField.isEmpty()) {
+        objectClassDef.append(" DESC '").append(descriptionField.getValue().trim()).append("'");
+      }
+
+      if (obsoleteCheckbox.getValue()) {
+        objectClassDef.append(" OBSOLETE");
+      }
+
+      // Superior classes
+      Set<String> superiorClasses = superiorClassesSelector.getValue();
+      if (superiorClasses != null && !superiorClasses.isEmpty()) {
+        List<String> superiorList = new ArrayList<>(superiorClasses);
+        if (superiorList.size() == 1) {
+          objectClassDef.append(" SUP ").append(superiorList.get(0));
+        } else if (superiorList.size() > 1) {
+          objectClassDef.append(" SUP ( ");
+          for (int i = 0; i < superiorList.size(); i++) {
+            if (i > 0) {
+              objectClassDef.append(" $ ");
+            }
+            objectClassDef.append(superiorList.get(i));
+          }
+          objectClassDef.append(" )");
+        }
+      }
+
+      if (typeComboBox.getValue() != null) {
+        objectClassDef.append(" ").append(typeComboBox.getValue());
+      }
+
+      // Required attributes
+      Set<String> requiredAttributes = requiredAttributesSelector.getValue();
+      if (requiredAttributes != null && !requiredAttributes.isEmpty()) {
+        List<String> mustList = new ArrayList<>(requiredAttributes);
+        if (mustList.size() == 1) {
+          objectClassDef.append(" MUST ").append(mustList.get(0));
+        } else if (mustList.size() > 1) {
+          objectClassDef.append(" MUST ( ");
+          for (int i = 0; i < mustList.size(); i++) {
+            if (i > 0) {
+              objectClassDef.append(" $ ");
+            }
+            objectClassDef.append(mustList.get(i));
+          }
+          objectClassDef.append(" )");
+        }
+      }
+
+      // Optional attributes
+      Set<String> optionalAttributes = optionalAttributesSelector.getValue();
+      if (optionalAttributes != null && !optionalAttributes.isEmpty()) {
+        List<String> mayList = new ArrayList<>(optionalAttributes);
+        if (mayList.size() == 1) {
+          objectClassDef.append(" MAY ").append(mayList.get(0));
+        } else if (mayList.size() > 1) {
+          objectClassDef.append(" MAY ( ");
+          for (int i = 0; i < mayList.size(); i++) {
+            if (i > 0) {
+              objectClassDef.append(" $ ");
+            }
+            objectClassDef.append(mayList.get(i));
+          }
+          objectClassDef.append(" )");
+        }
+      }
+
+      // Add X-SCHEMA-FILE extension if schema file is provided
+      if (schemaFileField.getValue() != null && !schemaFileField.getValue().trim().isEmpty()) {
+        objectClassDef.append(" X-SCHEMA-FILE '").append(schemaFileField.getValue().trim()).append("'");
+      }
+
+      objectClassDef.append(" )");
+
+      String newDefinition = objectClassDef.toString();
+
+      // Step 2: Re-read current schema definition for comparison
+      loadSchemaForEditing(); // Refresh the schema without Extended Schema Info Request Control
+      ObjectClassDefinition currentObjectClass = schema.getObjectClass(originalObjectClass.getOID());
+      
+      if (currentObjectClass == null) {
+        showError("Object class no longer exists in schema. Please refresh and try again.");
+        return false;
+      }
+
+      // Step 3: Compare current definition with new definition
+      String currentDefinition = currentObjectClass.toString();
+      
+      // Step 4: Check if there are changes
+      if (normalizeSchemaDefinition(currentDefinition).equals(normalizeSchemaDefinition(newDefinition))) {
+        showInfo("No changes detected. The object class definition is already up to date.");
+        return true;
+      }
+
+      // Step 5: Apply the changes
+      if (inMemoryLdapService.isInMemoryServer(serverConfig.getId())) {
+        // For in-memory servers, add the new definition (overwrites existing)
+        inMemoryLdapService.addObjectClassToSchema(serverConfig.getId(), newDefinition);
+      } else {
+        // For external LDAP servers, modify the schema
+        ldapService.modifyObjectClassInSchema(serverConfig.getId(), currentDefinition, newDefinition);
+      }
+
+      // Reload schema
+      loadSchema();
+
+      showSuccess("Object class '" + nameField.getValue() + "' updated successfully");
+      return true;
+
+    } catch (Exception e) {
+      showError("Failed to update object class: " + e.getMessage());
+      return false;
+    }
+  }
+
+  /**
+   * Validate and update existing attribute type.
+   */
+  private boolean validateAndUpdateAttributeType(Dialog dialog, AttributeTypeDefinition originalAttributeType,
+      TextField nameField, TextField oidField,
+      TextField descriptionField, ComboBox<String> syntaxOidSelector,
+      ComboBox<String> superiorTypeSelector, ComboBox<String> usageComboBox,
+      Checkbox singleValuedCheckbox, Checkbox obsoleteCheckbox, Checkbox collectiveCheckbox,
+      Checkbox noUserModificationCheckbox,
+      ComboBox<String> equalityMatchingRuleSelector,
+      ComboBox<String> orderingMatchingRuleSelector,
+      ComboBox<String> substringMatchingRuleSelector,
+      TextField schemaFileField) {
+    try {
+      // Validate required fields
+      if (nameField.isEmpty() || oidField.isEmpty() || syntaxOidSelector.isEmpty()) {
+        showError("Name, OID, and Syntax OID are required fields");
+        return false;
+      }
+
+      // Step 1: Build the new attribute type definition
+      StringBuilder attributeDef = new StringBuilder();
+      attributeDef.append("( ").append(oidField.getValue().trim());
+
+      if (!nameField.isEmpty()) {
+        attributeDef.append(" NAME '").append(nameField.getValue().trim()).append("'");
+      }
+
+      if (!descriptionField.isEmpty()) {
+        attributeDef.append(" DESC '").append(descriptionField.getValue().trim()).append("'");
+      }
+
+      if (obsoleteCheckbox.getValue()) {
+        attributeDef.append(" OBSOLETE");
+      }
+
+      // Superior type
+      if (superiorTypeSelector.getValue() != null && !superiorTypeSelector.getValue().trim().isEmpty()) {
+        attributeDef.append(" SUP ").append(superiorTypeSelector.getValue().trim());
+      }
+
+      // Equality matching rule
+      if (equalityMatchingRuleSelector.getValue() != null && !equalityMatchingRuleSelector.getValue().trim().isEmpty()) {
+        String equalityRule = equalityMatchingRuleSelector.getValue().trim();
+        if (equalityRule.contains(" ")) {
+          equalityRule = equalityRule.split(" ")[0]; // Extract OID if description included
+        }
+        attributeDef.append(" EQUALITY ").append(equalityRule);
+      }
+
+      // Ordering matching rule
+      if (orderingMatchingRuleSelector.getValue() != null && !orderingMatchingRuleSelector.getValue().trim().isEmpty()) {
+        String orderingRule = orderingMatchingRuleSelector.getValue().trim();
+        if (orderingRule.contains(" ")) {
+          orderingRule = orderingRule.split(" ")[0]; // Extract OID if description included
+        }
+        attributeDef.append(" ORDERING ").append(orderingRule);
+      }
+
+      // Substring matching rule
+      if (substringMatchingRuleSelector.getValue() != null && !substringMatchingRuleSelector.getValue().trim().isEmpty()) {
+        String substringRule = substringMatchingRuleSelector.getValue().trim();
+        if (substringRule.contains(" ")) {
+          substringRule = substringRule.split(" ")[0]; // Extract OID if description included
+        }
+        attributeDef.append(" SUBSTR ").append(substringRule);
+      }
+
+      // Syntax OID
+      String syntaxOid = syntaxOidSelector.getValue().trim();
+      if (syntaxOid.contains(" ")) {
+        syntaxOid = syntaxOid.split(" ")[0]; // Extract OID if description included
+      }
+      attributeDef.append(" SYNTAX ").append(syntaxOid);
+
+      if (singleValuedCheckbox.getValue()) {
+        attributeDef.append(" SINGLE-VALUE");
+      }
+
+      if (collectiveCheckbox.getValue()) {
+        attributeDef.append(" COLLECTIVE");
+      }
+
+      if (noUserModificationCheckbox.getValue()) {
+        attributeDef.append(" NO-USER-MODIFICATION");
+      }
+
+      if (usageComboBox.getValue() != null && !"USER_APPLICATIONS".equals(usageComboBox
+          .getValue())) {
+        attributeDef.append(" USAGE ").append(usageComboBox.getValue().toLowerCase()
+            .replace("_", ""));
+      }
+
+      // Add X-SCHEMA-FILE extension if schema file is provided
+      if (schemaFileField.getValue() != null && !schemaFileField.getValue().trim().isEmpty()) {
+        attributeDef.append(" X-SCHEMA-FILE '").append(schemaFileField.getValue().trim()).append("'");
+      }
+
+      attributeDef.append(" )");
+
+      String newDefinition = attributeDef.toString();
+
+      // Step 2: Re-read current schema definition for comparison
+      loadSchemaForEditing(); // Refresh the schema without Extended Schema Info Request Control
+      AttributeTypeDefinition currentAttributeType = schema.getAttributeType(originalAttributeType.getOID());
+      
+      if (currentAttributeType == null) {
+        showError("Attribute type no longer exists in schema. Please refresh and try again.");
+        return false;
+      }
+
+      // Step 3: Compare current definition with new definition
+      String currentDefinition = currentAttributeType.toString();
+      
+      // Step 4: Check if there are changes
+      if (normalizeSchemaDefinition(currentDefinition).equals(normalizeSchemaDefinition(newDefinition))) {
+        showInfo("No changes detected. The attribute type definition is already up to date.");
+        return true;
+      }
+
+      // Step 5: Apply the changes
+      if (inMemoryLdapService.isInMemoryServer(serverConfig.getId())) {
+        // For in-memory servers, add the new definition (overwrites existing)
+        inMemoryLdapService.addAttributeTypeToSchema(serverConfig.getId(), newDefinition);
+      } else {
+        // For external LDAP servers, modify the schema
+        ldapService.modifyAttributeTypeInSchema(serverConfig.getId(), currentDefinition, newDefinition);
+      }
+
+      // Reload schema
+      loadSchema();
+
+      showSuccess("Attribute type '" + nameField.getValue() + "' updated successfully");
+      return true;
+
+    } catch (Exception e) {
+      showError("Failed to update attribute type: " + e.getMessage());
       return false;
     }
   }

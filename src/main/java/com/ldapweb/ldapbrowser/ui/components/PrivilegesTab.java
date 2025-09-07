@@ -3,14 +3,14 @@ package com.ldapweb.ldapbrowser.ui.components;
 import com.ldapweb.ldapbrowser.model.LdapEntry;
 import com.ldapweb.ldapbrowser.model.LdapServerConfig;
 import com.ldapweb.ldapbrowser.service.LdapService;
+import com.unboundid.ldap.sdk.LDAPException;
+import com.unboundid.ldap.sdk.SearchScope;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.unboundid.ldap.sdk.LDAPException;
-import com.unboundid.ldap.sdk.SearchScope;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,10 +32,10 @@ public class PrivilegesTab extends VerticalLayout {
    */
   public PrivilegesTab(LdapService ldapService) {
     this.ldapService = ldapService;
-    initUI();
+    initUi();
   }
 
-  private void initUI() {
+  private void initUi() {
     setSizeFull();
     setPadding(true);
     setSpacing(true);
