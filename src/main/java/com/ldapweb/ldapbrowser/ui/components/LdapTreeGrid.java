@@ -30,6 +30,9 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
   // Paging support
   private final Map<String, Integer> entryPageState = new HashMap<>(); // DN -> current page
   private static final int PAGE_SIZE = 100;
+  // When loading the Root DSE we may want to include private naming contexts
+  // This flag is set when loadRootDSEWithNamingContexts(boolean) is called
+  private boolean includePrivateNamingContexts = false;
 
   public LdapTreeGrid(LdapService ldapService) {
     this.ldapService = ldapService;
@@ -125,6 +128,12 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
           handlePaginationClick(selectedEntry);
           // Clear selection to avoid keeping pagination entry selected
           asSingleSelect().clear();
+        } else if (selectedEntry.getDn().isEmpty() || "Root DSE".equals(selectedEntry.getRdn())) {
+          // If the Root DSE is selected, expand it to show naming contexts (and
+          // include private naming contexts depending on flag). This ensures the
+          // Root DSE is always the root-most object and its naming contexts are
+          // loaded on demand when the user interacts with it.
+          expandEntry(selectedEntry);
         }
       }
     });
@@ -466,46 +475,67 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
       throw new IllegalStateException("Server config not set");
     }
 
+    // Remember the preference for private naming contexts so that expand
+    // behavior can honor it later when Root DSE is interacted with.
+    this.includePrivateNamingContexts = includePrivateNamingContexts;
+
+    // **NEW: Collapse the entire tree before clearing to reset all expansion states**
+    // This prevents preservation of undesired expanded states and ensures a clean reload
+    collapseAll();
+
     clear();
 
+    // Load the Root DSE entry with naming contexts as a list where the first
+    // entry is expected to be the Root DSE itself (with empty DN)
     List<LdapEntry> rootEntries = ldapService.loadRootDSEWithNamingContexts(serverConfig.getId(),
         includePrivateNamingContexts);
 
-    for (LdapEntry entry : rootEntries) {
-      // Ensure all entries get a chance to show expanders by checking their object
-      // classes
-      ensureHasChildrenFlagIsSet(entry);
+    if (rootEntries.isEmpty()) {
+      dataProvider.refreshAll();
+      showNotification("No Root DSE or naming contexts found", NotificationVariant.LUMO_PRIMARY);
+      return;
+    }
 
-      treeData.addItem(null, entry);
-
-      // Add placeholder children for entries that might have children to show expand
-      // toggle
-      if (entry.isHasChildren() || shouldShowExpanderForEntry(entry)) {
-        // Check if this entry already has any children (including placeholders)
-        List<LdapEntry> entryChildren = treeData.getChildren(entry);
-        if (entryChildren.isEmpty()) {
-          // Create a placeholder entry to show the expand arrow
-          LdapEntry placeholder = createPlaceholderEntry();
-          treeData.addItem(entry, placeholder);
-        }
-        // Update the hasChildren flag if we're adding a placeholder
-        if (!entry.isHasChildren()) {
-          entry.setHasChildren(true);
-        }
+    // Find the explicit Root DSE entry (prefer one with empty DN). If not found,
+    // fall back to the first entry.
+    LdapEntry rootDse = null;
+    for (LdapEntry e : rootEntries) {
+      if (e.getDn().isEmpty() || "Root DSE".equals(e.getRdn())) {
+        rootDse = e;
+        break;
       }
+    }
+    if (rootDse == null) {
+      rootDse = rootEntries.get(0);
+    }
+
+    // Ensure root DSE shows as a root-most item
+    ensureHasChildrenFlagIsSet(rootDse);
+    treeData.addItem(null, rootDse);
+
+    // Add a placeholder for Root DSE so the user can expand it to load naming
+    // contexts on demand. We'll not pre-add naming contexts as separate roots.
+    if (rootDse.isHasChildren() || shouldShowExpanderForEntry(rootDse)) {
+      LdapEntry placeholder = createPlaceholderEntry();
+      treeData.addItem(rootDse, placeholder);
+      if (!rootDse.isHasChildren()) {
+        rootDse.setHasChildren(true);
+      }
+    }
+
+    // After adding the new Root DSE and placeholders, ensure it's not expanded
+    // (though collapseAll should handle this, this is a safeguard)
+    if (rootDse != null && isExpanded(rootDse)) {
+      collapse(rootDse);
     }
 
     dataProvider.refreshAll();
 
-    if (rootEntries.isEmpty()) {
-      showNotification("No Root DSE or naming contexts found", NotificationVariant.LUMO_PRIMARY);
-    } else {
-      String message = "Loaded Root DSE and " + (rootEntries.size() - 1) + " naming contexts";
-      if (includePrivateNamingContexts) {
-        message += " (including private naming contexts)";
-      }
-      showNotification(message, NotificationVariant.LUMO_SUCCESS);
+    String message = "Loaded Root DSE";
+    if (includePrivateNamingContexts) {
+      message += " (including private naming contexts)";
     }
+    showNotification(message, NotificationVariant.LUMO_SUCCESS);
   }
 
   private void loadChildren(LdapEntry parent) {
@@ -523,6 +553,97 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
     entryPageState.put(parent.getDn(), page);
 
     try {
+      // Special-case Root DSE: load naming contexts as its children instead of
+      // doing a regular browse. Root DSE is identified by an empty DN or
+      // explicit "Root DSE" RDN.
+      if (parent.getDn().isEmpty() || "Root DSE".equals(parent.getRdn())) {
+        getUI().ifPresent(ui -> ui.access(() -> {
+          parent.addAttribute("_loading", "true");
+          dataProvider.refreshItem(parent);
+        }));
+
+        try {
+          // Retrieve naming contexts via existing service methods
+          List<String> namingContextDns = ldapService.getNamingContexts(serverConfig.getId());
+          List<LdapEntry> namingContexts = new ArrayList<>();
+
+          for (String ctx : namingContextDns) {
+            try {
+              LdapEntry ctxEntry = ldapService.getEntryMinimal(serverConfig.getId(), ctx);
+              if (ctxEntry != null) {
+                ctxEntry.setHasChildren(true);
+                namingContexts.add(ctxEntry);
+              }
+            } catch (Exception ignoredCtx) {
+              LdapEntry ctxEntry = new LdapEntry();
+              ctxEntry.setDn(ctx);
+              ctxEntry.setRdn(ctx);
+              ctxEntry.setHasChildren(true);
+              ctxEntry.addAttribute("objectClass", "organizationalUnit");
+              namingContexts.add(ctxEntry);
+            }
+          }
+
+          if (includePrivateNamingContexts) {
+            List<String> privateDns = ldapService.getPrivateNamingContexts(serverConfig.getId());
+            for (String ctx : privateDns) {
+              try {
+                LdapEntry ctxEntry = ldapService.getEntryMinimal(serverConfig.getId(), ctx);
+                if (ctxEntry != null) {
+                  ctxEntry.setHasChildren(true);
+                  namingContexts.add(ctxEntry);
+                }
+              } catch (Exception ignoredCtx) {
+                LdapEntry ctxEntry = new LdapEntry();
+                ctxEntry.setDn(ctx);
+                ctxEntry.setRdn(ctx);
+                ctxEntry.setHasChildren(true);
+                ctxEntry.addAttribute("objectClass", "organizationalUnit");
+                namingContexts.add(ctxEntry);
+              }
+            }
+          }
+
+          getUI().ifPresent(ui -> ui.access(() -> {
+            // Remove loading indicator
+            parent.getAttributes().remove("_loading");
+
+            // Remove existing children
+            List<LdapEntry> existingChildren = new ArrayList<>(treeData.getChildren(parent));
+            for (LdapEntry child : existingChildren) {
+              treeData.removeItem(child);
+            }
+
+            // Add naming contexts as children under Root DSE
+            for (LdapEntry nc : namingContexts) {
+              ensureHasChildrenFlagIsSet(nc);
+              treeData.addItem(parent, nc);
+
+              if (nc.isHasChildren() || shouldShowExpanderForEntry(nc)) {
+                List<LdapEntry> childChildren = treeData.getChildren(nc);
+                if (childChildren.isEmpty()) {
+                  LdapEntry placeholder = createPlaceholderEntry();
+                  treeData.addItem(nc, placeholder);
+                }
+                if (!nc.isHasChildren()) {
+                  nc.setHasChildren(true);
+                }
+              }
+            }
+
+            dataProvider.refreshItem(parent, true);
+            showNotification("Loaded " + namingContexts.size() + " naming contexts", NotificationVariant.LUMO_SUCCESS);
+          }));
+        } catch (Exception ex) {
+          getUI().ifPresent(ui -> ui.access(() -> {
+            parent.getAttributes().remove("_loading");
+            dataProvider.refreshItem(parent);
+            showNotification("Failed to load naming contexts: " + ex.getMessage(), NotificationVariant.LUMO_ERROR);
+          }));
+        }
+
+        return;
+      }
       // First, check if the parent actually has children (lazy check)
       boolean actuallyHasChildren = ldapService.checkHasChildren(serverConfig.getId(), parent.getDn());
 
@@ -558,8 +679,14 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
         // Remove loading indicator
         parent.getAttributes().remove("_loading");
 
-        // Remove all existing children (including placeholders and pagination controls)
+        // **NEW: Collapse all existing children recursively before removing them**
+        // This prevents preservation of undesired expanded states on new children
         List<LdapEntry> existingChildren = new ArrayList<>(treeData.getChildren(parent));
+        for (LdapEntry child : existingChildren) {
+          collapseRecursively(child);  // Collapse the subtree to reset states
+        }
+
+        // Remove all existing children (including placeholders and pagination controls)
         for (LdapEntry child : existingChildren) {
           treeData.removeItem(child);
         }
