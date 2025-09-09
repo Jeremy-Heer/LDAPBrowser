@@ -8,6 +8,7 @@ import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.contextmenu.ContextMenu;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -15,6 +16,7 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.textfield.PasswordField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.ldapweb.ldapbrowser.model.LdapEntry;
@@ -57,6 +59,7 @@ public class AttributeEditor extends VerticalLayout {
   private Button saveButton;
   private Button refreshButton;
   private Button deleteEntryButton;
+  private Button testLoginButton;
   private boolean hasPendingChanges = false;
 
   public AttributeEditor(LdapService ldapService) {
@@ -124,6 +127,11 @@ public class AttributeEditor extends VerticalLayout {
     deleteEntryButton.addThemeVariants(ButtonVariant.LUMO_ERROR);
     deleteEntryButton.addClickListener(e -> confirmDeleteEntry());
 
+    testLoginButton = new Button("Test Login", new Icon(VaadinIcon.KEY));
+    testLoginButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+    testLoginButton.addClickListener(e -> openTestLoginDialog());
+    testLoginButton.getElement().setAttribute("title", "Test LDAP authentication with this entry's DN");
+
     // Initially disable all buttons
     setButtonsEnabled(false);
     // Initialize pending changes state
@@ -155,7 +163,7 @@ public class AttributeEditor extends VerticalLayout {
     buttonLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
     buttonLayout.setPadding(false);
     buttonLayout.setSpacing(true);
-    buttonLayout.add(addAttributeButton, saveButton, refreshButton, deleteEntryButton);
+    buttonLayout.add(addAttributeButton, saveButton, testLoginButton, refreshButton, deleteEntryButton);
 
     // Add spacer and checkbox on the right
     Span spacer = new Span();
@@ -746,6 +754,7 @@ public class AttributeEditor extends VerticalLayout {
   private void setButtonsEnabled(boolean enabled) {
     addAttributeButton.setEnabled(enabled);
     saveButton.setEnabled(enabled);
+    testLoginButton.setEnabled(enabled);
     refreshButton.setEnabled(enabled);
     deleteEntryButton.setEnabled(enabled);
   }
@@ -1371,6 +1380,124 @@ public class AttributeEditor extends VerticalLayout {
     } catch (LDAPException e) {
       showError("Failed to delete entry: " + e.getMessage());
     }
+  }
+
+  /**
+   * Open test login dialog to test LDAP authentication with the current entry's DN
+   */
+  private void openTestLoginDialog() {
+    if (currentEntry == null || serverConfig == null) {
+      showError("No entry selected or server not configured.");
+      return;
+    }
+
+    Dialog dialog = new Dialog();
+    dialog.setHeaderTitle("Test LDAP Authentication");
+    dialog.setWidth("400px");
+
+    // Info text
+    Span infoText = new Span("Enter password to test authentication for:");
+    infoText.getStyle().set("margin-bottom", "10px");
+    
+    Span dnText = new Span(currentEntry.getDn());
+    dnText.getStyle().set("font-family", "monospace");
+    dnText.getStyle().set("font-weight", "bold");
+    dnText.getStyle().set("word-break", "break-all");
+    dnText.getStyle().set("margin-bottom", "15px");
+
+    // Password field
+    PasswordField passwordField = new PasswordField("Password");
+    passwordField.setWidthFull();
+    passwordField.setPlaceholder("Enter password for authentication test");
+
+    // Result area
+    Div resultDiv = new Div();
+    resultDiv.getStyle().set("margin-top", "15px");
+
+    // Test button
+    Button testButton = new Button("Test Authentication", new Icon(VaadinIcon.PLAY));
+    testButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+    testButton.addClickListener(e -> {
+      String password = passwordField.getValue();
+      if (password == null || password.trim().isEmpty()) {
+        showError("Password is required for authentication test.");
+        return;
+      }
+
+      try {
+        LdapService.TestBindResult result = ldapService.testBind(
+            serverConfig.getId(), 
+            currentEntry.getDn(), 
+            password
+        );
+
+        resultDiv.removeAll();
+        
+        if (result.isSuccess()) {
+          Icon successIcon = new Icon(VaadinIcon.CHECK_CIRCLE);
+          successIcon.getStyle().set("color", "var(--lumo-success-color)");
+          Span successText = new Span(result.getMessage());
+          successText.getStyle().set("color", "var(--lumo-success-text-color)");
+          
+          HorizontalLayout successLayout = new HorizontalLayout(successIcon, successText);
+          successLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+          successLayout.getStyle().set("padding", "10px");
+          successLayout.getStyle().set("background", "var(--lumo-success-color-10pct)");
+          successLayout.getStyle().set("border-radius", "var(--lumo-border-radius-m)");
+          
+          resultDiv.add(successLayout);
+        } else {
+          Icon errorIcon = new Icon(VaadinIcon.CLOSE_CIRCLE);
+          errorIcon.getStyle().set("color", "var(--lumo-error-color)");
+          Span errorText = new Span(result.getMessage());
+          errorText.getStyle().set("color", "var(--lumo-error-text-color)");
+          
+          HorizontalLayout errorLayout = new HorizontalLayout(errorIcon, errorText);
+          errorLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+          errorLayout.getStyle().set("padding", "10px");
+          errorLayout.getStyle().set("background", "var(--lumo-error-color-10pct)");
+          errorLayout.getStyle().set("border-radius", "var(--lumo-border-radius-m)");
+          
+          resultDiv.add(errorLayout);
+        }
+        
+        // Clear password field after test
+        passwordField.clear();
+        
+      } catch (Exception ex) {
+        resultDiv.removeAll();
+        Icon errorIcon = new Icon(VaadinIcon.WARNING);
+        errorIcon.getStyle().set("color", "var(--lumo-error-color)");
+        Span errorText = new Span("Unexpected error: " + ex.getMessage());
+        errorText.getStyle().set("color", "var(--lumo-error-text-color)");
+        
+        HorizontalLayout errorLayout = new HorizontalLayout(errorIcon, errorText);
+        errorLayout.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+        errorLayout.getStyle().set("padding", "10px");
+        errorLayout.getStyle().set("background", "var(--lumo-error-color-10pct)");
+        errorLayout.getStyle().set("border-radius", "var(--lumo-border-radius-m)");
+        
+        resultDiv.add(errorLayout);
+      }
+    });
+
+    Button cancelButton = new Button("Close", e -> dialog.close());
+
+    VerticalLayout layout = new VerticalLayout(infoText, dnText, passwordField, resultDiv);
+    layout.setPadding(false);
+    layout.setSpacing(true);
+
+    dialog.add(layout);
+    dialog.getFooter().add(cancelButton, testButton);
+
+    // Focus on password field when dialog opens
+    dialog.addOpenedChangeListener(event -> {
+      if (event.isOpened()) {
+        passwordField.focus();
+      }
+    });
+
+    dialog.open();
   }
 
   private void showSuccess(String message) {

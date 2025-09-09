@@ -20,6 +20,8 @@ import com.unboundid.ldap.sdk.SearchResult;
 import com.unboundid.ldap.sdk.SearchResultEntry;
 import com.unboundid.ldap.sdk.SearchScope;
 import com.unboundid.ldap.sdk.SimpleBindRequest;
+import com.unboundid.ldap.sdk.BindRequest;
+import com.unboundid.ldap.sdk.BindResult;
 import com.unboundid.ldap.sdk.ResultCode;
 import com.unboundid.ldap.sdk.controls.SimplePagedResultsControl;
 import com.unboundid.ldap.sdk.extensions.StartTLSExtendedRequest;
@@ -66,6 +68,82 @@ public class LdapService {
       return true;
     } catch (Exception e) {
       return false;
+    }
+  }
+
+  /**
+   * Test LDAP bind authentication with provided DN and password
+   * 
+   * @param serverId the server ID to test bind against
+   * @param bindDn the DN to bind as
+   * @param password the password for the bind DN
+   * @return TestBindResult containing success status and message
+   */
+  public TestBindResult testBind(String serverId, String bindDn, String password) {
+    try {
+      LDAPConnection connection = getConnection(serverId);
+      
+      // Create a temporary connection for testing the bind
+      String host = connection.getConnectedAddress();
+      int port = connection.getConnectedPort();
+      boolean useSSL = connection.getSSLSession() != null;
+      
+      // Create a temporary connection with the test credentials
+      LDAPConnection testConnection = null;
+      try {
+        if (useSSL) {
+          SSLUtil sslUtil = new SSLUtil(new TrustAllTrustManager());
+          SSLSocketFactory socketFactory = sslUtil.createSSLSocketFactory();
+          testConnection = new LDAPConnection(socketFactory, host, port);
+        } else {
+          testConnection = new LDAPConnection(host, port);
+        }
+        
+        // Attempt to bind with the provided credentials
+        BindRequest bindRequest = new SimpleBindRequest(bindDn, password);
+        BindResult bindResult = testConnection.bind(bindRequest);
+        
+        if (bindResult.getResultCode() == ResultCode.SUCCESS) {
+          loggingService.logInfo("TEST_BIND", "Successful test bind for DN: " + bindDn);
+          return new TestBindResult(true, "Authentication successful for DN: " + bindDn);
+        } else {
+          loggingService.logInfo("TEST_BIND", "Failed test bind for DN: " + bindDn + " - " + bindResult.getDiagnosticMessage());
+          return new TestBindResult(false, "Authentication failed: " + bindResult.getDiagnosticMessage());
+        }
+        
+      } finally {
+        if (testConnection != null && testConnection.isConnected()) {
+          testConnection.close();
+        }
+      }
+      
+    } catch (LDAPException e) {
+      loggingService.logError("TEST_BIND", "Test bind error for DN: " + bindDn + " - " + e.getMessage());
+      return new TestBindResult(false, "Authentication error: " + e.getMessage());
+    } catch (Exception e) {
+      loggingService.logError("TEST_BIND", "Unexpected error during test bind for DN: " + bindDn + " - " + e.getMessage());
+      return new TestBindResult(false, "Unexpected error: " + e.getMessage());
+    }
+  }
+
+  /**
+   * Result class for test bind operations
+   */
+  public static class TestBindResult {
+    private final boolean success;
+    private final String message;
+
+    public TestBindResult(boolean success, String message) {
+      this.success = success;
+      this.message = message;
+    }
+
+    public boolean isSuccess() {
+      return success;
+    }
+
+    public String getMessage() {
+      return message;
     }
   }
 
