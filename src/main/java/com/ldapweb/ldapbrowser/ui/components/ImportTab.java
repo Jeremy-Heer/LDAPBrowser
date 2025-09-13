@@ -58,8 +58,10 @@ public class ImportTab extends VerticalLayout {
 
   // LDIF Mode Components
   private VerticalLayout ldifModeLayout;
+  private VerticalLayout ldifInputContainer;
   private Upload ldifUpload;
   private MemoryBuffer ldifBuffer;
+  private TextArea ldifTextArea;
   private Checkbox ldifContinueOnError;
   private Checkbox ldifPermissiveModify;
   private Checkbox ldifNoOperation;
@@ -106,8 +108,8 @@ public class ImportTab extends VerticalLayout {
   private void initializeComponents() {
     // Import Mode Selector
     importModeSelector = new ComboBox<>("Import Type");
-    importModeSelector.setItems("Input LDIF", "Input CSV");
-    importModeSelector.setValue("Input LDIF");
+    importModeSelector.setItems("Upload LDIF", "Enter LDIF", "Input CSV");
+    importModeSelector.setValue("Upload LDIF");
     importModeSelector.addValueChangeListener(e -> switchMode(e.getValue()));
 
     // Initialize mode-specific components
@@ -132,6 +134,11 @@ public class ImportTab extends VerticalLayout {
     ldifModeLayout.setSpacing(true);
     ldifModeLayout.addClassName("import-field-group");
 
+    // Container for LDIF input components
+    ldifInputContainer = new VerticalLayout();
+    ldifInputContainer.setPadding(false);
+    ldifInputContainer.setSpacing(true);
+
     // LDIF Upload
     ldifBuffer = new MemoryBuffer();
     ldifUpload = new Upload(ldifBuffer);
@@ -146,6 +153,16 @@ public class ImportTab extends VerticalLayout {
       } catch (Exception ex) {
         showError("Error processing LDIF file: " + ex.getMessage());
       }
+    });
+
+    // LDIF Text Area
+    ldifTextArea = new TextArea("LDIF Content");
+    ldifTextArea.setWidthFull();
+    ldifTextArea.setHeight("300px");
+    ldifTextArea.setPlaceholder("Enter LDIF content here...\n\nExample:\ndn: cn=John Doe,ou=People,dc=example,dc=com\nobjectClass: person\nobjectClass: organizationalPerson\nobjectClass: inetOrgPerson\ncn: John Doe\nsn: Doe\ngivenName: John\nmail: john.doe@example.com");
+    ldifTextArea.addValueChangeListener(event -> {
+      rawLdifContent = event.getValue();
+      updateLdifImportButtonState();
     });
 
     // LDIF Options
@@ -163,10 +180,16 @@ public class ImportTab extends VerticalLayout {
     ldifImportButton.addClickListener(e -> performLdifImport());
     ldifImportButton.setEnabled(false);
 
-    ldifModeLayout.add(
-        new H4("Input LDIF Import"),
+    // Initially show upload mode components
+    ldifInputContainer.add(
         new Span("Upload an LDIF file to import LDAP entries"),
-        ldifUpload,
+        ldifUpload);
+    ldifTextArea.setVisible(false);
+
+    ldifModeLayout.add(
+        new H4("LDIF Import"),
+        ldifInputContainer,
+        ldifTextArea,
         ldifContinueOnError,
         ldifPermissiveModify,
         ldifNoOperation,
@@ -344,11 +367,45 @@ public class ImportTab extends VerticalLayout {
   private void switchMode(String mode) {
     modeContainer.removeAll();
 
-    if ("Input LDIF".equals(mode)) {
+    if ("Upload LDIF".equals(mode)) {
+      // Show upload components, hide text area
+      ldifInputContainer.removeAll();
+      ldifInputContainer.add(
+          new Span("Upload an LDIF file to import LDAP entries"),
+          ldifUpload);
+      ldifTextArea.setVisible(false);
+      ldifTextArea.setValue("");
+      rawLdifContent = null;
+      modeContainer.add(ldifModeLayout);
+    } else if ("Enter LDIF".equals(mode)) {
+      // Show text area, hide upload components
+      ldifInputContainer.removeAll();
+      ldifInputContainer.add(new Span("Enter LDIF content directly below"));
+      ldifTextArea.setVisible(true);
+      rawLdifContent = ldifTextArea.getValue();
       modeContainer.add(ldifModeLayout);
     } else if ("Input CSV".equals(mode)) {
       modeContainer.add(csvModeLayout);
     }
+    
+    updateLdifImportButtonState();
+  }
+
+  private void updateLdifImportButtonState() {
+    boolean hasContent = false;
+    
+    String currentMode = importModeSelector.getValue();
+    if ("Upload LDIF".equals(currentMode)) {
+      // Check if file has been uploaded
+      hasContent = rawLdifContent != null && !rawLdifContent.trim().isEmpty();
+    } else if ("Enter LDIF".equals(currentMode)) {
+      // Check if text area has content
+      String textContent = ldifTextArea.getValue();
+      hasContent = textContent != null && !textContent.trim().isEmpty();
+      rawLdifContent = textContent;
+    }
+    
+    ldifImportButton.setEnabled(hasContent);
   }
 
   private void switchDnMethod(String method) {
@@ -373,7 +430,7 @@ public class ImportTab extends VerticalLayout {
         .filter(line -> line.startsWith("dn:"))
         .count();
 
-    ldifImportButton.setEnabled(true);
+    updateLdifImportButtonState();
     showSuccess("LDIF file loaded successfully. Found " + entryCount + " entries.");
   }
 
@@ -541,7 +598,7 @@ public class ImportTab extends VerticalLayout {
     }
 
     if (rawLdifContent == null || rawLdifContent.trim().isEmpty()) {
-      showError("Please upload an LDIF file first");
+      showError("Please provide LDIF content to import");
       return;
     }
 
@@ -871,6 +928,7 @@ public class ImportTab extends VerticalLayout {
     rawCsvContent = null;
     csvData.clear();
     csvColumnOrder.clear();
+    ldifTextArea.setValue("");
     ldifImportButton.setEnabled(false);
     csvImportButton.setEnabled(false);
     csvPreviewContainer.setVisible(false);

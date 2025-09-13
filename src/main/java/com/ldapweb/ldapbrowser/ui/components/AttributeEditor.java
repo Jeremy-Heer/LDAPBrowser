@@ -78,9 +78,18 @@ public class AttributeEditor extends VerticalLayout {
     // Copy DN button
     copyDnButton = new Button(new Icon(VaadinIcon.COPY));
     copyDnButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
-    copyDnButton.getElement().setAttribute("title", "Copy DN to clipboard");
-    copyDnButton.addClickListener(e -> copyDnToClipboard());
+    copyDnButton.getElement().setAttribute("title", "Copy options");
     copyDnButton.setEnabled(false); // Initially disabled
+
+    // Create context menu for copy options
+    ContextMenu copyDnMenu = new ContextMenu(copyDnButton);
+    copyDnMenu.setOpenOnClick(true);
+    copyDnMenu.addItem("Copy DN", e -> copyDnToClipboard())
+        .addComponentAsFirst(new Icon(VaadinIcon.CLIPBOARD_TEXT));
+    copyDnMenu.addItem("Copy Entry as LDIF (all user attributes)", e -> copyEntryAsUserLdif())
+        .addComponentAsFirst(new Icon(VaadinIcon.FILE_TEXT));
+    copyDnMenu.addItem("Copy Entry as LDIF (include operational attributes)", e -> copyEntryAsAllLdif())
+        .addComponentAsFirst(new Icon(VaadinIcon.FILE_TEXT_O));
 
     // Initialize entry type display
     entryTypeDisplay = new HorizontalLayout();
@@ -1260,6 +1269,75 @@ public class AttributeEditor extends VerticalLayout {
 
     // Show notification
     String message = "DN copied to clipboard: " + dn;
+    showSuccess(message);
+  }
+
+  /**
+   * Copy entry as LDIF with user attributes only
+   */
+  private void copyEntryAsUserLdif() {
+    if (currentEntry == null) {
+      showInfo("No entry to copy.");
+      return;
+    }
+
+    StringBuilder ldif = new StringBuilder();
+    ldif.append("dn: ").append(currentEntry.getDn()).append("\n");
+
+    // Get only user attributes (non-operational)
+    Map<String, List<String>> attributes = currentEntry.getAttributes();
+    for (Map.Entry<String, List<String>> attribute : attributes.entrySet()) {
+      String attrName = attribute.getKey();
+      
+      // Skip operational attributes (those that typically start with certain prefixes)
+      if (isOperationalAttribute(attrName)) {
+        continue;
+      }
+      
+      List<String> values = attribute.getValue();
+      for (String value : values) {
+        ldif.append(attrName).append(": ").append(value).append("\n");
+      }
+    }
+
+    // Copy to clipboard using JavaScript
+    getUI().ifPresent(ui -> ui.getPage().executeJs("navigator.clipboard.writeText($0)", ldif.toString()));
+
+    // Show notification
+    String message = "Entry copied as LDIF (user attributes) to clipboard";
+    showSuccess(message);
+  }
+
+  /**
+   * Copy entry as LDIF with all attributes including operational
+   */
+  private void copyEntryAsAllLdif() {
+    // Use fullEntry if available to ensure we have all attributes
+    LdapEntry entryToUse = fullEntry != null ? fullEntry : currentEntry;
+    
+    if (entryToUse == null) {
+      showInfo("No entry to copy.");
+      return;
+    }
+
+    StringBuilder ldif = new StringBuilder();
+    ldif.append("dn: ").append(entryToUse.getDn()).append("\n");
+
+    // Get all attributes including operational
+    Map<String, List<String>> attributes = entryToUse.getAttributes();
+    for (Map.Entry<String, List<String>> attribute : attributes.entrySet()) {
+      String attrName = attribute.getKey();
+      List<String> values = attribute.getValue();
+      for (String value : values) {
+        ldif.append(attrName).append(": ").append(value).append("\n");
+      }
+    }
+
+    // Copy to clipboard using JavaScript
+    getUI().ifPresent(ui -> ui.getPage().executeJs("navigator.clipboard.writeText($0)", ldif.toString()));
+
+    // Show notification  
+    String message = "Entry copied as LDIF (all attributes) to clipboard";
     showSuccess(message);
   }
 

@@ -76,11 +76,11 @@ public class SearchPanel extends VerticalLayout {
 
     returnAttributesField = new TextField("Return Attributes");
     returnAttributesField.setPlaceholder(
-      "e.g., cn,mail,telephoneNumber (leave empty for all attributes)");
+        "e.g., cn,mail,telephoneNumber (leave empty for all attributes)");
     returnAttributesField.setWidthFull();
     returnAttributesField.setHelperText(
-      "Comma-separated list of attributes to return. Leave empty to return all attributes. "
-      + "Use '+' for operational attributes.");
+        "Comma-separated list of attributes to return. Leave empty to return all attributes. "
+            + "Use '+' for operational attributes.");
     returnAttributesField.setClearButtonVisible(true);
 
     scopeComboBox = new ComboBox<>("Search Scope");
@@ -111,9 +111,8 @@ public class SearchPanel extends VerticalLayout {
     filterField.addKeyPressListener(com.vaadin.flow.component.Key.ENTER, e -> performSearch());
     baseDnField.addKeyPressListener(com.vaadin.flow.component.Key.ENTER, e -> performSearch());
     returnAttributesField.addKeyPressListener(
-      com.vaadin.flow.component.Key.ENTER,
-      e -> performSearch()
-    );
+        com.vaadin.flow.component.Key.ENTER,
+        e -> performSearch());
   }
 
   private void setupLayout() {

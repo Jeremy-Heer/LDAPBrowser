@@ -95,8 +95,9 @@ public class GroupSchemaTab extends VerticalLayout {
    * allow users to refresh the displayed data.
    * </p>
    *
-   * @param ldapService the service used to retrieve LDAP schema information
-   * @param loggingService the service used for logging schema comparison debug information
+   * @param ldapService    the service used to retrieve LDAP schema information
+   * @param loggingService the service used for logging schema comparison debug
+   *                       information
    */
   public GroupSchemaTab(LdapService ldapService, LoggingService loggingService) {
     this.ldapService = ldapService;
@@ -188,9 +189,9 @@ public class GroupSchemaTab extends VerticalLayout {
   private Grid<RowModel> createGrid() {
     Grid<RowModel> grid = new Grid<>(RowModel.class, false);
     grid.setSizeFull();
-  // Allow users to reorder columns and resize column widths for better UX
-  grid.setColumnReorderingAllowed(true);
-    
+    // Allow users to reorder columns and resize column widths for better UX
+    grid.setColumnReorderingAllowed(true);
+
     // Add selection listener to show details
     grid.asSingleSelect().addValueChangeListener(e -> {
       if (e.getValue() != null) {
@@ -199,7 +200,7 @@ public class GroupSchemaTab extends VerticalLayout {
         hideDetails();
       }
     });
-    
+
     return grid;
   }
 
@@ -211,7 +212,7 @@ public class GroupSchemaTab extends VerticalLayout {
     }
 
     statusLabel.setText("Loading schema from " + sortedServers.size() + " servers...");
-    
+
     // Log the start of schema comparison process
     loggingService.logDebug("SCHEMA", "Starting group schema comparison for " + sortedServers.size() + " servers");
 
@@ -237,7 +238,7 @@ public class GroupSchemaTab extends VerticalLayout {
       }
     }
 
-    loggingService.logDebug("SCHEMA", "Extended schema info control " + 
+    loggingService.logDebug("SCHEMA", "Extended schema info control " +
         (allSupportExtended ? "enabled" : "disabled") + " for all servers in group");
 
     // Fetch schemas with an all-or-none decision: if any server lacks support,
@@ -282,7 +283,7 @@ public class GroupSchemaTab extends VerticalLayout {
                       : "disabled for consistency"))
               +
               ".");
-      loggingService.logInfo("SCHEMA", "Group schema comparison completed successfully for " + 
+      loggingService.logInfo("SCHEMA", "Group schema comparison completed successfully for " +
           sortedServers.size() + " servers");
     }
   }
@@ -293,7 +294,7 @@ public class GroupSchemaTab extends VerticalLayout {
     mrDataProvider.getItems().clear();
     mruDataProvider.getItems().clear();
     synDataProvider.getItems().clear();
-    
+
     ocDataProvider.refreshAll();
     atDataProvider.refreshAll();
     mrDataProvider.refreshAll();
@@ -351,26 +352,26 @@ public class GroupSchemaTab extends VerticalLayout {
     grid.addColumn(RowModel::getName)
         .setHeader("Name")
         .setAutoWidth(true)
-  .setResizable(true)
+        .setResizable(true)
         .setFrozen(true)
         .setSortable(true)
         .setComparator(Comparator.comparing(RowModel::getName));
-        
+
     for (String server : serverNames) {
-    grid.addColumn(row -> row.getChecksum(server))
-      .setHeader(server)
-      .setAutoWidth(true)
-      .setResizable(true)
-      .setSortable(true)
-      .setComparator(Comparator.comparing(row -> row.getChecksum(server)));
+      grid.addColumn(row -> row.getChecksum(server))
+          .setHeader(server)
+          .setAutoWidth(true)
+          .setResizable(true)
+          .setSortable(true)
+          .setComparator(Comparator.comparing(row -> row.getChecksum(server)));
     }
-    
-  grid.addColumn(row -> row.isEqualAcross(serverNames) ? "Equal" : "Unequal")
-    .setHeader("Status")
-    .setAutoWidth(true)
-    .setResizable(true)
-    .setSortable(true)
-    .setComparator(Comparator.comparing(row -> row.isEqualAcross(serverNames)));
+
+    grid.addColumn(row -> row.isEqualAcross(serverNames) ? "Equal" : "Unequal")
+        .setHeader("Status")
+        .setAutoWidth(true)
+        .setResizable(true)
+        .setSortable(true)
+        .setComparator(Comparator.comparing(row -> row.isEqualAcross(serverNames)));
   }
 
   private enum ComponentType {
@@ -391,7 +392,7 @@ public class GroupSchemaTab extends VerticalLayout {
       if (schema == null) {
         continue;
       }
-      
+
       int elementCount = 0;
       switch (type) {
         case OBJECT_CLASS -> {
@@ -430,7 +431,7 @@ public class GroupSchemaTab extends VerticalLayout {
           }
         }
       }
-      
+
       loggingService.logSchemaComparisonStart(serverName, elementTypeName, elementCount);
     }
 
@@ -445,7 +446,7 @@ public class GroupSchemaTab extends VerticalLayout {
           loggingService.logSchemaError(server, elementTypeName, name, "Schema not available");
           continue;
         }
-        
+
         try {
           boolean includeExtensions = !ignoreExtensionsCheckbox.getValue();
           String sum = switch (type) {
@@ -525,8 +526,8 @@ public class GroupSchemaTab extends VerticalLayout {
       Schema schema = e.getValue();
       if (schema != null) {
         int processedCount = (int) rows.values().stream()
-            .filter(checksums -> !checksums.getOrDefault(serverName, "").equals("ERROR") 
-                              && !checksums.getOrDefault(serverName, "").equals("MISSING"))
+            .filter(checksums -> !checksums.getOrDefault(serverName, "").equals("ERROR")
+                && !checksums.getOrDefault(serverName, "").equals("MISSING"))
             .count();
         int errorCount = (int) rows.values().stream()
             .filter(checksums -> checksums.getOrDefault(serverName, "").equals("ERROR"))
@@ -576,16 +577,16 @@ public class GroupSchemaTab extends VerticalLayout {
    */
   private void applyFilter(String filterText) {
     String filter = filterText == null ? "" : filterText.toLowerCase().trim();
-    
-    ocDataProvider.setFilter(row -> filter.isEmpty() || 
+
+    ocDataProvider.setFilter(row -> filter.isEmpty() ||
         row.getName().toLowerCase().contains(filter));
-    atDataProvider.setFilter(row -> filter.isEmpty() || 
+    atDataProvider.setFilter(row -> filter.isEmpty() ||
         row.getName().toLowerCase().contains(filter));
-    mrDataProvider.setFilter(row -> filter.isEmpty() || 
+    mrDataProvider.setFilter(row -> filter.isEmpty() ||
         row.getName().toLowerCase().contains(filter));
-    mruDataProvider.setFilter(row -> filter.isEmpty() || 
+    mruDataProvider.setFilter(row -> filter.isEmpty() ||
         row.getName().toLowerCase().contains(filter));
-    synDataProvider.setFilter(row -> filter.isEmpty() || 
+    synDataProvider.setFilter(row -> filter.isEmpty() ||
         row.getName().toLowerCase().contains(filter));
   }
 
@@ -595,27 +596,27 @@ public class GroupSchemaTab extends VerticalLayout {
   private void showSchemaElementDetails(RowModel rowModel) {
     detailsPanel.removeAll();
     detailsPanel.setVisible(true);
-    
+
     // Header
     H3 header = new H3("Schema Element: " + rowModel.getName());
     header.getStyle().set("margin-bottom", "16px");
     detailsPanel.add(header);
-    
+
     // Create comparison grid
     Grid<SchemaPropertyRow> comparisonGrid = new Grid<>();
     comparisonGrid.setSizeFull();
     comparisonGrid.setHeight("400px");
-  // Allow users to reorder and resize columns in details comparison
-  comparisonGrid.setColumnReorderingAllowed(true);
-    
+    // Allow users to reorder and resize columns in details comparison
+    comparisonGrid.setColumnReorderingAllowed(true);
+
     // Property column
     comparisonGrid.addColumn(SchemaPropertyRow::getProperty)
         .setHeader("Property")
         .setAutoWidth(true)
-  .setFrozen(true)
-  .setResizable(true)
-  .setSortable(true);
-    
+        .setFrozen(true)
+        .setResizable(true)
+        .setSortable(true);
+
     // Add columns for each server
     for (String serverName : sortedServers.stream().map(this::displayName).toList()) {
       comparisonGrid.addColumn(row -> row.getValue(serverName))
@@ -624,11 +625,11 @@ public class GroupSchemaTab extends VerticalLayout {
           .setResizable(true)
           .setSortable(true);
     }
-    
+
     // Load detailed schema information for this element
     List<SchemaPropertyRow> propertyRows = loadSchemaElementDetails(rowModel);
     comparisonGrid.setItems(propertyRows);
-    
+
     detailsPanel.add(comparisonGrid);
     splitLayout.setSplitterPosition(50);
   }
@@ -647,10 +648,10 @@ public class GroupSchemaTab extends VerticalLayout {
   private List<SchemaPropertyRow> loadSchemaElementDetails(RowModel rowModel) {
     List<SchemaPropertyRow> propertyRows = new ArrayList<>();
     String elementName = rowModel.getName();
-    
+
     // Determine which tab is active to know which type of schema element
     ComponentType type = getCurrentComponentType();
-    
+
     // Collect detailed information from each server
     Map<String, Schema> schemas = new LinkedHashMap<>();
     for (LdapServerConfig cfg : sortedServers) {
@@ -665,7 +666,7 @@ public class GroupSchemaTab extends VerticalLayout {
         schemas.put(serverName, null);
       }
     }
-    
+
     // Extract properties based on type
     switch (type) {
       case OBJECT_CLASS -> {
@@ -684,7 +685,7 @@ public class GroupSchemaTab extends VerticalLayout {
         addSyntaxProperties(propertyRows, elementName, schemas);
       }
     }
-    
+
     return propertyRows;
   }
 
@@ -707,62 +708,58 @@ public class GroupSchemaTab extends VerticalLayout {
     return ComponentType.OBJECT_CLASS;
   }
 
-  private void addObjectClassProperties(List<SchemaPropertyRow> propertyRows, String elementName, Map<String, Schema> schemas) {
-    addProperty(propertyRows, "OID", elementName, schemas, 
+  private void addObjectClassProperties(List<SchemaPropertyRow> propertyRows, String elementName,
+      Map<String, Schema> schemas) {
+    addProperty(propertyRows, "OID", elementName, schemas,
         (schema, name) -> {
           ObjectClassDefinition def = schema.getObjectClass(name);
           return def != null ? def.getOID() : "N/A";
         });
-    
+
     addProperty(propertyRows, "Names", elementName, schemas,
         (schema, name) -> {
           ObjectClassDefinition def = schema.getObjectClass(name);
-          return def != null && def.getNames() != null ? 
-              String.join(", ", Arrays.asList(def.getNames())) : "N/A";
+          return def != null && def.getNames() != null ? String.join(", ", Arrays.asList(def.getNames())) : "N/A";
         });
-    
+
     addProperty(propertyRows, "Description", elementName, schemas,
         (schema, name) -> {
           ObjectClassDefinition def = schema.getObjectClass(name);
           return def != null ? (def.getDescription() != null ? def.getDescription() : "N/A") : "N/A";
         });
-    
+
     addProperty(propertyRows, "Type", elementName, schemas,
         (schema, name) -> {
           ObjectClassDefinition def = schema.getObjectClass(name);
-          return def != null && def.getObjectClassType() != null ? 
-              def.getObjectClassType().getName() : "N/A";
+          return def != null && def.getObjectClassType() != null ? def.getObjectClassType().getName() : "N/A";
         });
-    
+
     addProperty(propertyRows, "Obsolete", elementName, schemas,
         (schema, name) -> {
           ObjectClassDefinition def = schema.getObjectClass(name);
           return def != null ? (def.isObsolete() ? "Yes" : "No") : "N/A";
         });
-    
+
     addProperty(propertyRows, "Superior Classes", elementName, schemas,
         (schema, name) -> {
           ObjectClassDefinition def = schema.getObjectClass(name);
-          return def != null && def.getSuperiorClasses() != null ? 
-              String.join(", ", def.getSuperiorClasses()) : "N/A";
+          return def != null && def.getSuperiorClasses() != null ? String.join(", ", def.getSuperiorClasses()) : "N/A";
         });
-    
+
     // Add individual rows for Required Attributes
     addAttributeListProperties(propertyRows, "Required Attribute", elementName, schemas,
         (schema, name) -> {
           ObjectClassDefinition def = schema.getObjectClass(name);
-          return def != null && def.getRequiredAttributes() != null ? 
-              def.getRequiredAttributes() : new String[0];
+          return def != null && def.getRequiredAttributes() != null ? def.getRequiredAttributes() : new String[0];
         });
-    
-    // Add individual rows for Optional Attributes  
+
+    // Add individual rows for Optional Attributes
     addAttributeListProperties(propertyRows, "Optional Attribute", elementName, schemas,
         (schema, name) -> {
           ObjectClassDefinition def = schema.getObjectClass(name);
-          return def != null && def.getOptionalAttributes() != null ? 
-              def.getOptionalAttributes() : new String[0];
+          return def != null && def.getOptionalAttributes() != null ? def.getOptionalAttributes() : new String[0];
         });
-    
+
     // Add Extensions
     addProperty(propertyRows, "Extensions", elementName, schemas,
         (schema, name) -> {
@@ -770,9 +767,10 @@ public class GroupSchemaTab extends VerticalLayout {
           if (def != null && def.getExtensions() != null && !def.getExtensions().isEmpty()) {
             StringBuilder sb = new StringBuilder();
             for (Map.Entry<String, String[]> entry : def.getExtensions().entrySet()) {
-              if (sb.length() > 0) sb.append(", ");
+              if (sb.length() > 0)
+                sb.append(", ");
               sb.append(entry.getKey()).append("=[")
-                .append(String.join(", ", entry.getValue())).append("]");
+                  .append(String.join(", ", entry.getValue())).append("]");
             }
             return sb.toString();
           }
@@ -780,52 +778,50 @@ public class GroupSchemaTab extends VerticalLayout {
         });
   }
 
-  private void addAttributeTypeProperties(List<SchemaPropertyRow> propertyRows, String elementName, Map<String, Schema> schemas) {
+  private void addAttributeTypeProperties(List<SchemaPropertyRow> propertyRows, String elementName,
+      Map<String, Schema> schemas) {
     addProperty(propertyRows, "OID", elementName, schemas,
         (schema, name) -> {
           AttributeTypeDefinition def = schema.getAttributeType(name);
           return def != null ? def.getOID() : "N/A";
         });
-    
+
     addProperty(propertyRows, "Names", elementName, schemas,
         (schema, name) -> {
           AttributeTypeDefinition def = schema.getAttributeType(name);
-          return def != null && def.getNames() != null ? 
-              String.join(", ", Arrays.asList(def.getNames())) : "N/A";
+          return def != null && def.getNames() != null ? String.join(", ", Arrays.asList(def.getNames())) : "N/A";
         });
-    
+
     addProperty(propertyRows, "Description", elementName, schemas,
         (schema, name) -> {
           AttributeTypeDefinition def = schema.getAttributeType(name);
           return def != null ? (def.getDescription() != null ? def.getDescription() : "N/A") : "N/A";
         });
-    
+
     addProperty(propertyRows, "Syntax", elementName, schemas,
         (schema, name) -> {
           AttributeTypeDefinition def = schema.getAttributeType(name);
           return def != null ? (def.getSyntaxOID() != null ? def.getSyntaxOID() : "N/A") : "N/A";
         });
-    
+
     addProperty(propertyRows, "Single Value", elementName, schemas,
         (schema, name) -> {
           AttributeTypeDefinition def = schema.getAttributeType(name);
           return def != null ? (def.isSingleValued() ? "Yes" : "No") : "N/A";
         });
-    
+
     addProperty(propertyRows, "Usage", elementName, schemas,
         (schema, name) -> {
           AttributeTypeDefinition def = schema.getAttributeType(name);
-          return def != null && def.getUsage() != null ? 
-              def.getUsage().getName() : "N/A";
+          return def != null && def.getUsage() != null ? def.getUsage().getName() : "N/A";
         });
-    
+
     addProperty(propertyRows, "Equality Matching Rule", elementName, schemas,
         (schema, name) -> {
           AttributeTypeDefinition def = schema.getAttributeType(name);
-          return def != null ? (def.getEqualityMatchingRule() != null ? 
-              def.getEqualityMatchingRule() : "N/A") : "N/A";
+          return def != null ? (def.getEqualityMatchingRule() != null ? def.getEqualityMatchingRule() : "N/A") : "N/A";
         });
-    
+
     // Add Extensions
     addProperty(propertyRows, "Extensions", elementName, schemas,
         (schema, name) -> {
@@ -833,9 +829,10 @@ public class GroupSchemaTab extends VerticalLayout {
           if (def != null && def.getExtensions() != null && !def.getExtensions().isEmpty()) {
             StringBuilder sb = new StringBuilder();
             for (Map.Entry<String, String[]> entry : def.getExtensions().entrySet()) {
-              if (sb.length() > 0) sb.append(", ");
+              if (sb.length() > 0)
+                sb.append(", ");
               sb.append(entry.getKey()).append("=[")
-                .append(String.join(", ", entry.getValue())).append("]");
+                  .append(String.join(", ", entry.getValue())).append("]");
             }
             return sb.toString();
           }
@@ -843,32 +840,32 @@ public class GroupSchemaTab extends VerticalLayout {
         });
   }
 
-  private void addMatchingRuleProperties(List<SchemaPropertyRow> propertyRows, String elementName, Map<String, Schema> schemas) {
+  private void addMatchingRuleProperties(List<SchemaPropertyRow> propertyRows, String elementName,
+      Map<String, Schema> schemas) {
     addProperty(propertyRows, "OID", elementName, schemas,
         (schema, name) -> {
           MatchingRuleDefinition def = schema.getMatchingRule(name);
           return def != null ? def.getOID() : "N/A";
         });
-    
+
     addProperty(propertyRows, "Names", elementName, schemas,
         (schema, name) -> {
           MatchingRuleDefinition def = schema.getMatchingRule(name);
-          return def != null && def.getNames() != null ? 
-              String.join(", ", Arrays.asList(def.getNames())) : "N/A";
+          return def != null && def.getNames() != null ? String.join(", ", Arrays.asList(def.getNames())) : "N/A";
         });
-    
+
     addProperty(propertyRows, "Description", elementName, schemas,
         (schema, name) -> {
           MatchingRuleDefinition def = schema.getMatchingRule(name);
           return def != null ? (def.getDescription() != null ? def.getDescription() : "N/A") : "N/A";
         });
-    
+
     addProperty(propertyRows, "Syntax", elementName, schemas,
         (schema, name) -> {
           MatchingRuleDefinition def = schema.getMatchingRule(name);
           return def != null ? (def.getSyntaxOID() != null ? def.getSyntaxOID() : "N/A") : "N/A";
         });
-    
+
     // Add Extensions
     addProperty(propertyRows, "Extensions", elementName, schemas,
         (schema, name) -> {
@@ -876,9 +873,10 @@ public class GroupSchemaTab extends VerticalLayout {
           if (def != null && def.getExtensions() != null && !def.getExtensions().isEmpty()) {
             StringBuilder sb = new StringBuilder();
             for (Map.Entry<String, String[]> entry : def.getExtensions().entrySet()) {
-              if (sb.length() > 0) sb.append(", ");
+              if (sb.length() > 0)
+                sb.append(", ");
               sb.append(entry.getKey()).append("=[")
-                .append(String.join(", ", entry.getValue())).append("]");
+                  .append(String.join(", ", entry.getValue())).append("]");
             }
             return sb.toString();
           }
@@ -886,33 +884,34 @@ public class GroupSchemaTab extends VerticalLayout {
         });
   }
 
-  private void addMatchingRuleUseProperties(List<SchemaPropertyRow> propertyRows, String elementName, Map<String, Schema> schemas) {
+  private void addMatchingRuleUseProperties(List<SchemaPropertyRow> propertyRows, String elementName,
+      Map<String, Schema> schemas) {
     addProperty(propertyRows, "OID", elementName, schemas,
         (schema, name) -> {
           MatchingRuleUseDefinition def = schema.getMatchingRuleUse(name);
           return def != null ? def.getOID() : "N/A";
         });
-    
+
     addProperty(propertyRows, "Names", elementName, schemas,
         (schema, name) -> {
           MatchingRuleUseDefinition def = schema.getMatchingRuleUse(name);
-          return def != null && def.getNames() != null ? 
-              String.join(", ", Arrays.asList(def.getNames())) : "N/A";
+          return def != null && def.getNames() != null ? String.join(", ", Arrays.asList(def.getNames())) : "N/A";
         });
-    
+
     addProperty(propertyRows, "Description", elementName, schemas,
         (schema, name) -> {
           MatchingRuleUseDefinition def = schema.getMatchingRuleUse(name);
           return def != null ? (def.getDescription() != null ? def.getDescription() : "N/A") : "N/A";
         });
-    
+
     addProperty(propertyRows, "Applies To", elementName, schemas,
         (schema, name) -> {
           MatchingRuleUseDefinition def = schema.getMatchingRuleUse(name);
-          return def != null && def.getApplicableAttributeTypes() != null ? 
-              String.join(", ", def.getApplicableAttributeTypes()) : "N/A";
+          return def != null && def.getApplicableAttributeTypes() != null
+              ? String.join(", ", def.getApplicableAttributeTypes())
+              : "N/A";
         });
-    
+
     // Add Extensions
     addProperty(propertyRows, "Extensions", elementName, schemas,
         (schema, name) -> {
@@ -920,9 +919,10 @@ public class GroupSchemaTab extends VerticalLayout {
           if (def != null && def.getExtensions() != null && !def.getExtensions().isEmpty()) {
             StringBuilder sb = new StringBuilder();
             for (Map.Entry<String, String[]> entry : def.getExtensions().entrySet()) {
-              if (sb.length() > 0) sb.append(", ");
+              if (sb.length() > 0)
+                sb.append(", ");
               sb.append(entry.getKey()).append("=[")
-                .append(String.join(", ", entry.getValue())).append("]");
+                  .append(String.join(", ", entry.getValue())).append("]");
             }
             return sb.toString();
           }
@@ -930,19 +930,20 @@ public class GroupSchemaTab extends VerticalLayout {
         });
   }
 
-  private void addSyntaxProperties(List<SchemaPropertyRow> propertyRows, String elementName, Map<String, Schema> schemas) {
+  private void addSyntaxProperties(List<SchemaPropertyRow> propertyRows, String elementName,
+      Map<String, Schema> schemas) {
     addProperty(propertyRows, "OID", elementName, schemas,
         (schema, name) -> {
           AttributeSyntaxDefinition def = schema.getAttributeSyntax(name);
           return def != null ? def.getOID() : "N/A";
         });
-    
+
     addProperty(propertyRows, "Description", elementName, schemas,
         (schema, name) -> {
           AttributeSyntaxDefinition def = schema.getAttributeSyntax(name);
           return def != null ? (def.getDescription() != null ? def.getDescription() : "N/A") : "N/A";
         });
-    
+
     // Add Extensions
     addProperty(propertyRows, "Extensions", elementName, schemas,
         (schema, name) -> {
@@ -950,9 +951,10 @@ public class GroupSchemaTab extends VerticalLayout {
           if (def != null && def.getExtensions() != null && !def.getExtensions().isEmpty()) {
             StringBuilder sb = new StringBuilder();
             for (Map.Entry<String, String[]> entry : def.getExtensions().entrySet()) {
-              if (sb.length() > 0) sb.append(", ");
+              if (sb.length() > 0)
+                sb.append(", ");
               sb.append(entry.getKey()).append("=[")
-                .append(String.join(", ", entry.getValue())).append("]");
+                  .append(String.join(", ", entry.getValue())).append("]");
             }
             return sb.toString();
           }
@@ -960,14 +962,14 @@ public class GroupSchemaTab extends VerticalLayout {
         });
   }
 
-  private void addProperty(List<SchemaPropertyRow> propertyRows, String propertyName, String elementName, 
-                          Map<String, Schema> schemas, PropertyExtractor extractor) {
+  private void addProperty(List<SchemaPropertyRow> propertyRows, String propertyName, String elementName,
+      Map<String, Schema> schemas, PropertyExtractor extractor) {
     Map<String, String> values = new LinkedHashMap<>();
-    
+
     for (Map.Entry<String, Schema> entry : schemas.entrySet()) {
       String serverName = entry.getKey();
       Schema schema = entry.getValue();
-      
+
       String value;
       if (schema == null) {
         value = "ERROR";
@@ -980,7 +982,7 @@ public class GroupSchemaTab extends VerticalLayout {
       }
       values.put(serverName, value);
     }
-    
+
     propertyRows.add(new SchemaPropertyRow(propertyName, values));
   }
 
@@ -998,12 +1000,12 @@ public class GroupSchemaTab extends VerticalLayout {
    * Adds individual property rows for each attribute in an array.
    * This creates separate rows for better comparison across servers.
    */
-  private void addAttributeListProperties(List<SchemaPropertyRow> propertyRows, String propertyPrefix, 
-                                         String elementName, Map<String, Schema> schemas, 
-                                         AttributeArrayExtractor extractor) {
+  private void addAttributeListProperties(List<SchemaPropertyRow> propertyRows, String propertyPrefix,
+      String elementName, Map<String, Schema> schemas,
+      AttributeArrayExtractor extractor) {
     // First, collect all unique attributes across all servers
     Set<String> allAttributes = new TreeSet<>();
-    
+
     for (Map.Entry<String, Schema> entry : schemas.entrySet()) {
       Schema schema = entry.getValue();
       if (schema != null) {
@@ -1021,15 +1023,15 @@ public class GroupSchemaTab extends VerticalLayout {
         }
       }
     }
-    
+
     // Create a row for each unique attribute
     for (String attribute : allAttributes) {
       Map<String, String> values = new LinkedHashMap<>();
-      
+
       for (Map.Entry<String, Schema> entry : schemas.entrySet()) {
         String serverName = entry.getKey();
         Schema schema = entry.getValue();
-        
+
         String value = "N/A";
         if (schema != null) {
           try {
@@ -1053,13 +1055,14 @@ public class GroupSchemaTab extends VerticalLayout {
         }
         values.put(serverName, value);
       }
-      
+
       propertyRows.add(new SchemaPropertyRow(propertyPrefix + ": " + attribute, values));
     }
   }
 
   /**
-   * Represents a row in the schema comparison grid showing a property and its values across servers.
+   * Represents a row in the schema comparison grid showing a property and its
+   * values across servers.
    */
   public static class SchemaPropertyRow {
     private final String property;
