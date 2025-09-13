@@ -75,7 +75,10 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
   /**
    * Service for managing server selection.
+   * Note: No longer used directly in MainLayout for better multi-tab support.
+   * Selection state is now derived from the URL route parameters.
    */
+  @Deprecated
   private final ServerSelectionService selectionService;
 
   /**
@@ -219,10 +222,20 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
   @Override
   protected void onAttach(AttachEvent attachEvent) {
     super.onAttach(attachEvent);
-    // Show current server selection in the navbar context area
-    LdapServerConfig selected = selectionService.getSelected();
-    updateSelectionUi(selected);
-    selectionService.addListener(this::updateSelectionUi);
+    // Show current server selection based on the route path rather than shared selection service
+    String location = UI.getCurrent().getInternals().getActiveViewLocation().getPath();
+    if (location.startsWith("servers/")) {
+      // Extract server ID from route and find the corresponding server config
+      String serverId = location.substring("servers/".length());
+      findServerById(serverId).ifPresent(this::updateSelectionUi);
+    } else if (location.startsWith("group-search/")) {
+      // Update for group view
+      updateContextTitleForGroup(location);
+      updateConnectionChipForGroup(location);
+    } else {
+      // Default state when not on a server or group view
+      updateSelectionUi(null);
+    }
   }
 
   /**
@@ -457,8 +470,18 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     populateGroupsComboBox();
     populateInternalServersComboBox();
     updateInternalServersVisibility();
-    // Re-apply selection state based on current selection
-    updateSelectionUi(selectionService.getSelected());
+    
+    // Re-apply selection state based on current route path
+    String location = UI.getCurrent().getInternals().getActiveViewLocation().getPath();
+    if (location.startsWith("servers/")) {
+      String serverId = location.substring("servers/".length());
+      findServerById(serverId).ifPresent(this::updateSelectionUi);
+    } else if (location.startsWith("group-search/")) {
+      updateContextTitleForGroup(location);
+      updateConnectionChipForGroup(location);
+    } else {
+      updateSelectionUi(null);
+    }
   }
 
   /**
@@ -478,6 +501,10 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     } else {
       // If on a server route, try to set the ComboBox to match the current server
       updateComboBoxFromRoute(location);
+      
+      // Update context title for server view
+      String serverId = location.substring("servers/".length());
+      findServerById(serverId).ifPresent(this::updateSelectionUi);
     }
     
     // Clear group ComboBox selection if not on a group-search route
@@ -488,16 +515,13 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
       updateGroupComboBoxFromRoute(location);
       // Update context title for group view
       updateContextTitleForGroup(location);
+      // Update connection chip for group
+      updateConnectionChipForGroup(location);
     }
     
-    // Update context title for server view if not on group-search route
-    if (!location.startsWith("group-search/")) {
-      // Restore server context title if we have a selected server
-      LdapServerConfig selectedServer = selectionService.getSelected();
-      updateSelectionUi(selectedServer);
-    } else {
-      // For group routes, update connection chip to show group status
-      updateConnectionChipForGroup(location);
+    // If not on a server or group route, ensure UI shows disconnected state
+    if (!location.startsWith("servers/") && !location.startsWith("group-search/")) {
+      updateSelectionUi(null);
     }
   }
 
@@ -516,6 +540,28 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
       
       contextTitle.setText("Group: " + groupName);
     }
+  }
+  
+  /**
+   * Find a server configuration by its ID.
+   *
+   * @param serverId the ID of the server to find
+   * @return an Optional containing the server if found
+   */
+  private java.util.Optional<LdapServerConfig> findServerById(String serverId) {
+    // First try to find in external servers
+    java.util.Optional<LdapServerConfig> externalServer = configurationService.getAllConfigurations().stream()
+        .filter(config -> serverId.equals(config.getId()))
+        .findFirst();
+    
+    if (externalServer.isPresent()) {
+      return externalServer;
+    }
+    
+    // If not found in external servers, try internal servers
+    return inMemoryLdapService.getRunningInMemoryServers().stream()
+        .filter(config -> serverId.equals(config.getId()))
+        .findFirst();
   }
 
   /**

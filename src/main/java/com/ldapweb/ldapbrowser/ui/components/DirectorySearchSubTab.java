@@ -7,6 +7,7 @@ import com.ldapweb.ldapbrowser.service.ConfigurationService;
 import com.ldapweb.ldapbrowser.service.InMemoryLdapService;
 import com.ldapweb.ldapbrowser.service.LdapService;
 import com.ldapweb.ldapbrowser.service.LoggingService;
+import com.ldapweb.ldapbrowser.util.RouteBasedServerSelection;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.SearchScope;
 import com.vaadin.flow.component.button.Button;
@@ -140,6 +141,21 @@ public class DirectorySearchSubTab extends VerticalLayout {
    */
   public void setParentTab(DirectorySearchTab parentTab) {
     this.parentTab = parentTab;
+  }
+
+  /**
+   * Gets the selected environments for searches, supporting multi-tab operation.
+   * Falls back to route-based selection if parent tab is not available.
+   */
+  private Set<LdapServerConfig> getSelectedEnvironments() {
+    if (parentTab != null) {
+      return parentTab.getSelectedEnvironments();
+    }
+    
+    // Fallback to route-based selection for multi-tab support
+    return RouteBasedServerSelection.getCurrentServerFromRoute(configurationService, inMemoryLdapService)
+        .map(Set::of)
+        .orElse(Set.of());
   }
 
   private void initializeComponents() {
@@ -410,9 +426,7 @@ public class DirectorySearchSubTab extends VerticalLayout {
 
   private void updateBasicSearchButton() {
     String searchTerm = nameField != null ? nameField.getValue() : "";
-    Set<LdapServerConfig> selectedEnvironments = parentTab != null
-        ? parentTab.getSelectedEnvironments()
-        : new HashSet<>();
+    Set<LdapServerConfig> selectedEnvironments = getSelectedEnvironments();
     if (searchButton != null) {
       boolean enabled = searchTerm != null && !searchTerm.trim().isEmpty()
           && !selectedEnvironments.isEmpty();
@@ -437,9 +451,7 @@ public class DirectorySearchSubTab extends VerticalLayout {
   }
 
   private void updateAdvancedSearchButton() {
-    Set<LdapServerConfig> selectedEnvironments = parentTab != null
-          ? parentTab.getSelectedEnvironments()
-          : new HashSet<>();
+    Set<LdapServerConfig> selectedEnvironments = getSelectedEnvironments();
     String filter = advancedSearchBuilder != null ? advancedSearchBuilder.getGeneratedFilter() : "";
     if (advancedSearchButton != null) {
       boolean enabled = !selectedEnvironments.isEmpty() && !filter.trim().isEmpty();
@@ -481,9 +493,7 @@ public class DirectorySearchSubTab extends VerticalLayout {
 
   private void performAdvancedSearchWithResults(
       String customFilter, String customSearchBase) {
-    Set<LdapServerConfig> selectedEnvironments = parentTab != null
-        ? parentTab.getSelectedEnvironments()
-        : new HashSet<>();
+    Set<LdapServerConfig> selectedEnvironments = getSelectedEnvironments();
 
     if (selectedEnvironments.isEmpty()) {
       showError("Please select at least one environment");
@@ -557,9 +567,7 @@ public class DirectorySearchSubTab extends VerticalLayout {
 
   private void performSearch(String searchTerm, SearchType searchType,
       String customFilter, String customSearchBase) {
-    Set<LdapServerConfig> selectedEnvironments =
-        parentTab != null ? parentTab.getSelectedEnvironments()
-            : new HashSet<>();
+    Set<LdapServerConfig> selectedEnvironments = getSelectedEnvironments();
 
     if (selectedEnvironments.isEmpty()) {
       showError("Please select at least one environment");

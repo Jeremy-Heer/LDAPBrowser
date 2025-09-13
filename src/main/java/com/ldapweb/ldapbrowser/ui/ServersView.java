@@ -12,6 +12,7 @@ import com.ldapweb.ldapbrowser.ui.components.DashboardTab;
 import com.ldapweb.ldapbrowser.ui.components.DirectorySearchTab;
 import com.ldapweb.ldapbrowser.ui.components.ExportTab;
 import com.ldapweb.ldapbrowser.ui.components.SchemaBrowser;
+import com.ldapweb.ldapbrowser.util.RouteBasedServerSelection;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -53,7 +54,7 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
    * @param configurationService the configuration service
    * @param inMemoryLdapService the in-memory LDAP service
    * @param loggingService the logging service
-   * @param selectionService the server selection service
+   * @param selectionService the server selection service (deprecated, kept for compatibility)
    */
   public ServersView(LdapService ldapService,
       ConfigurationService configurationService,
@@ -71,7 +72,8 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
     setSpacing(false);
 
     initTabs();
-    bindSelection();
+    // Note: No longer binding to ServerSelectionService for multi-tab friendliness
+    // Selection is now handled via route parameters in beforeEnter
   }
 
   private void initTabs() {
@@ -186,21 +188,69 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
     if (sidParam.isPresent()) {
       String id = sidParam.get();
       System.out.println("ServersView: Processing server ID: " + id);
-      // Try to resolve from external first
-      LdapServerConfig cfg = configurationService.getAllConfigurations().stream()
-          .filter(c -> id.equals(c.getId()))
-          .findFirst()
-          .orElseGet(() -> inMemoryLdapService.getAllInMemoryServers().stream()
-              .filter(c -> id.equals(c.getId()))
-              .findFirst()
-              .orElse(null));
-      if (cfg != null) {
-        selectionService.setSelected(cfg);
+      
+      // Get server config from route-based selection utility
+      Optional<LdapServerConfig> cfg = RouteBasedServerSelection.findServerById(id, 
+          configurationService, inMemoryLdapService);
+      
+      if (cfg.isPresent()) {
+        // Apply selection directly to UI components without using shared service
+        applySelectionToComponents(cfg.get());
       } else {
+        // Server not found, reroute to server list
+        Notification.show("Server not found: " + id, 3000, Notification.Position.TOP_END);
         event.rerouteTo("servers");
       }
     } else {
+      // No server ID, reroute to server list
       event.rerouteTo("servers");
+    }
+  }
+  
+  /**
+   * Apply server selection directly to UI components without using shared service.
+   * This ensures multi-tab independence.
+   */
+  private void applySelectionToComponents(LdapServerConfig config) {
+    if (config == null) {
+      Notification n = Notification.show(
+          "Select a server from the drawer to begin", 3000, Notification.Position.TOP_END);
+      n.addThemeVariants(NotificationVariant.LUMO_CONTRAST);
+      return;
+    }
+
+    try {
+      if (!ldapService.isConnected(config.getId())) {
+        ldapService.connect(config);
+      }
+    } catch (Exception e) {
+      Notification n = Notification.show(
+          "Failed to connect: " + e.getMessage(), 5000, Notification.Position.TOP_END);
+      n.addThemeVariants(NotificationVariant.LUMO_ERROR);
+      return;
+    }
+
+    // Update tabs that need the server config explicitly 
+    // but don't trigger immediate data loading
+    dashboardTab.setServerConfig(config);
+    schemaBrowser.setServerConfig(config);
+    accessControlsTab.setServerConfig(config);
+    reportsTab.setServerConfig(config);
+    bulkOperationsTab.setServerConfig(config);
+    directorySearchTab.refreshEnvironments();
+    
+    // Only load data for the currently active tab
+    Tab selectedTab = tabSheet.getSelectedTab();
+    if (selectedTab != null) {
+      String tabLabel = selectedTab.getLabel();
+      if ("LDAP Browser".equals(tabLabel)) {
+        dashboardTab.loadRootDSEWithNamingContexts();
+      } else if ("Access".equals(tabLabel)) {
+        accessControlsTab.loadData();
+      } else if ("Schema".equals(tabLabel)) {
+        // Load schema when the Schema tab is selected
+        schemaBrowser.loadSchema();
+      }
     }
   }
 }

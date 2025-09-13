@@ -7,6 +7,7 @@ import com.ldapweb.ldapbrowser.service.InMemoryLdapService;
 import com.ldapweb.ldapbrowser.service.LdapService;
 import com.ldapweb.ldapbrowser.service.LoggingService;
 import com.ldapweb.ldapbrowser.service.ServerSelectionService;
+import com.ldapweb.ldapbrowser.util.RouteBasedServerSelection;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -52,7 +53,7 @@ public class DirectorySearchTab extends VerticalLayout {
    * @param ldapService the LDAP service
    * @param configurationService the configuration service
    * @param inMemoryLdapService the in-memory LDAP service
-   * @param selectionService the server selection service
+   * @param selectionService the server selection service (deprecated, kept for compatibility)
    * @param loggingService the logging service
    */
   public DirectorySearchTab(LdapService ldapService, ConfigurationService configurationService,
@@ -66,8 +67,8 @@ public class DirectorySearchTab extends VerticalLayout {
 
     initializeComponents();
     setupLayout();
-    // When server selection changes, update search button state
-    this.selectionService.addListener(cfg -> searchTabContent.updateSearchButton());
+    // Note: No longer listening to ServerSelectionService for multi-tab friendliness
+    // Search button state is updated via refreshEnvironments() when needed
   }
 
   private void initializeComponents() {
@@ -181,9 +182,11 @@ public class DirectorySearchTab extends VerticalLayout {
   }
 
   /**
-  * Get the selected environments from the environment dropdown.
+  * Get the selected environments from the route-based selection or environment supplier.
+  * This method is multi-tab friendly as it derives selection from the current route.
   */
   public Set<LdapServerConfig> getSelectedEnvironments() {
+    // If we have an explicit environment supplier (e.g., for group searches), use it
     if (environmentSupplier != null) {
       try {
         java.util.Set<LdapServerConfig> envs = environmentSupplier.get();
@@ -192,8 +195,11 @@ public class DirectorySearchTab extends VerticalLayout {
         return java.util.Collections.emptySet();
       }
     }
-    LdapServerConfig cfg = selectionService.getSelected();
-    return cfg != null ? Set.of(cfg) : Collections.emptySet();
+    
+    // For single-server routes, get server from current route
+    return RouteBasedServerSelection.getCurrentServerFromRoute(configurationService, inMemoryLdapService)
+        .map(Set::of)
+        .orElse(Collections.emptySet());
   }
 
   /**
