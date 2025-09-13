@@ -411,8 +411,23 @@ public class LdapTreeGrid extends TreeGrid<LdapEntry> {
     if (entry.getDn().isEmpty() || "Root DSE".equals(entry.getRdn())) {
       return "Root DSE";
     }
-    // Return the full DN instead of display name
-    return entry.getDn();
+    
+    // Check if this entry is a naming context (should show full DN)
+    // Naming contexts are either:
+    // 1. Root-level entries (have no parent in the tree) 
+    // 2. Direct children of Root DSE (their parent has empty DN or "Root DSE" RDN)
+    LdapEntry parent = treeData.getParent(entry);
+    if (parent == null || 
+        (parent.getDn().isEmpty() || "Root DSE".equals(parent.getRdn()))) {
+      // This is either a root-level entry or a naming context under Root DSE
+      // Show the full DN as it provides context for which naming context it is
+      return entry.getDn();
+    } else {
+      // This is a child entry under a regular parent (not Root DSE)
+      // Show only the RDN to avoid clutter and improve readability
+      String rdn = entry.getRdn();
+      return rdn != null && !rdn.isEmpty() ? rdn : entry.getDn();
+    }
   }
 
   public void setServerConfig(LdapServerConfig serverConfig) {
