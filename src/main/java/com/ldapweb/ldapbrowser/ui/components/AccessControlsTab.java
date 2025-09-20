@@ -22,8 +22,7 @@ public class AccessControlsTab extends VerticalLayout {
   private TabSheet tabSheet;
   private GlobalAccessControlTab globalAccessControlTab;
   private EntryAccessControlTab entryAccessControlTab;
-  private ResourceLimitsTab resourceLimitsTab;
-  private PrivilegesTab privilegesTab;
+  private EffectiveRightsTab effectiveRightsTab;
 
   /**
    * Constructs a new AccessControlsTab.
@@ -73,13 +72,9 @@ public class AccessControlsTab extends VerticalLayout {
     entryAccessControlTab = new EntryAccessControlTab(ldapService);
     tabSheet.add(entryAccessControlTabComponent, entryAccessControlTab);
 
-    Tab resourceLimitsTabComponent = new Tab("Resource Limits");
-    resourceLimitsTab = new ResourceLimitsTab(ldapService);
-    tabSheet.add(resourceLimitsTabComponent, resourceLimitsTab);
-
-    Tab privilegesTabComponent = new Tab("Privileges");
-    privilegesTab = new PrivilegesTab(ldapService);
-    tabSheet.add(privilegesTabComponent, privilegesTab);
+    Tab effectiveRightsTabComponent = new Tab("Effective Rights");
+    effectiveRightsTab = new EffectiveRightsTab(ldapService);
+    tabSheet.add(effectiveRightsTabComponent, effectiveRightsTab);
 
     // Add selection listener to load data only when tab is selected
     tabSheet.addSelectedChangeListener(event -> {
@@ -92,10 +87,8 @@ public class AccessControlsTab extends VerticalLayout {
         globalAccessControlTab.loadData();
       } else if (selectedTab == entryAccessControlTabComponent) {
         entryAccessControlTab.loadData();
-      } else if (selectedTab == resourceLimitsTabComponent) {
-        resourceLimitsTab.loadData();
-      } else if (selectedTab == privilegesTabComponent) {
-        privilegesTab.loadData();
+      } else if (selectedTab == effectiveRightsTabComponent) {
+        effectiveRightsTab.loadData();
       }
     });
 
@@ -114,8 +107,7 @@ public class AccessControlsTab extends VerticalLayout {
     // Update all sub-tabs with server config
     globalAccessControlTab.setServerConfig(config);
     entryAccessControlTab.setServerConfig(config);
-    resourceLimitsTab.setServerConfig(config);
-    privilegesTab.setServerConfig(config);
+    effectiveRightsTab.setServerConfig(config);
   }
 
   /**
@@ -137,11 +129,8 @@ public class AccessControlsTab extends VerticalLayout {
         case "Entry Access Control":
           entryAccessControlTab.loadData();
           break;
-        case "Resource Limits":
-          resourceLimitsTab.loadData();
-          break;
-        case "Privileges":
-          privilegesTab.loadData();
+        case "Effective Rights":
+          effectiveRightsTab.loadData();
           break;
       }
     }
