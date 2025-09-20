@@ -184,10 +184,8 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
   @Override
   public void beforeEnter(BeforeEnterEvent event) {
     Optional<String> sidParam = event.getRouteParameters().get("sid");
-    System.out.println("ServersView: Processing route parameters: " + event.getRouteParameters());
     if (sidParam.isPresent()) {
       String id = sidParam.get();
-      System.out.println("ServersView: Processing server ID: " + id);
       
       // Get server config from route-based selection utility
       Optional<LdapServerConfig> cfg = RouteBasedServerSelection.findServerById(id, 

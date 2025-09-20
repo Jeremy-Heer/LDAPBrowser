@@ -948,6 +948,27 @@ public class SchemaBrowser extends VerticalLayout {
       addDetailRow(details, "Substring Matching Rule", attributeType.getSubstringMatchingRule());
     }
 
+    // Find object classes that use this attribute
+    String attributeName = attributeType.getNameOrOID();
+    if (attributeName != null) {
+      List<String> mustObjectClasses = getObjectClassesUsingAttributeAsMust(attributeName);
+      List<String> mayObjectClasses = getObjectClassesUsingAttributeAsMay(attributeName);
+
+      // Used as MUST attribute
+      if (!mustObjectClasses.isEmpty()) {
+        addDetailRow(details, "Used as MUST", String.join(", ", mustObjectClasses));
+      } else {
+        addDetailRow(details, "Used as MUST", "(not used)");
+      }
+
+      // Used as MAY attribute
+      if (!mayObjectClasses.isEmpty()) {
+        addDetailRow(details, "Used as MAY", String.join(", ", mayObjectClasses));
+      } else {
+        addDetailRow(details, "Used as MAY", "(not used)");
+      }
+    }
+
     // Add raw schema definition at the bottom
     addRawDefinition(details, attributeType);
 
@@ -1412,6 +1433,64 @@ public class SchemaBrowser extends VerticalLayout {
       }
     });
     return comboBox;
+  }
+
+  /**
+   * Get object classes that have the specified attribute as a MUST attribute.
+   */
+  private List<String> getObjectClassesUsingAttributeAsMust(String attributeName) {
+    List<String> objectClassNames = new ArrayList<>();
+    if (schema != null && attributeName != null) {
+      try {
+        Collection<ObjectClassDefinition> objectClasses = schema.getObjectClasses();
+        for (ObjectClassDefinition oc : objectClasses) {
+          if (oc.getRequiredAttributes() != null) {
+            for (String requiredAttr : oc.getRequiredAttributes()) {
+              if (attributeName.equalsIgnoreCase(requiredAttr)) {
+                String ocName = oc.getNameOrOID();
+                if (ocName != null && !ocName.trim().isEmpty()) {
+                  objectClassNames.add(ocName);
+                }
+                break;
+              }
+            }
+          }
+        }
+        objectClassNames.sort(String.CASE_INSENSITIVE_ORDER);
+      } catch (Exception e) {
+        // If schema access fails, return empty list
+      }
+    }
+    return objectClassNames;
+  }
+
+  /**
+   * Get object classes that have the specified attribute as a MAY attribute.
+   */
+  private List<String> getObjectClassesUsingAttributeAsMay(String attributeName) {
+    List<String> objectClassNames = new ArrayList<>();
+    if (schema != null && attributeName != null) {
+      try {
+        Collection<ObjectClassDefinition> objectClasses = schema.getObjectClasses();
+        for (ObjectClassDefinition oc : objectClasses) {
+          if (oc.getOptionalAttributes() != null) {
+            for (String optionalAttr : oc.getOptionalAttributes()) {
+              if (attributeName.equalsIgnoreCase(optionalAttr)) {
+                String ocName = oc.getNameOrOID();
+                if (ocName != null && !ocName.trim().isEmpty()) {
+                  objectClassNames.add(ocName);
+                }
+                break;
+              }
+            }
+          }
+        }
+        objectClassNames.sort(String.CASE_INSENSITIVE_ORDER);
+      } catch (Exception e) {
+        // If schema access fails, return empty list
+      }
+    }
+    return objectClassNames;
   }
 
   /**
