@@ -52,8 +52,8 @@ public class BulkGroupMembershipsTab extends VerticalLayout {
 
   // UI Components
   private TextField groupNameField;
-  private TextField userBaseDnField;
-  private TextField groupBaseDnField;
+  private DnSelectorField userBaseDnField;
+  private DnSelectorField groupBaseDnField;
   private ComboBox<String> operationComboBox;
   private TextArea userListArea;
   private Upload fileUpload;
@@ -83,12 +83,12 @@ public class BulkGroupMembershipsTab extends VerticalLayout {
     groupNameField.setRequired(true);
 
     // Base DN fields
-    userBaseDnField = new TextField("User Base DN (Optional)");
+    userBaseDnField = new DnSelectorField("User Base DN (Optional)", ldapService);
     userBaseDnField.setWidthFull();
     userBaseDnField.setPlaceholder("If empty, uses server Base DN");
     userBaseDnField.setHelperText("Base DN to search for users");
 
-    groupBaseDnField = new TextField("Group Base DN (Optional)");
+    groupBaseDnField = new DnSelectorField("Group Base DN (Optional)", ldapService);
     groupBaseDnField.setWidthFull();
     groupBaseDnField.setPlaceholder("If empty, uses server Base DN");
     groupBaseDnField.setHelperText("Base DN to search for the group");
@@ -680,6 +680,14 @@ public class BulkGroupMembershipsTab extends VerticalLayout {
 
   public void setServerConfig(LdapServerConfig serverConfig) {
     this.serverConfig = serverConfig;
+    
+    // Set server config for DN selector fields
+    if (userBaseDnField != null) {
+      userBaseDnField.setServerConfig(serverConfig);
+    }
+    if (groupBaseDnField != null) {
+      groupBaseDnField.setServerConfig(serverConfig);
+    }
   }
 
   public void clear() {

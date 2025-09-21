@@ -1,11 +1,30 @@
 /* Advanced Search Builder Styles */
 
 .advanced-search-builder {
-    background: #fafafa;
-    border: 1px solid var(--lumo-contrast-20pct);
-    border-radius: var(--lumo-border-radius-m);
-    padding: var(--lumo-space-m);
-    margin: var(--lumo-space-xs) 0;
+    background: #fafafa !important;
+    border: 1px solid var(--lumo-contrast-20pct) !important;
+    border-radius: var(--lumo-border-radius-m) !important;
+    padding: var(--lumo-space-m) !important;
+    margin: var(--lumo-space-xs) 0 !important;
+}
+
+.filter-groups-container {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+}
+
+.filter-group {
+    background: white !important;
+    border: 1px solid var(--lumo-contrast-10pct) !important;
+    border-radius: var(--lumo-border-radius-s) !important;
+    padding: var(--lumo-space-s) !important;
+    margin: var(--lumo-space-s) 0 !important;
+}
+
+.filter-units-container {
+    background: transparent !important;
+    border: none !important;
 }
 
 .search-criteria-container {
@@ -51,10 +70,24 @@
     border-radius: var(--lumo-border-radius-s);
 }
 
+/* CRITICAL OVERRIDE - Remove all background styling from advanced search container */
+.advanced-search-container {
+    background: white !important;
+    background-image: none !important;
+    border: none !important;
+    border-left: none !important;
+    border-radius: 0 !important;
+    padding: var(--lumo-space-m) !important;
+}
+
+/* Also handle the old class name in case it's used elsewhere */
 .advanced-search-layout {
-    background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
-    border-radius: var(--lumo-border-radius-s);
-    border-left: 4px solid #f59e0b;
+    background: white !important;
+    background-image: none !important;
+    border: none !important;
+    border-left: none !important;
+    border-radius: 0 !important;
+    padding: var(--lumo-space-m) !important;
 }
 
 /* Enhance the instructions text */
@@ -68,27 +101,79 @@
     color: #0c4a6e;
 }
 
-/* Add hover effects to remove buttons */
-.advanced-search-builder vaadin-button[theme~="error"] {
-    transition: all 0.2s ease;
+/* AGGRESSIVE BUTTON STYLING OVERRIDES */
+
+/* Fix buttons with small + tertiary theme combination (Add Filter Unit buttons) */
+.advanced-search-builder vaadin-button[theme~="small"][theme~="tertiary"],
+.advanced-search-layout vaadin-button[theme~="small"][theme~="tertiary"],
+.advanced-search-container vaadin-button[theme~="small"][theme~="tertiary"] {
+    background: transparent !important;
+    border: 2px solid var(--lumo-primary-color) !important;
+    border-style: solid !important;
+    color: var(--lumo-primary-color) !important;
+    border-radius: var(--lumo-border-radius-s) !important;
+    padding: var(--lumo-space-xs) var(--lumo-space-s) !important;
+    font-size: var(--lumo-font-size-s) !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
 }
 
-.advanced-search-builder vaadin-button[theme~="error"]:hover {
-    transform: scale(1.1);
-    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+.advanced-search-builder vaadin-button[theme~="small"][theme~="tertiary"]:hover,
+.advanced-search-layout vaadin-button[theme~="small"][theme~="tertiary"]:hover,
+.advanced-search-container vaadin-button[theme~="small"][theme~="tertiary"]:hover {
+    background: var(--lumo-primary-color-10pct) !important;
+    border: 2px solid var(--lumo-primary-color) !important;
+    border-style: solid !important;
+    transform: translateY(-1px) !important;
 }
 
-/* Style the add criteria button */
-.advanced-search-builder vaadin-button[theme~="small"] {
-    border: 2px dashed var(--lumo-primary-color);
-    background: transparent;
-    color: var(--lumo-primary-color);
-    transition: all 0.2s ease;
+/* Fix buttons with error + small theme combination (Remove buttons) */
+.advanced-search-builder vaadin-button[theme~="error"][theme~="small"],
+.advanced-search-layout vaadin-button[theme~="error"][theme~="small"],
+.advanced-search-container vaadin-button[theme~="error"][theme~="small"] {
+    background: var(--lumo-error-color) !important;
+    color: var(--lumo-error-contrast-color) !important;
+    border: 2px solid var(--lumo-error-color) !important;
+    border-style: solid !important;
+    border-radius: var(--lumo-border-radius-s) !important;
+    padding: var(--lumo-space-xs) var(--lumo-space-s) !important;
+    font-size: var(--lumo-font-size-s) !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
 }
 
-.advanced-search-builder vaadin-button[theme~="small"]:hover {
-    background: var(--lumo-primary-color-10pct);
-    border-style: solid;
+.advanced-search-builder vaadin-button[theme~="error"][theme~="small"]:hover,
+.advanced-search-layout vaadin-button[theme~="error"][theme~="small"]:hover,
+.advanced-search-container vaadin-button[theme~="error"][theme~="small"]:hover {
+    background: var(--lumo-error-color-50pct) !important;
+    color: var(--lumo-error-color) !important;
+    border: 2px solid var(--lumo-error-color) !important;
+    border-style: solid !important;
+    transform: scale(1.05) !important;
+}
+
+/* Fix all other small buttons (fallback) */
+.advanced-search-builder vaadin-button[theme~="small"],
+.advanced-search-layout vaadin-button[theme~="small"],
+.advanced-search-container vaadin-button[theme~="small"] {
+    background: var(--lumo-base-color) !important;
+    border: 2px solid var(--lumo-contrast-30pct) !important;
+    border-style: solid !important;
+    border-radius: var(--lumo-border-radius-s) !important;
+    color: var(--lumo-body-text-color) !important;
+    padding: var(--lumo-space-xs) var(--lumo-space-s) !important;
+    font-size: var(--lumo-font-size-s) !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
+}
+
+.advanced-search-builder vaadin-button[theme~="small"]:hover,
+.advanced-search-layout vaadin-button[theme~="small"]:hover,
+.advanced-search-container vaadin-button[theme~="small"]:hover {
+    background: var(--lumo-contrast-5pct) !important;
+    border-color: var(--lumo-contrast-50pct) !important;
+    border-style: solid !important;
+    transform: translateY(-1px) !important;
 }
 
 /* Responsive design for smaller screens */

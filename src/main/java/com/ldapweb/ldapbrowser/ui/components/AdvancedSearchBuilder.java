@@ -1,8 +1,11 @@
 package com.ldapweb.ldapbrowser.ui.components;
 
+import com.ldapweb.ldapbrowser.model.LdapServerConfig;
+import com.ldapweb.ldapbrowser.service.LdapService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -20,10 +23,13 @@ import java.util.List;
  * filters
  * Supports Filter Units, Logical Filter Groupings, and Nesting
  */
+@CssImport("./styles/advanced-search.css")
 public class AdvancedSearchBuilder extends VerticalLayout {
 
+  private final LdapService ldapService;
+
   // Search base field
-  private TextField searchBaseField;
+  private DnSelectorField searchBaseField;
 
   // Filter groups container
   private VerticalLayout filterGroupsContainer;
@@ -111,7 +117,8 @@ public class AdvancedSearchBuilder extends VerticalLayout {
     }
   }
 
-  public AdvancedSearchBuilder() {
+  public AdvancedSearchBuilder(LdapService ldapService) {
+    this.ldapService = ldapService;
     this.filterGroups = new ArrayList<>();
 
     initializeComponents();
@@ -121,7 +128,7 @@ public class AdvancedSearchBuilder extends VerticalLayout {
 
   private void initializeComponents() {
     // Search base field
-    searchBaseField = new TextField("Search Base DN");
+    searchBaseField = new DnSelectorField("Search Base DN", ldapService);
     searchBaseField.setPlaceholder("Leave blank to use default search base for the environment");
     searchBaseField.setWidthFull();
     searchBaseField.getStyle().set("margin-bottom", "10px");
@@ -293,6 +300,13 @@ public class AdvancedSearchBuilder extends VerticalLayout {
   }
 
   /**
+   * Set the server configuration for the DN selector field
+   */
+  public void setServerConfig(LdapServerConfig serverConfig) {
+    searchBaseField.setServerConfig(serverConfig);
+  }
+
+  /**
    * Get the generated LDAP filter
    */
   public String getGeneratedFilter() {
@@ -361,11 +375,23 @@ public class AdvancedSearchBuilder extends VerticalLayout {
       addFilterUnitButton = new Button("Add Filter Unit", new Icon(VaadinIcon.PLUS_CIRCLE));
       addFilterUnitButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
       addFilterUnitButton.addClickListener(e -> addFilterUnit());
+      
+      // Force proper styling with inline styles
+      addFilterUnitButton.getStyle().set("background", "transparent");
+      addFilterUnitButton.getStyle().set("border", "2px solid var(--lumo-primary-color)");
+      addFilterUnitButton.getStyle().set("color", "var(--lumo-primary-color)");
+      addFilterUnitButton.getStyle().set("border-radius", "var(--lumo-border-radius-s)");
 
       // Remove group button
       removeGroupButton = new Button("Remove Group", new Icon(VaadinIcon.TRASH));
       removeGroupButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_SMALL);
       removeGroupButton.addClickListener(e -> removeFilterGroup(this));
+      
+      // Force proper styling with inline styles
+      removeGroupButton.getStyle().set("background", "var(--lumo-error-color)");
+      removeGroupButton.getStyle().set("border", "2px solid var(--lumo-error-color)");
+      removeGroupButton.getStyle().set("color", "var(--lumo-error-contrast-color)");
+      removeGroupButton.getStyle().set("border-radius", "var(--lumo-border-radius-s)");
     }
 
     private void setupGroupLayout() {
@@ -496,6 +522,12 @@ public class AdvancedSearchBuilder extends VerticalLayout {
           parentGroup.removeFilterUnit(this);
         }
       });
+      
+      // Force proper styling with inline styles
+      removeButton.getStyle().set("background", "var(--lumo-error-color)");
+      removeButton.getStyle().set("border", "2px solid var(--lumo-error-color)");
+      removeButton.getStyle().set("color", "var(--lumo-error-contrast-color)");
+      removeButton.getStyle().set("border-radius", "var(--lumo-border-radius-s)");
     }
 
     private void setupUnitLayout() {

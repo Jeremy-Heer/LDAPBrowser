@@ -27,7 +27,7 @@ public class SearchPanel extends VerticalLayout {
   private final LdapService ldapService;
   private LdapServerConfig serverConfig;
 
-  private TextField baseDnField;
+  private DnSelectorField baseDnField;
   private TextField filterField;
   private TextField returnAttributesField;
   private ComboBox<SearchScope> scopeComboBox;
@@ -65,7 +65,7 @@ public class SearchPanel extends VerticalLayout {
   }
 
   private void initializeComponents() {
-    baseDnField = new TextField("Search Base DN");
+    baseDnField = new DnSelectorField("Search Base DN", ldapService);
     baseDnField.setPlaceholder("e.g., ou=users,dc=example,dc=com");
     baseDnField.setWidthFull();
 
@@ -109,10 +109,10 @@ public class SearchPanel extends VerticalLayout {
 
     // Enable search on Enter key
     filterField.addKeyPressListener(com.vaadin.flow.component.Key.ENTER, e -> performSearch());
-    baseDnField.addKeyPressListener(com.vaadin.flow.component.Key.ENTER, e -> performSearch());
     returnAttributesField.addKeyPressListener(
         com.vaadin.flow.component.Key.ENTER,
         e -> performSearch());
+    // Note: DnSelectorField doesn't support direct key press listeners
   }
 
   private void setupLayout() {
@@ -131,6 +131,10 @@ public class SearchPanel extends VerticalLayout {
 
   public void setServerConfig(LdapServerConfig serverConfig) {
     this.serverConfig = serverConfig;
+    
+    // Set server config on the DN selector field
+    baseDnField.setServerConfig(serverConfig);
+    
     if (serverConfig != null && serverConfig.getBaseDn() != null) {
       baseDnField.setValue(serverConfig.getBaseDn());
     }

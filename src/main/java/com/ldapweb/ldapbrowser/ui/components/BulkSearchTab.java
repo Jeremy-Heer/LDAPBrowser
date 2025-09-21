@@ -49,7 +49,7 @@ public class BulkSearchTab extends VerticalLayout {
   private LdapServerConfig serverConfig;
 
   // UI Components
-  private TextField searchBaseField;
+  private DnSelectorField searchBaseField;
   private TextArea searchFilterField;
   private Checkbox continueOnErrorCheckbox;
   private Checkbox permissiveModifyCheckbox;
@@ -79,7 +79,7 @@ public class BulkSearchTab extends VerticalLayout {
 
   private void initializeComponents() {
     // Search fields
-    searchBaseField = new TextField("Search Base");
+    searchBaseField = new DnSelectorField("Search Base", ldapService);
     searchBaseField.setWidthFull();
     searchBaseField.setPlaceholder("dc=example,dc=com");
 
@@ -422,6 +422,11 @@ public class BulkSearchTab extends VerticalLayout {
    */
   public void setServerConfig(LdapServerConfig serverConfig) {
     this.serverConfig = serverConfig;
+    
+    // Set server config for DN selector field
+    if (searchBaseField != null) {
+      searchBaseField.setServerConfig(serverConfig);
+    }
   }
 
   public void clear() {

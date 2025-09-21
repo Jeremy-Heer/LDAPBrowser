@@ -73,7 +73,7 @@ public class ExportTab extends VerticalLayout {
 
   // Search Mode Components
   private VerticalLayout searchModeLayout;
-  private TextField searchBaseField;
+  private DnSelectorField searchBaseField;
   private TextArea searchFilterField;
   private TextField returnAttributesField;
   private ComboBox<String> outputFormatCombo;
@@ -81,7 +81,7 @@ public class ExportTab extends VerticalLayout {
 
   // Input CSV Mode Components
   private VerticalLayout csvModeLayout;
-  private TextField csvSearchBaseField;
+  private DnSelectorField csvSearchBaseField;
   private TextArea csvSearchFilterField;
   private TextField csvReturnAttributesField;
   private ComboBox<String> csvOutputFormatCombo;
@@ -161,7 +161,7 @@ public class ExportTab extends VerticalLayout {
     searchModeLayout.addClassName("export-field-group");
 
     // Search fields
-    searchBaseField = new TextField("Search Base");
+    searchBaseField = new DnSelectorField("Search Base", ldapService);
     searchBaseField.setWidthFull();
     searchBaseField.setPlaceholder("dc=example,dc=com");
 
@@ -217,7 +217,7 @@ public class ExportTab extends VerticalLayout {
     });
 
     // CSV Search fields
-    csvSearchBaseField = new TextField("Search Base");
+    csvSearchBaseField = new DnSelectorField("Search Base", ldapService);
     csvSearchBaseField.setWidthFull();
     csvSearchBaseField.setPlaceholder("dc=example,dc=com");
 
@@ -964,6 +964,14 @@ public class ExportTab extends VerticalLayout {
   public void setServerConfig(LdapServerConfig serverConfig) {
     this.serverConfig = serverConfig;
     this.groupServers = null; // Clear group servers when setting single server
+    
+    // Set server config for DN selector fields
+    if (searchBaseField != null) {
+      searchBaseField.setServerConfig(serverConfig);
+    }
+    if (csvSearchBaseField != null) {
+      csvSearchBaseField.setServerConfig(serverConfig);
+    }
   }
 
   /**

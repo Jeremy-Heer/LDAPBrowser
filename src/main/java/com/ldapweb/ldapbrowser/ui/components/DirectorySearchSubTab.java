@@ -234,10 +234,15 @@ public class DirectorySearchSubTab extends VerticalLayout {
     VerticalLayout layout = new VerticalLayout();
     layout.setPadding(true);
     layout.setSpacing(true);
-    layout.addClassName("advanced-search-layout");
+    layout.addClassName("advanced-search-container");
+    
+    // Force clean styling with inline styles to override any CSS issues
+    layout.getStyle().set("background", "white");
+    layout.getStyle().set("background-image", "none");
+    layout.getStyle().set("border", "none");
 
     // Advanced search builder
-    advancedSearchBuilder = new AdvancedSearchBuilder();
+    advancedSearchBuilder = new AdvancedSearchBuilder(ldapService);
 
     // Listen for filter changes to update search button
     advancedSearchBuilder.getElement().addEventListener("filter-changed",
@@ -452,6 +457,14 @@ public class DirectorySearchSubTab extends VerticalLayout {
 
   private void updateAdvancedSearchButton() {
     Set<LdapServerConfig> selectedEnvironments = getSelectedEnvironments();
+    
+    // Update server config for DN selector if we have environments selected
+    if (advancedSearchBuilder != null && !selectedEnvironments.isEmpty()) {
+      // Use the first selected environment for the DN selector
+      LdapServerConfig firstEnvironment = selectedEnvironments.iterator().next();
+      advancedSearchBuilder.setServerConfig(firstEnvironment);
+    }
+    
     String filter = advancedSearchBuilder != null ? advancedSearchBuilder.getGeneratedFilter() : "";
     if (advancedSearchButton != null) {
       boolean enabled = !selectedEnvironments.isEmpty() && !filter.trim().isEmpty();

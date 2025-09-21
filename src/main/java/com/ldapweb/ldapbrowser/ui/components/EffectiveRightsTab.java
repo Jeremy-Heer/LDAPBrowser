@@ -45,10 +45,11 @@ import java.util.List;
  */
 public class EffectiveRightsTab extends VerticalLayout {
 
+  private final LdapService ldapService;
   private LdapServerConfig serverConfig;
   
   // Form fields
-  private TextField searchBaseField;
+  private DnSelectorField searchBaseField;
   private ComboBox<SearchScope> scopeComboBox;
   private TextField searchFilterField;
   private TextField attributesField;
@@ -65,9 +66,10 @@ public class EffectiveRightsTab extends VerticalLayout {
   /**
    * Constructs a new EffectiveRightsTab.
    *
-   * @param ldapService the LDAP service (not used - we create direct connections)
+   * @param ldapService the LDAP service
    */
   public EffectiveRightsTab(LdapService ldapService) {
+    this.ldapService = ldapService;
     initUI();
   }
 
@@ -97,7 +99,7 @@ public class EffectiveRightsTab extends VerticalLayout {
     );
 
     // Search Base
-    searchBaseField = new TextField("Search Base");
+    searchBaseField = new DnSelectorField("Search Base", ldapService);
     searchBaseField.setPlaceholder("dc=example,dc=com");
     searchBaseField.setWidthFull();
 
@@ -219,6 +221,9 @@ public class EffectiveRightsTab extends VerticalLayout {
    */
   public void setServerConfig(LdapServerConfig config) {
     this.serverConfig = config;
+    
+    // Set server config for DN selector
+    searchBaseField.setServerConfig(config);
     
     // Set default search base from server config
     if (config != null && config.getBaseDn() != null && !config.getBaseDn().isEmpty()) {
