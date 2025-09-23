@@ -807,6 +807,35 @@ public class LdapService {
   }
 
   /**
+   * Add a value to an attribute of an LDAP entry.
+   *
+   * @param serverId the server ID
+   * @param dn the distinguished name of the entry
+   * @param attributeName the name of the attribute
+   * @param attributeValue the value to add
+   * @throws LDAPException if the operation fails
+   */
+  public void addAttributeValue(String serverId, String dn, String attributeName, String attributeValue) 
+      throws LDAPException {
+    try {
+      loggingService.logDebug("MODIFY", 
+          "Adding attribute value - Server: " + serverId + ", DN: " + dn + 
+          ", Attribute: " + attributeName + ", Value: [value]");
+      
+      // Create modification to add the attribute value
+      Modification modification = new Modification(ModificationType.ADD, attributeName, attributeValue);
+      List<Modification> modifications = List.of(modification);
+      
+      modifyEntry(serverId, dn, modifications);
+      
+    } catch (LDAPException e) {
+      loggingService.logModificationError("Server " + serverId, dn, 
+          "ADD_ATTRIBUTE_VALUE (" + attributeName + ")", e.getMessage());
+      throw e;
+    }
+  }
+
+  /**
    * Get LDAP schema information
    */
   public Schema getSchema(String serverId) throws LDAPException {
