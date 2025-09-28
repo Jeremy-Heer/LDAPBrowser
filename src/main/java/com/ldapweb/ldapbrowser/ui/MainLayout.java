@@ -5,6 +5,7 @@ import com.ldapweb.ldapbrowser.service.ConfigurationService;
 import com.ldapweb.ldapbrowser.service.InMemoryLdapService;
 import com.ldapweb.ldapbrowser.service.LdapService;
 import com.ldapweb.ldapbrowser.service.ServerSelectionService;
+import com.ldapweb.ldapbrowser.service.UIPasswordPromptService;
 import com.ldapweb.ldapbrowser.ui.SettingsView;
 import com.ldapweb.ldapbrowser.ui.WelcomeView;
 import com.vaadin.flow.component.AttachEvent;
@@ -92,6 +93,11 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
   private final InMemoryLdapService inMemoryLdapService;
 
   /**
+   * Service for prompting passwords in the UI.
+   */
+  private final UIPasswordPromptService passwordPromptService;
+
+  /**
    * Side navigation component for the drawer.
    */
   private final SideNav nav;
@@ -109,15 +115,21 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
    * @param selectionService     the server selection service
    * @param ldapService          the LDAP service
    * @param inMemoryLdapService  the in-memory LDAP service
+   * @param passwordPromptService the password prompt service
    */
   public MainLayout(ConfigurationService configurationService,
       ServerSelectionService selectionService,
       LdapService ldapService,
-      InMemoryLdapService inMemoryLdapService) {
+      InMemoryLdapService inMemoryLdapService,
+      UIPasswordPromptService passwordPromptService) {
     this.configurationService = configurationService;
     this.selectionService = selectionService;
     this.ldapService = ldapService;
     this.inMemoryLdapService = inMemoryLdapService;
+    this.passwordPromptService = passwordPromptService;
+
+    // Set up password prompting callback for LDAP service
+    ldapService.setPasswordPromptCallback(passwordPromptService);
 
     // Navbar content (to the side of the drawer toggle)
     final DrawerToggle toggle = new DrawerToggle();

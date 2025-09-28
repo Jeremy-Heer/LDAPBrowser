@@ -46,6 +46,7 @@ public class MultiGroupInMemoryServerConfigDialog extends Dialog {
   private TextField baseDnField;
   private TextField bindDnField;
   private PasswordField passwordField;
+  private Checkbox promptForPasswordCheckbox;
   private Checkbox useSSLCheckbox;
   private Checkbox generateTestDataCheckbox;
 
@@ -113,6 +114,17 @@ public class MultiGroupInMemoryServerConfigDialog extends Dialog {
     passwordField.setWidthFull();
     passwordField.setHelperText("Password for administrator account");
 
+    promptForPasswordCheckbox = new Checkbox("Prompt for admin password");
+    promptForPasswordCheckbox.getStyle().set("font-size", "var(--lumo-font-size-s)");
+    promptForPasswordCheckbox.addValueChangeListener(e -> {
+      boolean promptEnabled = e.getValue();
+      passwordField.setVisible(!promptEnabled);
+      passwordField.setRequiredIndicatorVisible(!promptEnabled);
+      if (promptEnabled) {
+        passwordField.clear();
+      }
+    });
+
     useSSLCheckbox = new Checkbox("Enable SSL/TLS");
 
     generateTestDataCheckbox = new Checkbox("Generate Test Data");
@@ -159,6 +171,7 @@ public class MultiGroupInMemoryServerConfigDialog extends Dialog {
         baseDnField,
         bindDnField,
         passwordField,
+        promptForPasswordCheckbox,
         useSSLCheckbox,
         generateTestDataCheckbox);
 
@@ -166,6 +179,7 @@ public class MultiGroupInMemoryServerConfigDialog extends Dialog {
         new FormLayout.ResponsiveStep("0", 1),
         new FormLayout.ResponsiveStep("400px", 2));
 
+    serverForm.setColspan(promptForPasswordCheckbox, 2);
     serverForm.setColspan(useSSLCheckbox, 1);
     serverForm.setColspan(generateTestDataCheckbox, 1);
 
@@ -273,6 +287,7 @@ public class MultiGroupInMemoryServerConfigDialog extends Dialog {
       baseDnField.setValue(config.getBaseDn() != null ? config.getBaseDn() : "");
       bindDnField.setValue(config.getBindDn() != null ? config.getBindDn() : "");
       passwordField.setValue(config.getPassword() != null ? config.getPassword() : "");
+      promptForPasswordCheckbox.setValue(config.isPromptForPassword());
       useSSLCheckbox.setValue(config.isUseSSL());
       
       // Select the groups this server belongs to
@@ -305,7 +320,9 @@ public class MultiGroupInMemoryServerConfigDialog extends Dialog {
       return;
     }
 
-    if (passwordField.getValue() == null || passwordField.getValue().trim().isEmpty()) {
+    // Validate password field only if not prompting for password
+    if (!promptForPasswordCheckbox.getValue() && 
+        (passwordField.getValue() == null || passwordField.getValue().trim().isEmpty())) {
       passwordField.setInvalid(true);
       passwordField.setErrorMessage("Admin password is required");
       return;
@@ -324,6 +341,7 @@ public class MultiGroupInMemoryServerConfigDialog extends Dialog {
     config.setBaseDn(baseDnField.getValue().trim());
     config.setBindDn(bindDnField.getValue().trim());
     config.setPassword(passwordField.getValue());
+    config.setPromptForPassword(promptForPasswordCheckbox.getValue());
     config.setUseSSL(useSSLCheckbox.getValue());
     config.setUseStartTLS(false); // Not applicable for in-memory servers
 

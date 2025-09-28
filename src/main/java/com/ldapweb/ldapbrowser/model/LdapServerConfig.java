@@ -21,6 +21,7 @@ public class LdapServerConfig implements Serializable {
   private int port;
   private String bindDn;
   private String password;
+  private boolean promptForPassword; // New field: prompt for password during connection
   private boolean useSSL;
   private boolean useStartTLS;
   private String baseDn;
@@ -172,6 +173,14 @@ public class LdapServerConfig implements Serializable {
 
   public void setPassword(String password) {
     this.password = password;
+  }
+
+  public boolean isPromptForPassword() {
+    return promptForPassword;
+  }
+
+  public void setPromptForPassword(boolean promptForPassword) {
+    this.promptForPassword = promptForPassword;
   }
 
   public boolean isUseSSL() {

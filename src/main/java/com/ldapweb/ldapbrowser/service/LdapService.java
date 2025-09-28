@@ -41,6 +41,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -50,12 +51,22 @@ import java.util.stream.Collectors;
 public class LdapService {
 
   private final Map<String, LDAPConnection> connections = new HashMap<>();
+  private final Map<String, String> inMemoryPasswords = new HashMap<>(); // Store session passwords for prompt-enabled servers
   private final Map<String, byte[]> pagingCookies = new HashMap<>(); // Store paging cookies for LDAP paged search
   private final Map<String, Integer> currentPages = new HashMap<>(); // Track current page for each search context
   private final LoggingService loggingService;
+  private PasswordPromptCallback passwordPromptCallback;
 
   public LdapService(LoggingService loggingService) {
     this.loggingService = loggingService;
+  }
+
+  /**
+   * Sets the callback for prompting passwords when needed.
+   * @param callback the password prompt callback
+   */
+  public void setPasswordPromptCallback(PasswordPromptCallback callback) {
+    this.passwordPromptCallback = callback;
   }
 
   /**
@@ -154,6 +165,14 @@ public class LdapService {
     try {
       loggingService.logInfo("CONNECTION",
           "Attempting to connect to " + config.getName() + " (" + config.getHost() + ":" + config.getPort() + ")");
+      
+      // Check if this server requires password prompting
+      if (config.isPromptForPassword() && 
+          config.getBindDn() != null && !config.getBindDn().trim().isEmpty()) {
+        throw new LDAPException(ResultCode.AUTH_METHOD_NOT_SUPPORTED,
+            "Password required for authentication. Use connectAsync for servers with password prompting enabled.");
+      }
+      
       LDAPConnection connection = createConnection(config);
       connections.put(config.getId(), connection);
       config.setConnection(connection);
@@ -165,10 +184,79 @@ public class LdapService {
   }
 
   /**
+   * Connect to LDAP server with password prompting support.
+   * This method will prompt for password if the server configuration requires it.
+   * 
+   * @param config the server configuration
+   * @param onSuccess callback called on successful connection
+   * @param onError callback called on connection failure
+   */
+  public void connectWithPrompt(LdapServerConfig config, Runnable onSuccess, java.util.function.Consumer<String> onError) {
+    try {
+      loggingService.logInfo("CONNECTION",
+          "Attempting to connect to " + config.getName() + " (" + config.getHost() + ":" + config.getPort() + ")");
+
+      if (config.isPromptForPassword() && (config.getPassword() == null || config.getPassword().trim().isEmpty())) {
+        // Need to prompt for password
+        if (passwordPromptCallback == null) {
+          onError.accept("Password prompting not supported in this context");
+          return;
+        }
+
+        // Check if we already have a password in memory for this server
+        String inMemoryPassword = inMemoryPasswords.get(config.getId());
+        if (inMemoryPassword != null) {
+          // Use the in-memory password
+          connectWithPassword(config, inMemoryPassword, onSuccess, onError);
+        } else {
+          // Prompt for password
+          passwordPromptCallback.promptForPassword(config.getName(), config.getId())
+              .thenAccept(password -> {
+                if (password != null) {
+                  // Store password in memory for this session
+                  inMemoryPasswords.put(config.getId(), password);
+                  connectWithPassword(config, password, onSuccess, onError);
+                } else {
+                  onError.accept("Password prompt was cancelled");
+                }
+              })
+              .exceptionally(ex -> {
+                onError.accept("Error prompting for password: " + ex.getMessage());
+                return null;
+              });
+        }
+      } else {
+        // Use configured password or anonymous bind
+        connectWithPassword(config, config.getPassword(), onSuccess, onError);
+      }
+    } catch (Exception e) {
+      loggingService.logConnectionError(config.getName(), "Connection failed", e.getMessage());
+      onError.accept(e.getMessage());
+    }
+  }
+
+  private void connectWithPassword(LdapServerConfig config, String password, Runnable onSuccess, Consumer<String> onError) {
+    try {
+      LDAPConnection connection = createConnectionWithPassword(config, password);
+      connections.put(config.getId(), connection);
+      config.setConnection(connection);
+      loggingService.logConnection(config.getName(), "Successfully connected");
+      if (onSuccess != null) {
+        onSuccess.run();
+      }
+    } catch (LDAPException e) {
+      loggingService.logConnectionError(config.getName(), "Connection failed", e.getMessage());
+      onError.accept(e.getMessage());
+    }
+  }
+
+  /**
    * Disconnect from LDAP server
    */
   public void disconnect(String serverId) {
     LDAPConnection connection = connections.remove(serverId);
+    // Also remove any in-memory password for this server
+    inMemoryPasswords.remove(serverId);
     if (connection != null && connection.isConnected()) {
       // Find the server name for logging
       String serverName = "Server " + serverId;
@@ -1235,7 +1323,96 @@ public class LdapService {
 
     // Bind to the directory
     if (config.getBindDn() != null && !config.getBindDn().trim().isEmpty()) {
-      BindRequest bindRequest = new SimpleBindRequest(config.getBindDn(), config.getPassword());
+      // Check if we should prompt for password
+      if (config.isPromptForPassword()) {
+        // Check if we have an in-memory password for this server
+        String storedPassword = inMemoryPasswords.get(config.getId());
+        if (storedPassword == null) {
+          // No password available and prompting is enabled - attempt anonymous bind or prompt
+          if (passwordPromptCallback != null) {
+            // We have a callback, but we can't use it in the synchronous createConnection method
+            // This should be handled by the calling code using connectWithPrompt instead
+            connection.close();
+            throw new LDAPException(ResultCode.AUTH_METHOD_NOT_SUPPORTED,
+                "Password required for authentication. Use connectWithPrompt for servers with password prompting enabled.");
+          } else {
+            // No callback available, attempt anonymous bind
+            // Don't perform any bind operation for anonymous access
+          }
+        } else {
+          // Use the stored in-memory password
+          BindRequest bindRequest = new SimpleBindRequest(config.getBindDn(), storedPassword);
+          BindResult bindResult = connection.bind(bindRequest);
+          if (bindResult.getResultCode() != ResultCode.SUCCESS) {
+            connection.close();
+            throw new LDAPException(bindResult.getResultCode(),
+                "Bind failed: " + bindResult.getDiagnosticMessage());
+          }
+        }
+      } else {
+        // Normal password-based authentication
+        String password = config.getPassword();
+        if (password == null || password.isEmpty()) {
+          // No password provided for bind DN - attempt anonymous bind
+          // Don't perform any bind operation for anonymous access
+        } else {
+          BindRequest bindRequest = new SimpleBindRequest(config.getBindDn(), password);
+          BindResult bindResult = connection.bind(bindRequest);
+          if (bindResult.getResultCode() != ResultCode.SUCCESS) {
+            connection.close();
+            throw new LDAPException(bindResult.getResultCode(),
+                "Bind failed: " + bindResult.getDiagnosticMessage());
+          }
+        }
+      }
+    }
+
+    return connection;
+  }
+
+  private LDAPConnection createConnectionWithPassword(LdapServerConfig config, String password) throws LDAPException {
+    LDAPConnection connection;
+
+    if (config.isUseSSL()) {
+      // Create SSL connection
+      try {
+        SSLUtil sslUtil = new SSLUtil(new TrustAllTrustManager());
+        SSLSocketFactory socketFactory = sslUtil.createSSLSocketFactory();
+        connection = new LDAPConnection(socketFactory, config.getHost(), config.getPort());
+      } catch (Exception e) {
+        throw new LDAPException(ResultCode.CONNECT_ERROR, "Failed to create SSL connection", e);
+      }
+    } else {
+      connection = new LDAPConnection(config.getHost(), config.getPort());
+    }
+
+    // Use StartTLS if configured
+    if (config.isUseStartTLS() && !config.isUseSSL()) {
+      try {
+        SSLUtil sslUtil = new SSLUtil(new TrustAllTrustManager());
+        SSLSocketFactory socketFactory = sslUtil.createSSLSocketFactory();
+        ExtendedResult startTLSResult = connection.processExtendedOperation(
+            new StartTLSExtendedRequest(socketFactory));
+        if (startTLSResult.getResultCode() != ResultCode.SUCCESS) {
+          throw new LDAPException(startTLSResult.getResultCode(),
+              "StartTLS failed: " + startTLSResult.getDiagnosticMessage());
+        }
+      } catch (Exception e) {
+        connection.close();
+        throw new LDAPException(ResultCode.CONNECT_ERROR, "Failed to establish StartTLS", e);
+      }
+    }
+
+    // Bind to the directory
+    if (config.getBindDn() != null && !config.getBindDn().trim().isEmpty()) {
+      // We have a bind DN - we need a password too
+      if (password == null || password.trim().isEmpty()) {
+        connection.close();
+        throw new LDAPException(ResultCode.INVALID_CREDENTIALS, 
+            "Simple bind operations are not allowed to contain a bind DN without a password");
+      }
+      
+      BindRequest bindRequest = new SimpleBindRequest(config.getBindDn(), password);
       BindResult bindResult = connection.bind(bindRequest);
       if (bindResult.getResultCode() != ResultCode.SUCCESS) {
         connection.close();
@@ -1243,6 +1420,7 @@ public class LdapService {
             "Bind failed: " + bindResult.getDiagnosticMessage());
       }
     }
+    // If no bind DN is specified, use anonymous connection (no bind needed)
 
     return connection;
   }

@@ -44,6 +44,7 @@ public class MultiGroupServerConfigDialog extends Dialog {
   private IntegerField portField;
   private TextField bindDnField;
   private PasswordField passwordField;
+  private Checkbox promptForPasswordCheckbox;
   private Checkbox useSslCheckbox;
   private Checkbox useStartTlsCheckbox;
   private TextField baseDnField;
@@ -107,6 +108,17 @@ public class MultiGroupServerConfigDialog extends Dialog {
     passwordField = new PasswordField("Password");
     passwordField.setWidthFull();
 
+    promptForPasswordCheckbox = new Checkbox("Prompt for password");
+    promptForPasswordCheckbox.getStyle().set("font-size", "var(--lumo-font-size-s)");
+    promptForPasswordCheckbox.addValueChangeListener(e -> {
+      boolean promptEnabled = e.getValue();
+      passwordField.setVisible(!promptEnabled);
+      passwordField.setRequiredIndicatorVisible(!promptEnabled);
+      if (promptEnabled) {
+        passwordField.clear();
+      }
+    });
+
     useSslCheckbox = new Checkbox("Use SSL");
     useSslCheckbox.addValueChangeListener(e -> {
       if (e.getValue()) {
@@ -168,6 +180,7 @@ public class MultiGroupServerConfigDialog extends Dialog {
         portField,
         bindDnField,
         passwordField,
+        promptForPasswordCheckbox,
         useSslCheckbox,
         useStartTlsCheckbox,
         baseDnField);
@@ -176,6 +189,7 @@ public class MultiGroupServerConfigDialog extends Dialog {
         new FormLayout.ResponsiveStep("0", 1),
         new FormLayout.ResponsiveStep("400px", 2));
 
+    basicForm.setColspan(promptForPasswordCheckbox, 2);
     basicForm.setColspan(useSslCheckbox, 1);
     basicForm.setColspan(useStartTlsCheckbox, 1);
 
@@ -282,6 +296,7 @@ public class MultiGroupServerConfigDialog extends Dialog {
       portField.setValue(config.getPort());
       bindDnField.setValue(config.getBindDn() != null ? config.getBindDn() : "");
       passwordField.setValue(config.getPassword() != null ? config.getPassword() : "");
+      promptForPasswordCheckbox.setValue(config.isPromptForPassword());
       useSslCheckbox.setValue(config.isUseSSL());
       useStartTlsCheckbox.setValue(config.isUseStartTLS());
       baseDnField.setValue(config.getBaseDn() != null ? config.getBaseDn() : "");
@@ -315,6 +330,7 @@ public class MultiGroupServerConfigDialog extends Dialog {
     config.setPort(portField.getValue());
     config.setBindDn(bindDnField.getValue());
     config.setPassword(passwordField.getValue());
+    config.setPromptForPassword(promptForPasswordCheckbox.getValue());
     config.setUseSSL(useSslCheckbox.getValue());
     config.setUseStartTLS(useStartTlsCheckbox.getValue());
     config.setBaseDn(baseDnField.getValue());

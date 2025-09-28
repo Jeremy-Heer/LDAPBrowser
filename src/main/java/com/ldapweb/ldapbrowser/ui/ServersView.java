@@ -148,7 +148,19 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
 
     try {
       if (!ldapService.isConnected(config.getId())) {
-        ldapService.connect(config);
+        System.out.println("DEBUG: ServersView.applySelection() calling connectWithPrompt for: " + config.getName());
+        ldapService.connectWithPrompt(config, 
+          () -> {
+            // Success callback - continue with the rest of the method
+            updateTabsAfterConnection(config);
+          },
+          errorMessage -> {
+            // Error callback
+            Notification n = Notification.show(
+                "Failed to connect: " + errorMessage, 5000, Notification.Position.TOP_END);
+            n.addThemeVariants(NotificationVariant.LUMO_ERROR);
+          });
+        return; // Exit early since connectWithPrompt is async
       }
     } catch (Exception e) {
       Notification n = Notification.show(
@@ -156,6 +168,11 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
       n.addThemeVariants(NotificationVariant.LUMO_ERROR);
       return;
     }
+
+    updateTabsAfterConnection(config);
+  }
+
+  private void updateTabsAfterConnection(LdapServerConfig config) {
 
     // Update tabs that need the server config explicitly 
     // but don't trigger immediate data loading
@@ -219,7 +236,19 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
 
     try {
       if (!ldapService.isConnected(config.getId())) {
-        ldapService.connect(config);
+        System.out.println("DEBUG: ServersView.applySelectionToComponents() calling connectWithPrompt for: " + config.getName());
+        ldapService.connectWithPrompt(config, 
+          () -> {
+            // Success callback - continue with the rest of the method
+            updateTabsAfterConnection(config);
+          },
+          errorMessage -> {
+            // Error callback
+            Notification n = Notification.show(
+                "Failed to connect: " + errorMessage, 5000, Notification.Position.TOP_END);
+            n.addThemeVariants(NotificationVariant.LUMO_ERROR);
+          });
+        return; // Exit early since connectWithPrompt is async
       }
     } catch (Exception e) {
       Notification n = Notification.show(
@@ -228,27 +257,6 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
       return;
     }
 
-    // Update tabs that need the server config explicitly 
-    // but don't trigger immediate data loading
-    dashboardTab.setServerConfig(config);
-    schemaBrowser.setServerConfig(config);
-    accessControlsTab.setServerConfig(config);
-    reportsTab.setServerConfig(config);
-    bulkOperationsTab.setServerConfig(config);
-    directorySearchTab.refreshEnvironments();
-    
-    // Only load data for the currently active tab
-    Tab selectedTab = tabSheet.getSelectedTab();
-    if (selectedTab != null) {
-      String tabLabel = selectedTab.getLabel();
-      if ("LDAP Browser".equals(tabLabel)) {
-        dashboardTab.loadRootDSEWithNamingContexts();
-      } else if ("Access".equals(tabLabel)) {
-        accessControlsTab.loadData();
-      } else if ("Schema".equals(tabLabel)) {
-        // Load schema when the Schema tab is selected
-        schemaBrowser.loadSchema();
-      }
-    }
+    updateTabsAfterConnection(config);
   }
 }
