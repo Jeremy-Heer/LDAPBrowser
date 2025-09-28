@@ -2,6 +2,7 @@ package com.ldapweb.ldapbrowser.ui.components;
 
 import com.ldapweb.ldapbrowser.model.LdapServerConfig;
 import com.ldapweb.ldapbrowser.service.ConfigurationService;
+import com.ldapweb.ldapbrowser.service.InMemoryLdapService;
 import com.ldapweb.ldapbrowser.service.LdapService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -28,6 +29,7 @@ public class ConnectionsTab extends VerticalLayout {
 
   private final LdapService ldapService;
   private final ConfigurationService configurationService;
+  private final InMemoryLdapService inMemoryLdapService;
 
   // Server management controls
   private Grid<LdapServerConfig> serverGrid;
@@ -40,9 +42,11 @@ public class ConnectionsTab extends VerticalLayout {
   private Consumer<LdapServerConfig> connectionListener;
   private Runnable disconnectionListener;
 
-  public ConnectionsTab(LdapService ldapService, ConfigurationService configurationService) {
+  public ConnectionsTab(LdapService ldapService, ConfigurationService configurationService,
+                       InMemoryLdapService inMemoryLdapService) {
     this.ldapService = ldapService;
     this.configurationService = configurationService;
+    this.inMemoryLdapService = inMemoryLdapService;
 
     initializeComponents();
     setupLayout();
@@ -221,7 +225,8 @@ public class ConnectionsTab extends VerticalLayout {
   }
 
   private void openServerDialog(LdapServerConfig config) {
-    ServerConfigDialog dialog = new ServerConfigDialog(config);
+    MultiGroupServerConfigDialog dialog = new MultiGroupServerConfigDialog(
+        config, configurationService, inMemoryLdapService);
     dialog.addSaveListener(savedConfig -> {
       configurationService.saveConfiguration(savedConfig);
       refreshServerList();
