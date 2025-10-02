@@ -9,6 +9,7 @@ import com.unboundid.ldap.sdk.schema.AttributeTypeDefinition;
 import com.unboundid.ldap.sdk.schema.Schema;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.checkbox.CheckboxGroup;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.combobox.MultiSelectComboBox;
@@ -23,6 +24,7 @@ import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
@@ -57,11 +59,10 @@ public class AciBuilderDialog extends Dialog {
   private CheckboxGroup<String> permissionsGroup;
   
   // Bind rule components
-  private ComboBox<String> bindRuleTypeCombo;
-  private TextField bindRuleValueField;
-  private DnSelectorField bindRuleDnField;
-  private VerticalLayout bindRuleContainer;
-  private Span autoPrependLabel;
+  private List<BindRule> bindRules;
+  private VerticalLayout bindRulesContainer;
+  private RadioButtonGroup<String> bindRuleCombinationGroup;
+  private Button addBindRuleButton;
   
   // Preview area
   private TextArea aciPreviewArea;
@@ -95,11 +96,171 @@ public class AciBuilderDialog extends Dialog {
     this.serverId = serverId;
     this.serverConfig = serverConfig;
     this.targets = new ArrayList<>();
+    this.bindRules = new ArrayList<>();
     initUI();
     setupEventHandlers();
     // Add initial target after UI is fully initialized
     addNewTarget();
+    // Add initial bind rule
+    addNewBindRule();
     updatePreview();
+  }
+
+  /**
+   * Populates the ACI Builder dialog with values from an existing ACI string.
+   * This method attempts to parse the ACI and populate the form fields accordingly.
+   *
+   * @param aciString the existing ACI string to parse and populate
+   */
+  public void populateFromAci(String aciString) {
+    if (aciString == null || aciString.trim().isEmpty()) {
+      return;
+    }
+    
+    try {
+      // Basic ACI parsing - this is a simplified version
+      // A full parser would need to handle all the complex ACI syntax
+      
+      // Extract ACL description
+      if (aciString.contains("acl \"")) {
+        int start = aciString.indexOf("acl \"") + 5;
+        int end = aciString.indexOf("\"", start);
+        if (end > start) {
+          String description = aciString.substring(start, end);
+          if (aclDescriptionField != null) {
+            aclDescriptionField.setValue(description);
+          }
+        }
+      }
+      
+      // Extract allow/deny and permissions
+      if (aciString.contains(" allow ")) {
+        if (allowDenyGroup != null) {
+          allowDenyGroup.setValue("allow");
+        }
+        // Extract permissions - look for pattern "allow (permissions)"
+        int allowIndex = aciString.indexOf(" allow ");
+        String afterAllow = aciString.substring(allowIndex + 7); // Skip " allow "
+        if (afterAllow.startsWith("(") && afterAllow.contains(")")) {
+          int start = 1; // Skip the opening parenthesis
+          int end = afterAllow.indexOf(")");
+          if (end > start) {
+            String permsStr = afterAllow.substring(start, end);
+            if (permissionsGroup != null) {
+              Set<String> permissions = Arrays.stream(permsStr.split(","))
+                  .map(String::trim)
+                  .filter(p -> !p.isEmpty())
+                  .collect(Collectors.toSet());
+              permissionsGroup.setValue(permissions);
+            }
+          }
+        }
+      } else if (aciString.contains(" deny ")) {
+        if (allowDenyGroup != null) {
+          allowDenyGroup.setValue("deny");
+        }
+        // Extract permissions - look for pattern "deny (permissions)"
+        int denyIndex = aciString.indexOf(" deny ");
+        String afterDeny = aciString.substring(denyIndex + 6); // Skip " deny "
+        if (afterDeny.startsWith("(") && afterDeny.contains(")")) {
+          int start = 1; // Skip the opening parenthesis
+          int end = afterDeny.indexOf(")");
+          if (end > start) {
+            String permsStr = afterDeny.substring(start, end);
+            if (permissionsGroup != null) {
+              Set<String> permissions = Arrays.stream(permsStr.split(","))
+                  .map(String::trim)
+                  .filter(p -> !p.isEmpty())
+                  .collect(Collectors.toSet());
+              permissionsGroup.setValue(permissions);
+            }
+          }
+        }
+      }
+      
+      // Extract bind rules - simple implementation for now
+      // TODO: Implement full parsing of complex bind rule expressions with AND/OR
+      bindRules.clear();
+      bindRulesContainer.removeAll();
+      
+      // Look for simple bind rule patterns
+      if (aciString.contains("userdn=\"")) {
+        int start = aciString.indexOf("userdn=\"") + 8;
+        int end = aciString.indexOf("\"", start);
+        if (end > start) {
+          String userdn = aciString.substring(start, end);
+          if (userdn.startsWith("ldap:///")) {
+            userdn = userdn.substring(8);
+          }
+          BindRule bindRule = new BindRule("userdn", userdn, false);
+          bindRules.add(bindRule);
+          BindRuleComponent component = new BindRuleComponent(bindRule, this::removeBindRule, this::updatePreview);
+          bindRulesContainer.add(component);
+        }
+      } else if (aciString.contains("groupdn=\"")) {
+        int start = aciString.indexOf("groupdn=\"") + 9;
+        int end = aciString.indexOf("\"", start);
+        if (end > start) {
+          String groupdn = aciString.substring(start, end);
+          if (groupdn.startsWith("ldap:///")) {
+            groupdn = groupdn.substring(8);
+          }
+          BindRule bindRule = new BindRule("groupdn", groupdn, false);
+          bindRules.add(bindRule);
+          BindRuleComponent component = new BindRuleComponent(bindRule, this::removeBindRule, this::updatePreview);
+          bindRulesContainer.add(component);
+        }
+      } else if (aciString.contains("roledn=\"")) {
+        int start = aciString.indexOf("roledn=\"") + 8;
+        int end = aciString.indexOf("\"", start);
+        if (end > start) {
+          String roledn = aciString.substring(start, end);
+          if (roledn.startsWith("ldap:///")) {
+            roledn = roledn.substring(8);
+          }
+          BindRule bindRule = new BindRule("roledn", roledn, false);
+          bindRules.add(bindRule);
+          BindRuleComponent component = new BindRuleComponent(bindRule, this::removeBindRule, this::updatePreview);
+          bindRulesContainer.add(component);
+        }
+      }
+      
+      // If no bind rules found, add a default one
+      if (bindRules.isEmpty()) {
+        addNewBindRule();
+      }
+      
+      // Extract targetattr if present
+      if (aciString.contains("(targetattr=\"")) {
+        int start = aciString.indexOf("(targetattr=\"") + 13;
+        int end = aciString.indexOf("\")", start);
+        if (end > start && !targets.isEmpty()) {
+          String attrs = aciString.substring(start, end);
+          TargetComponent firstTarget = targets.get(0);
+          if (firstTarget.targetTypeCombo != null) {
+            firstTarget.targetTypeCombo.setValue("targetattr");
+            // Trigger the value change to show the controls
+            firstTarget.updateDynamicControls();
+            
+            // Set the attribute values
+            if (firstTarget.targetAttrCombo != null) {
+              Set<String> attrSet = Arrays.stream(attrs.split("\\|\\|"))
+                  .map(String::trim)
+                  .filter(attr -> !attr.isEmpty())
+                  .collect(Collectors.toSet());
+              firstTarget.targetAttrCombo.setValue(attrSet);
+            }
+          }
+        }
+      }
+      
+      // Update the preview after populating
+      updatePreview();
+      
+    } catch (Exception e) {
+      // If parsing fails, just log it and continue - the user can still use the builder
+      System.err.println("Failed to parse ACI for auto-population: " + e.getMessage());
+    }
   }
 
   /**
@@ -574,59 +735,70 @@ public class AciBuilderDialog extends Dialog {
     section.setPadding(false);
     section.setSpacing(true);
     
-    H3 title = new H3("3. Bind Rule");
+    H3 title = new H3("3. Bind Rules");
     title.getStyle().set("margin", "0");
     section.add(title);
     
-    Span info = new Span("Specify who this ACI applies to (the requester identification)");
+    Span info = new Span("Specify who this ACI applies to (the requester identification). Multiple bind rules can be combined using AND/OR operators.");
     info.getStyle().set("color", "var(--lumo-secondary-text-color)")
         .set("font-size", "var(--lumo-font-size-s)");
     section.add(info);
 
-    FormLayout form = new FormLayout();
+    // Combination type selection
+    HorizontalLayout combinationLayout = new HorizontalLayout();
+    combinationLayout.setAlignItems(FlexComponent.Alignment.CENTER);
+    combinationLayout.setSpacing(true);
     
-    bindRuleTypeCombo = new ComboBox<>("Bind Rule Type");
-    bindRuleTypeCombo.setItems("userdn", "groupdn", "roledn", "authmethod", "ip", "dns", 
-                               "dayofweek", "timeofday", "userattr", "secure");
-    bindRuleTypeCombo.setValue("userdn");
-    bindRuleTypeCombo.setRequired(true);
-    form.add(bindRuleTypeCombo);
+    Span combinationLabel = new Span("Combine bind rules using:");
+    combinationLabel.getStyle().set("font-weight", "500");
     
-    // Create container for bind rule value field
-    bindRuleContainer = new VerticalLayout();
-    bindRuleContainer.setPadding(false);
-    bindRuleContainer.setSpacing(false);
+    bindRuleCombinationGroup = new RadioButtonGroup<>();
+    bindRuleCombinationGroup.setItems("and", "or");
+    bindRuleCombinationGroup.setValue("and");
+    bindRuleCombinationGroup.addValueChangeListener(e -> updatePreview());
     
-    // Auto-prepend info label (initially visible for DN types)
-    autoPrependLabel = new Span("Note: 'ldap:///' will be automatically prepended");
-    autoPrependLabel.getStyle().set("color", "var(--lumo-primary-text-color)")
-        .set("font-size", "var(--lumo-font-size-xs)")
-        .set("font-weight", "500")
-        .set("margin-bottom", "var(--lumo-space-xs)");
-    bindRuleContainer.add(autoPrependLabel);
+    combinationLayout.add(combinationLabel, bindRuleCombinationGroup);
+    section.add(combinationLayout);
     
-    // Create both field types - we'll show/hide them based on bind rule type
-    bindRuleValueField = new TextField("Bind Rule Value");
-    bindRuleValueField.setPlaceholder("e.g., self or simple");
-    bindRuleValueField.setHelperText("Value for the selected bind rule type");
-    bindRuleValueField.setRequired(true);
-    bindRuleValueField.setWidthFull();
+    // Container for multiple bind rules
+    bindRulesContainer = new VerticalLayout();
+    bindRulesContainer.setPadding(false);
+    bindRulesContainer.setSpacing(true);
+    section.add(bindRulesContainer);
     
-    // Create DN selector field (for DN-based bind rules)
-    bindRuleDnField = new DnSelectorField("Bind Rule Value", ldapService);
-    bindRuleDnField.setServerConfig(serverConfig);
-    bindRuleDnField.setPlaceholder("e.g., uid=admin,ou=people,dc=example,dc=com");
-    bindRuleDnField.setHelperText("Select or enter a DN for the bind rule");
-    bindRuleDnField.setWidthFull();
-    
-    // Initially add the DN field (since default is "userdn")
-    bindRuleContainer.add(bindRuleDnField);
-    
-    form.add(bindRuleContainer);
-    form.setColspan(bindRuleContainer, 2);
+    // Add new bind rule button
+    addBindRuleButton = new Button("Add Bind Rule", VaadinIcon.PLUS.create());
+    addBindRuleButton.addThemeVariants(ButtonVariant.LUMO_SMALL);
+    addBindRuleButton.addClickListener(e -> addNewBindRule());
+    section.add(addBindRuleButton);
 
-    section.add(form);
     return section;
+  }
+
+  private void addNewBindRule() {
+    BindRule bindRule = new BindRule("userdn", "", false);
+    bindRules.add(bindRule);
+    
+    BindRuleComponent bindRuleComponent = new BindRuleComponent(bindRule, this::removeBindRule, this::updatePreview);
+    bindRulesContainer.add(bindRuleComponent);
+    
+    updatePreview();
+  }
+  
+  private void removeBindRule(BindRuleComponent component) {
+    bindRulesContainer.remove(component);
+    // Find and remove the corresponding BindRule from the list
+    BindRule toRemove = null;
+    for (BindRule bindRule : bindRules) {
+      if (component.getBindRule() == bindRule) {
+        toRemove = bindRule;
+        break;
+      }
+    }
+    if (toRemove != null) {
+      bindRules.remove(toRemove);
+    }
+    updatePreview();
   }
 
   private VerticalLayout createPreviewSection() {
@@ -654,95 +826,8 @@ public class AciBuilderDialog extends Dialog {
     aclDescriptionField.addValueChangeListener(event -> updatePreview());
     allowDenyGroup.addValueChangeListener(event -> updatePreview());
     permissionsGroup.addValueChangeListener(event -> updatePreview());
-    bindRuleTypeCombo.addValueChangeListener(event -> {
-      updateBindRuleHelperText();
-      updatePreview();
-    });
-    bindRuleValueField.addValueChangeListener(event -> updatePreview());
-    bindRuleDnField.addValueChangeListener(event -> updatePreview());
-    
-    // Update helper text for bind rule value based on type
-    updateBindRuleHelperText();
-  }
-
-  private void updateBindRuleHelperText() {
-    String type = bindRuleTypeCombo.getValue();
-    if (type != null) {
-      boolean isDnType = type.equals("userdn") || type.equals("groupdn") || type.equals("roledn");
-      
-      // Show/hide auto-prepend label for DN types
-      if (autoPrependLabel != null) {
-        autoPrependLabel.setVisible(isDnType);
-      }
-      
-      // Switch between DN field and regular text field based on type
-      if (bindRuleContainer != null) {
-        // Remove both fields first
-        bindRuleContainer.remove(bindRuleValueField);
-        bindRuleContainer.remove(bindRuleDnField);
-        
-        if (isDnType) {
-          // Use DN selector field for DN-based bind rules
-          bindRuleContainer.add(bindRuleDnField);
-          switch (type) {
-            case "userdn":
-              bindRuleDnField.setHelperText("e.g., self, uid=admin,ou=people,dc=example,dc=com");
-              bindRuleDnField.setPlaceholder("self");
-              break;
-            case "groupdn":
-              bindRuleDnField.setHelperText("e.g., cn=administrators,ou=groups,dc=example,dc=com");
-              bindRuleDnField.setPlaceholder("cn=group,ou=groups,dc=example,dc=com");
-              break;
-            case "roledn":
-              bindRuleDnField.setHelperText("e.g., cn=admin-role,ou=roles,dc=example,dc=com");
-              bindRuleDnField.setPlaceholder("cn=role,ou=roles,dc=example,dc=com");
-              break;
-          }
-        } else {
-          // Use regular text field for non-DN bind rules
-          bindRuleContainer.add(bindRuleValueField);
-          switch (type) {
-            case "authmethod":
-              bindRuleValueField.setHelperText("e.g., simple, sasl");
-              bindRuleValueField.setPlaceholder("simple");
-              break;
-            case "ip":
-              bindRuleValueField.setHelperText("e.g., 192.168.1.*, 10.0.0.0/24");
-              bindRuleValueField.setPlaceholder("192.168.1.*");
-              break;
-            case "dns":
-              bindRuleValueField.setHelperText("e.g., *.example.com, localhost");
-              bindRuleValueField.setPlaceholder("*.example.com");
-              break;
-            case "secure":
-              bindRuleValueField.setHelperText("true or false");
-              bindRuleValueField.setPlaceholder("true");
-              break;
-            default:
-              bindRuleValueField.setHelperText("Value for the selected bind rule type");
-              bindRuleValueField.setPlaceholder("");
-              break;
-          }
-        }
-      }
-    }
   }
   
-  private String getBindRuleValue() {
-    String type = bindRuleTypeCombo.getValue();
-    if (type != null) {
-      boolean isDnType = type.equals("userdn") || type.equals("groupdn") || type.equals("roledn");
-      if (isDnType) {
-        String value = bindRuleDnField.getValue();
-        return value != null ? value : "";
-      } else {
-        String value = bindRuleValueField.getValue();
-        return value != null ? value : "";
-      }
-    }
-    return "";
-  }
-
   private void updatePreview() {
     // Don't update preview if UI is not fully initialized
     if (aciPreviewArea == null) {
@@ -752,8 +837,9 @@ public class AciBuilderDialog extends Dialog {
     try {
       String aci = buildAciString();
       aciPreviewArea.setValue(aci);
+      boolean isValid = isValidAci();
       if (buildButton != null) {
-        buildButton.setEnabled(isValidAci());
+        buildButton.setEnabled(isValid);
       }
     } catch (Exception e) {
       aciPreviewArea.setValue("Invalid ACI configuration: " + e.getMessage());
@@ -798,18 +884,23 @@ public class AciBuilderDialog extends Dialog {
       aci.append(") ");
     }
     
-    // Add bind rule
-    String bindType = bindRuleTypeCombo.getValue();
-    String bindValue = getBindRuleValue();
-    
-    if (bindType != null && bindValue != null && !bindValue.trim().isEmpty()) {
-      aci.append(bindType).append("=\"");
-      if (bindType.equals("userdn") || bindType.equals("groupdn") || bindType.equals("roledn")) {
-        if (!bindValue.startsWith("ldap:///")) {
-          aci.append("ldap:///");
+    // Add bind rules
+    if (!bindRules.isEmpty()) {
+      List<String> bindRuleStrings = new ArrayList<>();
+      for (BindRule bindRule : bindRules) {
+        if (bindRule.getValue() != null && !bindRule.getValue().trim().isEmpty()) {
+          bindRuleStrings.add(bindRule.toString());
         }
       }
-      aci.append(bindValue.trim()).append("\"");
+      
+      if (!bindRuleStrings.isEmpty()) {
+        if (bindRuleStrings.size() == 1) {
+          aci.append(bindRuleStrings.get(0));
+        } else {
+          String combination = bindRuleCombinationGroup.getValue();
+          aci.append(String.join(" " + combination + " ", bindRuleStrings));
+        }
+      }
     }
     
     aci.append(";)");
@@ -831,7 +922,10 @@ public class AciBuilderDialog extends Dialog {
       return false;
     }
     
-    if (bindRuleTypeCombo.getValue() == null || getBindRuleValue().trim().isEmpty()) {
+    // Check that at least one valid bind rule is specified
+    boolean hasValidBindRule = bindRules.stream()
+        .anyMatch(bindRule -> bindRule.getValue() != null && !bindRule.getValue().trim().isEmpty());
+    if (!hasValidBindRule) {
       return false;
     }
     
@@ -867,5 +961,158 @@ public class AciBuilderDialog extends Dialog {
   private void showSuccess(String message) {
     Notification n = Notification.show(message, 3000, Notification.Position.TOP_END);
     n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+  }
+  
+  /**
+   * Component for editing a single bind rule.
+   */
+  private class BindRuleComponent extends HorizontalLayout {
+    private final BindRule bindRule;
+    private final ComboBox<String> typeCombo;
+    private final TextField valueField;
+    private final DnSelectorField dnField;
+    private final Checkbox negatedCheckbox;
+    private final Button removeButton;
+    private final Consumer<BindRuleComponent> onRemove;
+    private final Runnable onUpdate;
+    private VerticalLayout fieldContainer;
+    
+    public BindRuleComponent(BindRule bindRule, Consumer<BindRuleComponent> onRemove, Runnable onUpdate) {
+      this.bindRule = bindRule;
+      this.onRemove = onRemove;
+      this.onUpdate = onUpdate;
+      
+      setAlignItems(FlexComponent.Alignment.END);
+      setSpacing(true);
+      setWidthFull();
+      
+      // Negation checkbox
+      negatedCheckbox = new Checkbox("NOT");
+      negatedCheckbox.setValue(bindRule.isNegated());
+      negatedCheckbox.addValueChangeListener(e -> {
+        bindRule.setNegated(e.getValue());
+        onUpdate.run();
+      });
+      add(negatedCheckbox);
+      
+      // Type combo
+      typeCombo = new ComboBox<>("Type");
+      typeCombo.setItems("userdn", "groupdn", "roledn", "authmethod", "ip", "dns", 
+                         "dayofweek", "timeofday", "userattr", "secure");
+      typeCombo.setValue(bindRule.getType());
+      typeCombo.setRequired(true);
+      typeCombo.addValueChangeListener(e -> {
+        bindRule.setType(e.getValue());
+        updateFieldType();
+        onUpdate.run();
+      });
+      add(typeCombo);
+      
+      // Field container for value field
+      fieldContainer = new VerticalLayout();
+      fieldContainer.setPadding(false);
+      fieldContainer.setSpacing(false);
+      fieldContainer.setWidthFull();
+      
+      // Create both field types
+      valueField = new TextField("Value");
+      valueField.setWidthFull();
+      valueField.addValueChangeListener(e -> {
+        bindRule.setValue(e.getValue());
+        onUpdate.run();
+      });
+      
+      dnField = new DnSelectorField("Value", ldapService);
+      dnField.setServerConfig(serverConfig);
+      dnField.setWidthFull();
+      dnField.addValueChangeListener(e -> {
+        bindRule.setValue(e.getValue());
+        onUpdate.run();
+      });
+      
+      updateFieldType();
+      add(fieldContainer);
+      
+      // Remove button
+      removeButton = new Button(VaadinIcon.TRASH.create());
+      removeButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
+      removeButton.addClickListener(e -> onRemove.accept(this));
+      add(removeButton);
+      
+      setFlexGrow(1, fieldContainer);
+    }
+    
+    private void updateFieldType() {
+      fieldContainer.removeAll();
+      
+      String type = typeCombo.getValue();
+      boolean isDnType = "userdn".equals(type) || "groupdn".equals(type) || "roledn".equals(type);
+      
+      if (isDnType) {
+        fieldContainer.add(dnField);
+        if ("userdn".equals(type)) {
+          dnField.setPlaceholder("self or uid=admin,ou=people,dc=example,dc=com");
+        } else if ("groupdn".equals(type)) {
+          dnField.setPlaceholder("cn=group,ou=groups,dc=example,dc=com");
+        } else if ("roledn".equals(type)) {
+          dnField.setPlaceholder("cn=role,ou=roles,dc=example,dc=com");
+        }
+      } else {
+        fieldContainer.add(valueField);
+        if ("authmethod".equals(type)) {
+          valueField.setPlaceholder("simple, sasl, etc.");
+        } else if ("ip".equals(type)) {
+          valueField.setPlaceholder("192.168.1.1 or 192.168.1.0/24");
+        } else if ("dns".equals(type)) {
+          valueField.setPlaceholder("*.example.com");
+        } else {
+          valueField.setPlaceholder("Value for " + type);
+        }
+      }
+    }
+    
+    public BindRule getBindRule() {
+      return bindRule;
+    }
+  }
+  
+  /**
+   * Represents a single bind rule in an ACI.
+   */
+  private static class BindRule {
+    private String type;
+    private String value;
+    private boolean negated;
+    
+    public BindRule(String type, String value, boolean negated) {
+      this.type = type;
+      this.value = value;
+      this.negated = negated;
+    }
+    
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
+    
+    public String getValue() { return value; }
+    public void setValue(String value) { this.value = value; }
+    
+    public boolean isNegated() { return negated; }
+    public void setNegated(boolean negated) { this.negated = negated; }
+    
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder();
+      if (negated) {
+        sb.append("not ");
+      }
+      sb.append(type).append("=\"");
+      if (type.equals("userdn") || type.equals("groupdn") || type.equals("roledn")) {
+        if (!value.startsWith("ldap:///")) {
+          sb.append("ldap:///");
+        }
+      }
+      sb.append(value).append("\"");
+      return sb.toString();
+    }
   }
 }

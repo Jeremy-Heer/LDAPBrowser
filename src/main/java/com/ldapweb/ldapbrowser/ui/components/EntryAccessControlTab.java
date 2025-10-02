@@ -18,6 +18,7 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.Modification;
@@ -54,7 +55,7 @@ public class EntryAccessControlTab extends VerticalLayout {
     setPadding(true);
     setSpacing(true);
 
-    // Header with title and add button
+    // Header with title and buttons
     HorizontalLayout header = new HorizontalLayout();
     header.setWidthFull();
     header.setJustifyContentMode(JustifyContentMode.BETWEEN);
@@ -63,11 +64,21 @@ public class EntryAccessControlTab extends VerticalLayout {
     H3 title = new H3("Entry Access Control");
     title.getStyle().set("margin", "0");
     
+    // Button group for actions
+    HorizontalLayout buttonGroup = new HorizontalLayout();
+    buttonGroup.setSpacing(true);
+    
+    Button refreshButton = new Button("Refresh", VaadinIcon.REFRESH.create());
+    refreshButton.addThemeVariants(ButtonVariant.LUMO_CONTRAST);
+    refreshButton.addClickListener(event -> refreshData());
+    
     Button addAciButton = new Button("Add New ACI", VaadinIcon.PLUS.create());
     addAciButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
     addAciButton.addClickListener(event -> openAddAciDialog());
     
-    header.add(title, addAciButton);
+    buttonGroup.add(refreshButton, addAciButton);
+    
+    header.add(title, buttonGroup);
     add(header);
 
     Div description = new Div();
@@ -100,15 +111,26 @@ public class EntryAccessControlTab extends VerticalLayout {
         .setAutoWidth(true)
         .setFlexGrow(2);
 
-    // Add delete action column
+    // Add action columns
     aciGrid.addColumn(new ComponentRenderer<>(aciInfo -> {
+      HorizontalLayout actions = new HorizontalLayout();
+      actions.setSpacing(false);
+      actions.setPadding(false);
+      
+      Button editButton = new Button(new Icon(VaadinIcon.EDIT));
+      editButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+      editButton.setTooltipText("Edit ACI");
+      editButton.addClickListener(event -> openEditAciDialog(aciInfo));
+      
       Button deleteButton = new Button(new Icon(VaadinIcon.TRASH));
       deleteButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
       deleteButton.setTooltipText("Delete ACI");
       deleteButton.addClickListener(event -> deleteAci(aciInfo));
-      return deleteButton;
+      
+      actions.add(editButton, deleteButton);
+      return actions;
     }))
-        .setHeader("Delete")
+        .setHeader("Actions")
         .setAutoWidth(true)
         .setFlexGrow(0);
 
@@ -265,6 +287,27 @@ public class EntryAccessControlTab extends VerticalLayout {
   }
 
   /**
+   * Opens the Edit ACI dialog with pre-populated data.
+   */
+  private void openEditAciDialog(EntryAciInfo aciInfo) {
+    if (serverConfig == null) {
+      showError("No server selected");
+      return;
+    }
+
+    if (!ldapService.isConnected(serverConfig.getId())) {
+      showError("Not connected to server: " + serverConfig.getName());
+      return;
+    }
+
+    // Create edit dialog with existing ACI data
+    AddAciDialog dialog = new AddAciDialog(ldapService, serverConfig, 
+        (targetDn, newAci) -> handleAciEdited(aciInfo, targetDn, newAci), 
+        aciInfo);
+    dialog.open();
+  }
+
+  /**
    * Handles the addition of a new ACI.
    */
   private void handleAciAdded(String targetDn, String aci) {
@@ -278,6 +321,43 @@ public class EntryAccessControlTab extends VerticalLayout {
       showSuccess("ACI added successfully to " + targetDn);
     } catch (LDAPException e) {
       showError("Failed to add ACI: " + e.getMessage());
+    }
+  }
+
+  /**
+   * Handles the editing of an existing ACI.
+   */
+  private void handleAciEdited(EntryAciInfo originalAci, String targetDn, String newAci) {
+    try {
+      // If DN changed, this is a move operation (delete from old, add to new)
+      if (!originalAci.getDn().equals(targetDn)) {
+        // Remove from original DN
+        Modification deleteModification = new Modification(ModificationType.DELETE, "aci", originalAci.getAciValue());
+        List<Modification> deleteModifications = List.of(deleteModification);
+        ldapService.modifyEntry(serverConfig.getId(), originalAci.getDn(), deleteModifications);
+        
+        // Add to new DN
+        ldapService.addAttributeValue(serverConfig.getId(), targetDn, "aci", newAci);
+        showSuccess("ACI moved from " + originalAci.getDn() + " to " + targetDn);
+      } else {
+        // Same DN, replace the ACI value
+        List<Modification> modifications = new ArrayList<>();
+        
+        // Delete old ACI value
+        modifications.add(new Modification(ModificationType.DELETE, "aci", originalAci.getAciValue()));
+        
+        // Add new ACI value
+        modifications.add(new Modification(ModificationType.ADD, "aci", newAci));
+        
+        ldapService.modifyEntry(serverConfig.getId(), targetDn, modifications);
+        showSuccess("ACI updated successfully on " + targetDn);
+      }
+      
+      // Refresh the data to show the updated ACI
+      refreshData();
+      
+    } catch (LDAPException e) {
+      showError("Failed to update ACI: " + e.getMessage());
     }
   }
 
@@ -341,23 +421,35 @@ public class EntryAccessControlTab extends VerticalLayout {
     private final LdapService ldapService;
     private final LdapServerConfig serverConfig;
     private final java.util.function.BiConsumer<String, String> onAciAdded;
+    private final EntryAciInfo editingAci; // null for add mode, populated for edit mode
     
     private DnSelectorField targetDnField;
     private Button buildAciButton;
     private TextField aciField;
     private Button addButton;
     private Button cancelButton;
+    private Button copyLdifButton;
 
+    // Constructor for adding new ACI
     public AddAciDialog(LdapService ldapService, LdapServerConfig serverConfig,
                        java.util.function.BiConsumer<String, String> onAciAdded) {
+      this(ldapService, serverConfig, onAciAdded, null);
+    }
+
+    // Constructor for editing existing ACI or adding new ACI
+    public AddAciDialog(LdapService ldapService, LdapServerConfig serverConfig,
+                       java.util.function.BiConsumer<String, String> onAciAdded,
+                       EntryAciInfo editingAci) {
       this.ldapService = ldapService;
       this.serverConfig = serverConfig;
       this.onAciAdded = onAciAdded;
+      this.editingAci = editingAci;
       initUI();
     }
 
     private void initUI() {
-      setHeaderTitle("Add Access Control Instruction");
+      boolean isEditMode = editingAci != null;
+      setHeaderTitle(isEditMode ? "Edit Access Control Instruction" : "Add Access Control Instruction");
       setModal(true);
       setDraggable(true);
       setResizable(true);
@@ -369,7 +461,9 @@ public class EntryAccessControlTab extends VerticalLayout {
 
       // Description
       Div description = new Div();
-      description.setText("Add a new Access Control Instruction (ACI) to a specific entry.");
+      description.setText(isEditMode ? 
+          "Edit the Access Control Instruction (ACI) for the selected entry." :
+          "Add a new Access Control Instruction (ACI) to a specific entry.");
       description.getStyle().set("color", "var(--lumo-secondary-text-color)")
           .set("margin-bottom", "var(--lumo-space-m)");
       content.add(description);
@@ -385,6 +479,12 @@ public class EntryAccessControlTab extends VerticalLayout {
       targetDnField.setHelperText("Distinguished Name of the entry to add the ACI to");
       targetDnField.setServerConfig(serverConfig);
       targetDnField.setWidthFull();
+      
+      // Pre-populate if in edit mode
+      if (isEditMode) {
+        targetDnField.setValue(editingAci.getDn());
+      }
+      
       content.add(targetDnField);
 
       // ACI section
@@ -401,6 +501,11 @@ public class EntryAccessControlTab extends VerticalLayout {
       aciField.setHelperText("Complete ACI string following PingDirectory syntax");
       aciField.setWidthFull();
       
+      // Pre-populate if in edit mode
+      if (isEditMode) {
+        aciField.setValue(editingAci.getAciValue());
+      }
+      
       buildAciButton = new Button("Build ACI", VaadinIcon.COG.create());
       buildAciButton.addClickListener(event -> openAciBuilder());
       
@@ -411,17 +516,30 @@ public class EntryAccessControlTab extends VerticalLayout {
       add(content);
 
       // Footer buttons
-      addButton = new Button("Add ACI", event -> addAci());
+      addButton = new Button(isEditMode ? "Update ACI" : "Add ACI", event -> addAci());
       addButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
       addButton.setEnabled(false);
       
+      copyLdifButton = new Button("Copy as LDIF", VaadinIcon.COPY.create());
+      copyLdifButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+      copyLdifButton.addClickListener(event -> copyAciAsLdif());
+      copyLdifButton.setTooltipText(isEditMode ? 
+          "Copy as LDIF for updating the existing ACI" : 
+          "Copy as LDIF for adding the ACI to the target entry");
+      copyLdifButton.setEnabled(false);
+      
       cancelButton = new Button("Cancel", event -> close());
       
-      getFooter().add(cancelButton, addButton);
+      getFooter().add(cancelButton, copyLdifButton, addButton);
 
       // Enable add button when both fields have values
       targetDnField.addValueChangeListener(event -> updateAddButtonState());
       aciField.addValueChangeListener(event -> updateAddButtonState());
+      
+      // Update button state for edit mode
+      if (isEditMode) {
+        updateAddButtonState();
+      }
     }
 
     private void openAciBuilder() {
@@ -429,6 +547,13 @@ public class EntryAccessControlTab extends VerticalLayout {
         aciField.setValue(builtAci);
         updateAddButtonState();
       }, ldapService, serverConfig.getId(), serverConfig);
+      
+      // If there's an existing ACI value, populate the builder with it
+      String existingAci = aciField.getValue().trim();
+      if (!existingAci.isEmpty()) {
+        aciBuilder.populateFromAci(existingAci);
+      }
+      
       aciBuilder.open();
     }
 
@@ -436,6 +561,7 @@ public class EntryAccessControlTab extends VerticalLayout {
       boolean canAdd = !targetDnField.getValue().trim().isEmpty() && 
                       !aciField.getValue().trim().isEmpty();
       addButton.setEnabled(canAdd);
+      copyLdifButton.setEnabled(canAdd);
     }
 
     private void addAci() {
@@ -451,6 +577,81 @@ public class EntryAccessControlTab extends VerticalLayout {
         onAciAdded.accept(targetDn, aci);
       }
       close();
+    }
+
+    /**
+     * Copies the ACI as LDIF format to the clipboard.
+     */
+    private void copyAciAsLdif() {
+      String targetDn = targetDnField.getValue().trim();
+      String aci = aciField.getValue().trim();
+      
+      if (targetDn.isEmpty() || aci.isEmpty()) {
+        showError("Please specify both target DN and ACI before copying as LDIF");
+        return;
+      }
+      
+      try {
+        String ldif;
+        boolean isEditMode = editingAci != null;
+        
+        if (isEditMode) {
+          // Generate update LDIF that replaces the old ACI with the new one
+          ldif = generateUpdateLdif(targetDn, editingAci.getAciValue(), aci);
+        } else {
+          // Generate add LDIF for new ACI
+          ldif = generateAddLdif(targetDn, aci);
+        }
+        
+        // Copy to clipboard using browser API
+        UI.getCurrent().getPage().executeJs(
+            "navigator.clipboard.writeText($0).then(() => {" +
+            "  console.log('LDIF copied to clipboard');" +
+            "}, (err) => {" +
+            "  console.error('Failed to copy to clipboard:', err);" +
+            "});", ldif);
+        
+        String message = isEditMode ? "Update LDIF copied to clipboard" : "Add LDIF copied to clipboard";
+        showSuccess(message);
+      } catch (Exception e) {
+        showError("Failed to copy LDIF: " + e.getMessage());
+      }
+    }
+    
+    /**
+     * Generates LDIF for adding a new ACI to an entry.
+     */
+    private String generateAddLdif(String targetDn, String aci) {
+      StringBuilder ldif = new StringBuilder();
+      ldif.append("# LDIF to add new ACI to entry\n");
+      ldif.append("dn: ").append(targetDn).append("\n");
+      ldif.append("changetype: modify\n");
+      ldif.append("add: aci\n");
+      ldif.append("aci: ").append(aci).append("\n");
+      ldif.append("-\n");
+      return ldif.toString();
+    }
+    
+    /**
+     * Generates LDIF for updating an existing ACI.
+     */
+    private String generateUpdateLdif(String targetDn, String oldAci, String newAci) {
+      StringBuilder ldif = new StringBuilder();
+      ldif.append("# LDIF to update existing ACI\n");
+      ldif.append("dn: ").append(targetDn).append("\n");
+      ldif.append("changetype: modify\n");
+      ldif.append("delete: aci\n");
+      ldif.append("aci: ").append(oldAci).append("\n");
+      ldif.append("-\n");
+      ldif.append("add: aci\n");
+      ldif.append("aci: ").append(newAci).append("\n");
+      ldif.append("-\n");
+      return ldif.toString();
+    }
+    
+    private void showSuccess(String message) {
+      Notification n = Notification.show(message, 3000, Notification.Position.TOP_END);
+      n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
     }
 
     private void showError(String message) {

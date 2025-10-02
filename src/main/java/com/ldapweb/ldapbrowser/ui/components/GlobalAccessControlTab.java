@@ -5,11 +5,15 @@ import com.ldapweb.ldapbrowser.model.LdapServerConfig;
 import com.ldapweb.ldapbrowser.service.LdapService;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.SearchScope;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
 import java.util.ArrayList;
@@ -43,8 +47,21 @@ public class GlobalAccessControlTab extends VerticalLayout {
     setPadding(true);
     setSpacing(true);
 
+    // Header with title and refresh button
+    HorizontalLayout header = new HorizontalLayout();
+    header.setWidthFull();
+    header.setJustifyContentMode(JustifyContentMode.BETWEEN);
+    header.setAlignItems(Alignment.CENTER);
+    
     H3 title = new H3("Global Access Control");
-    add(title);
+    title.getStyle().set("margin", "0");
+    
+    Button refreshButton = new Button("Refresh", VaadinIcon.REFRESH.create());
+    refreshButton.addThemeVariants(ButtonVariant.LUMO_CONTRAST);
+    refreshButton.addClickListener(event -> refreshData());
+    
+    header.add(title, refreshButton);
+    add(header);
 
     Div description = new Div();
     description.setText("Global Access Control Instructions (ACIs) from Access Control Handler.");
@@ -147,6 +164,14 @@ public class GlobalAccessControlTab extends VerticalLayout {
       aciGrid.setItems(new ArrayList<>());
       showError("Failed to search for global ACIs: " + e.getMessage());
     }
+  }
+
+  /**
+   * Refreshes the global ACI data from the server.
+   */
+  private void refreshData() {
+    dataLoaded = false;
+    loadData();
   }
 
   private void showError(String message) {
