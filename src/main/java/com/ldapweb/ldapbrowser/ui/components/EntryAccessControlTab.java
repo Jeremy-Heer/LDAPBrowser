@@ -26,6 +26,7 @@ import com.unboundid.ldap.sdk.ModificationType;
 import com.unboundid.ldap.sdk.SearchScope;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Tab component for displaying entry access control information.
@@ -39,6 +40,8 @@ public class EntryAccessControlTab extends VerticalLayout {
   private ProgressBar progressBar;
   private Div loadingContainer;
   private boolean dataLoaded = false;
+  private TextField searchField;
+  private List<EntryAciInfo> allAciInfo = new ArrayList<>();
 
   /**
    * Constructs a new EntryAccessControlTab.
@@ -87,6 +90,15 @@ public class EntryAccessControlTab extends VerticalLayout {
         .set("margin-bottom", "var(--lumo-space-m)");
     add(description);
 
+    // Search field for filtering ACI rules
+    searchField = new TextField();
+    searchField.setPlaceholder("Search ACIs by DN or rule content...");
+    searchField.setPrefixComponent(VaadinIcon.SEARCH.create());
+    searchField.setWidthFull();
+    searchField.getStyle().set("margin-bottom", "var(--lumo-space-m)");
+    searchField.addValueChangeListener(event -> filterAciGrid());
+    add(searchField);
+
     // Create loading indicator
     progressBar = new ProgressBar();
     progressBar.setIndeterminate(true);
@@ -101,17 +113,8 @@ public class EntryAccessControlTab extends VerticalLayout {
 
     // Grid for displaying entry DN and ACI values
     aciGrid = new Grid<>(EntryAciInfo.class, false);
-    aciGrid.addColumn(EntryAciInfo::getDn)
-        .setHeader("Entry DN")
-        .setAutoWidth(true)
-        .setFlexGrow(1);
     
-    aciGrid.addColumn(EntryAciInfo::getAciValue)
-        .setHeader("Access Control Instruction (ACI)")
-        .setAutoWidth(true)
-        .setFlexGrow(2);
-
-    // Add action columns
+    // Add action columns first (leftmost position)
     aciGrid.addColumn(new ComponentRenderer<>(aciInfo -> {
       HorizontalLayout actions = new HorizontalLayout();
       actions.setSpacing(false);
@@ -133,6 +136,16 @@ public class EntryAccessControlTab extends VerticalLayout {
         .setHeader("Actions")
         .setAutoWidth(true)
         .setFlexGrow(0);
+    
+    aciGrid.addColumn(EntryAciInfo::getDn)
+        .setHeader("Entry DN")
+        .setAutoWidth(true)
+        .setFlexGrow(1);
+    
+    aciGrid.addColumn(EntryAciInfo::getAciValue)
+        .setHeader("Access Control Instruction (ACI)")
+        .setAutoWidth(true)
+        .setFlexGrow(2);
 
     aciGrid.setSizeFull();
     add(aciGrid);
@@ -206,7 +219,9 @@ public class EntryAccessControlTab extends VerticalLayout {
       // Update UI
       loadingContainer.setVisible(false);
       aciGrid.setVisible(true);
-      aciGrid.setItems(aciInfoList);
+      allAciInfo.clear();
+      allAciInfo.addAll(aciInfoList);
+      filterAciGrid(); // Apply any current filter
       dataLoaded = true;
 
       if (aciInfoList.isEmpty()) {
@@ -218,6 +233,7 @@ public class EntryAccessControlTab extends VerticalLayout {
     } catch (LDAPException e) {
       loadingContainer.setVisible(false);
       aciGrid.setVisible(true);
+      allAciInfo.clear();
       aciGrid.setItems(new ArrayList<>());
       showError("Failed to search for entry ACIs: " + e.getMessage());
     }
@@ -412,6 +428,29 @@ public class EntryAccessControlTab extends VerticalLayout {
     content.add(buttons);
     confirmDialog.add(content);
     confirmDialog.open();
+  }
+
+  /**
+   * Filters the ACI grid based on the search field value.
+   * Searches in both DN and ACI Value columns.
+   */
+  private void filterAciGrid() {
+    String searchText = searchField.getValue();
+    if (searchText == null || searchText.trim().isEmpty()) {
+      // Show all ACI entries
+      aciGrid.setItems(allAciInfo);
+    } else {
+      // Filter entries containing the search text in DN or ACI value (case-insensitive)
+      String lowerCaseFilter = searchText.toLowerCase().trim();
+      List<EntryAciInfo> filteredItems = allAciInfo.stream()
+        .filter(aciInfo -> 
+          aciInfo.getDn().toLowerCase().contains(lowerCaseFilter) ||
+          aciInfo.getAciValue().toLowerCase().contains(lowerCaseFilter)
+        )
+        .collect(Collectors.toList());
+      
+      aciGrid.setItems(filteredItems);
+    }
   }
 
   /**
@@ -649,12 +688,12 @@ public class EntryAccessControlTab extends VerticalLayout {
       return ldif.toString();
     }
     
-    private void showSuccess(String message) {
+    private static void showSuccess(String message) {
       Notification n = Notification.show(message, 3000, Notification.Position.TOP_END);
       n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
     }
 
-    private void showError(String message) {
+    private static void showError(String message) {
       Notification n = Notification.show(message, 5000, Notification.Position.TOP_END);
       n.addThemeVariants(NotificationVariant.LUMO_ERROR);
     }

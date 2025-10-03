@@ -178,81 +178,38 @@ public class AciBuilderDialog extends Dialog {
         }
       }
       
-      // Extract bind rules - simple implementation for now
-      // TODO: Implement full parsing of complex bind rule expressions with AND/OR
+      // Extract bind rules - improved implementation to handle multiple bind rules
       bindRules.clear();
       bindRulesContainer.removeAll();
       
-      // Look for simple bind rule patterns
-      if (aciString.contains("userdn=\"")) {
-        int start = aciString.indexOf("userdn=\"") + 8;
-        int end = aciString.indexOf("\"", start);
-        if (end > start) {
-          String userdn = aciString.substring(start, end);
-          if (userdn.startsWith("ldap:///")) {
-            userdn = userdn.substring(8);
-          }
-          BindRule bindRule = new BindRule("userdn", userdn, false);
-          bindRules.add(bindRule);
-          BindRuleComponent component = new BindRuleComponent(bindRule, this::removeBindRule, this::updatePreview);
-          bindRulesContainer.add(component);
-        }
-      } else if (aciString.contains("groupdn=\"")) {
-        int start = aciString.indexOf("groupdn=\"") + 9;
-        int end = aciString.indexOf("\"", start);
-        if (end > start) {
-          String groupdn = aciString.substring(start, end);
-          if (groupdn.startsWith("ldap:///")) {
-            groupdn = groupdn.substring(8);
-          }
-          BindRule bindRule = new BindRule("groupdn", groupdn, false);
-          bindRules.add(bindRule);
-          BindRuleComponent component = new BindRuleComponent(bindRule, this::removeBindRule, this::updatePreview);
-          bindRulesContainer.add(component);
-        }
-      } else if (aciString.contains("roledn=\"")) {
-        int start = aciString.indexOf("roledn=\"") + 8;
-        int end = aciString.indexOf("\"", start);
-        if (end > start) {
-          String roledn = aciString.substring(start, end);
-          if (roledn.startsWith("ldap:///")) {
-            roledn = roledn.substring(8);
-          }
-          BindRule bindRule = new BindRule("roledn", roledn, false);
-          bindRules.add(bindRule);
-          BindRuleComponent component = new BindRuleComponent(bindRule, this::removeBindRule, this::updatePreview);
-          bindRulesContainer.add(component);
-        }
-      }
+      // Parse all bind rule types - changed from if-else if to independent if statements
+      // to allow multiple bind rule types to be parsed from the same ACI string
+      
+      // Parse userdn bind rules
+      parseBindRulesOfType(aciString, "userdn", 0);
+      
+      // Parse groupdn bind rules  
+      parseBindRulesOfType(aciString, "groupdn", 0);
+      
+      // Parse roledn bind rules
+      parseBindRulesOfType(aciString, "roledn", 0);
+      
+      // Parse other bind rule types
+      parseBindRulesOfType(aciString, "authmethod", 0);
+      parseBindRulesOfType(aciString, "ip", 0);
+      parseBindRulesOfType(aciString, "dns", 0);
+      parseBindRulesOfType(aciString, "dayofweek", 0);
+      parseBindRulesOfType(aciString, "timeofday", 0);
+      parseBindRulesOfType(aciString, "userattr", 0);
+      parseBindRulesOfType(aciString, "secure", 0);
       
       // If no bind rules found, add a default one
       if (bindRules.isEmpty()) {
         addNewBindRule();
       }
       
-      // Extract targetattr if present
-      if (aciString.contains("(targetattr=\"")) {
-        int start = aciString.indexOf("(targetattr=\"") + 13;
-        int end = aciString.indexOf("\")", start);
-        if (end > start && !targets.isEmpty()) {
-          String attrs = aciString.substring(start, end);
-          TargetComponent firstTarget = targets.get(0);
-          if (firstTarget.targetTypeCombo != null) {
-            firstTarget.targetTypeCombo.setValue("targetattr");
-            // Trigger the value change to show the controls
-            firstTarget.updateDynamicControls();
-            
-            // Set the attribute values
-            if (firstTarget.targetAttrCombo != null) {
-              Set<String> attrSet = Arrays.stream(attrs.split("\\|\\|"))
-                  .map(String::trim)
-                  .filter(attr -> !attr.isEmpty())
-                  .collect(Collectors.toSet());
-              firstTarget.targetAttrCombo.setValue(attrSet);
-            }
-          }
-        }
-      }
+      // Parse all target types from the ACI string
+      parseTargetsFromAci(aciString);
       
       // Update the preview after populating
       updatePreview();
@@ -260,6 +217,142 @@ public class AciBuilderDialog extends Dialog {
     } catch (Exception e) {
       // If parsing fails, just log it and continue - the user can still use the builder
       System.err.println("Failed to parse ACI for auto-population: " + e.getMessage());
+    }
+  }
+
+  /**
+   * Helper method to parse bind rules of a specific type from the ACI string.
+   * This method can find and parse multiple instances of the same bind rule type.
+   *
+   * @param aciString the ACI string to parse
+   * @param bindRuleType the type of bind rule to look for (e.g., "userdn", "groupdn", "roledn")
+   * @param typeLength the length of the bind rule type string plus the equals and quote characters (not used anymore)
+   */
+  private void parseBindRulesOfType(String aciString, String bindRuleType, int typeLength) {
+    String searchPattern = bindRuleType + "=\"";
+    int searchStart = 0;
+    
+    // Look for all instances of this bind rule type
+    while (true) {
+      int start = aciString.indexOf(searchPattern, searchStart);
+      if (start == -1) {
+        break; // No more instances found
+      }
+      
+      // Move past the pattern to the start of the value
+      int valueStart = start + searchPattern.length();
+      int end = aciString.indexOf("\"", valueStart);
+      
+      if (end > valueStart) {
+        String value = aciString.substring(valueStart, end);
+        
+        // Handle ldap:/// prefix for DN-based bind rules
+        if ((bindRuleType.equals("userdn") || bindRuleType.equals("groupdn") || bindRuleType.equals("roledn")) 
+            && value.startsWith("ldap:///")) {
+          value = value.substring(8);
+        }
+        
+        // Check if this bind rule is negated by looking backwards for "not " before the bind rule type
+        boolean negated = false;
+        String beforeBindRule = aciString.substring(Math.max(0, start - 10), start);
+        if (beforeBindRule.toLowerCase().contains("not ")) {
+          negated = true;
+        }
+        
+        // Create and add the bind rule
+        BindRule bindRule = new BindRule(bindRuleType, value, negated);
+        bindRules.add(bindRule);
+        BindRuleComponent component = new BindRuleComponent(bindRule, this::removeBindRule, this::updatePreview);
+        bindRulesContainer.add(component);
+      }
+      
+      // Move search start past this match to find the next one
+      searchStart = valueStart;
+    }
+  }
+
+  /**
+   * Helper method to parse all target types from the ACI string.
+   * This method can find and parse multiple target types in the same ACI.
+   */
+  private void parseTargetsFromAci(String aciString) {
+    // Define all supported target types and their patterns
+    // Put targetscope before scope to prioritize the new syntax
+    String[] targetTypes = {"targetattr", "extop", "target", "targetfilter", "targettrfilters", 
+                           "targetcontrol", "requestcriteria", "targetscope", "scope"};
+    
+    int targetIndex = 0;
+    
+    for (String targetType : targetTypes) {
+      String pattern = "(" + targetType + "=\"";
+      if (aciString.contains(pattern)) {
+        int start = aciString.indexOf(pattern) + pattern.length();
+        int end = aciString.indexOf("\")", start);
+        if (end > start) {
+          String value = aciString.substring(start, end);
+          
+          // Ensure we have enough target components
+          while (targets.size() <= targetIndex) {
+            addNewTarget();
+          }
+          
+          // Set the target type and value
+          TargetComponent target = targets.get(targetIndex);
+          if (target.targetTypeCombo != null) {
+            // Map old "scope" to new "targetscope" for backward compatibility
+            String mappedTargetType = "scope".equals(targetType) ? "targetscope" : targetType;
+            target.targetTypeCombo.setValue(mappedTargetType);
+            // Trigger the value change to show the controls
+            target.updateDynamicControls();
+            
+            // Set the specific value based on target type
+            switch (targetType) {
+              case "targetattr":
+                if (target.targetAttrCombo != null) {
+                  Set<String> attrSet = Arrays.stream(value.split("\\|\\|"))
+                      .map(String::trim)
+                      .filter(attr -> !attr.isEmpty())
+                      .collect(Collectors.toSet());
+                  target.targetAttrCombo.setValue(attrSet);
+                }
+                break;
+              case "extop":
+                if (target.extopCombo != null) {
+                  target.extopCombo.setValue(value);
+                }
+                break;
+              case "target":
+                if (target.targetDnField != null) {
+                  target.targetDnField.setValue(value);
+                }
+                break;
+              case "targetfilter":
+                if (target.targetFilterField != null) {
+                  target.targetFilterField.setValue(value);
+                }
+                break;
+              case "targetcontrol":
+                if (target.targetControlCombo != null) {
+                  target.targetControlCombo.setValue(value);
+                }
+                break;
+              case "requestcriteria":
+                if (target.requestCriteriaField != null) {
+                  target.requestCriteriaField.setValue(value);
+                }
+                break;
+              case "scope":
+              case "targetscope":
+                if (target.scopeCombo != null) {
+                  target.scopeCombo.setValue(value);
+                }
+                break;
+            }
+            
+            targetIndex++;
+          }
+        }
+      }
     }
   }
 
@@ -299,7 +392,7 @@ public class AciBuilderDialog extends Dialog {
       
       targetTypeCombo = new ComboBox<>("Target Type");
       targetTypeCombo.setItems("target", "targetattr", "targetfilter", "targettrfilters", 
-                              "extop", "targetcontrol", "requestcriteria", "scope");
+                              "extop", "targetcontrol", "requestcriteria", "targetscope");
       targetTypeCombo.setRequired(true);
       targetTypeCombo.addValueChangeListener(event -> updateDynamicControls());
       
@@ -384,13 +477,15 @@ public class AciBuilderDialog extends Dialog {
           dynamicControlsContainer.add(targetTrFiltersField);
           break;
           
-        case "scope":
-          scopeCombo = new ComboBox<>("LDAP Scope");
-          scopeCombo.setItems("base", "one", "sub", "subordinate");
-          scopeCombo.setValue("sub");
-          scopeCombo.setHelperText("Search scope for LDAP operations");
+        case "targetscope":
+          scopeCombo = new ComboBox<>("Target Scope");
+          scopeCombo.setItems("base", "onelevel", "subtree", "subordinate");
+          scopeCombo.setValue("subtree");
+          scopeCombo.setHelperText("Scope for ACI target (base=entry only, onelevel=immediate children, subtree=entry and descendants, subordinate=descendants only)");
           scopeCombo.addValueChangeListener(event -> updatePreview());
           dynamicControlsContainer.add(scopeCombo);
+          // Trigger preview update since we set a default value
+          updatePreview();
           break;
       }
     }
@@ -556,8 +651,15 @@ public class AciBuilderDialog extends Dialog {
               "(requestcriteria=\"" + requestCriteriaField.getValue().trim() + "\")" : "";
               
         case "target":
-          return targetDnField.getValue() != null && !targetDnField.getValue().trim().isEmpty() ?
-              "(target=\"ldap:///" + targetDnField.getValue().trim() + "\")" : "";
+          if (targetDnField.getValue() != null && !targetDnField.getValue().trim().isEmpty()) {
+            String targetValue = targetDnField.getValue().trim();
+            // Check if ldap:/// prefix is already present
+            if (!targetValue.startsWith("ldap:///")) {
+              targetValue = "ldap:///" + targetValue;
+            }
+            return "(target=\"" + targetValue + "\")";
+          }
+          return "";
               
         case "targetattr":
           Set<String> attrs = targetAttrCombo.getValue();
@@ -572,8 +674,8 @@ public class AciBuilderDialog extends Dialog {
           return targetTrFiltersField.getValue() != null && !targetTrFiltersField.getValue().trim().isEmpty() ?
               "(targettrfilters=\"" + targetTrFiltersField.getValue().trim() + "\")" : "";
               
-        case "scope":
-          return scopeCombo.getValue() != null && !scopeCombo.getValue().equals("sub") ?
+        case "targetscope":
+          return scopeCombo.getValue() != null && !scopeCombo.getValue().trim().isEmpty() ?
               "(targetscope=\"" + scopeCombo.getValue() + "\")" : "";
               
         default:
@@ -601,7 +703,7 @@ public class AciBuilderDialog extends Dialog {
           return targetFilterField.getValue() != null && !targetFilterField.getValue().trim().isEmpty();
         case "targettrfilters":
           return targetTrFiltersField.getValue() != null && !targetTrFiltersField.getValue().trim().isEmpty();
-        case "scope":
+        case "targetscope":
           return scopeCombo.getValue() != null;
         default:
           return false;
@@ -1057,6 +1159,8 @@ public class AciBuilderDialog extends Dialog {
         } else if ("roledn".equals(type)) {
           dnField.setPlaceholder("cn=role,ou=roles,dc=example,dc=com");
         }
+        // Set the value on the DN field
+        dnField.setValue(bindRule.getValue() != null ? bindRule.getValue() : "");
       } else {
         fieldContainer.add(valueField);
         if ("authmethod".equals(type)) {
@@ -1068,6 +1172,8 @@ public class AciBuilderDialog extends Dialog {
         } else {
           valueField.setPlaceholder("Value for " + type);
         }
+        // Set the value on the text field
+        valueField.setValue(bindRule.getValue() != null ? bindRule.getValue() : "");
       }
     }
     
