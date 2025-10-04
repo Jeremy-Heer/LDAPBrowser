@@ -13,7 +13,7 @@ public class AciParser {
 
   // ACI structure: (target1)(target2)...(version 3.0; acl "description"; allow/deny (permissions) bind_rules;)
   private static final Pattern ACI_MAIN_PATTERN = Pattern.compile(
-      "^(.*)\\(version\\s+3\\.0;\\s*acl\\s+\"([^\"]*)\";\\s*(allow|deny)\\s*\\(([^)]+)\\)\\s*([^;]*);\\)$",
+      "^(.*)\\(version\\s+3\\.0;\\s*acl\\s+\"([^\"]*)\";\\s*(allow|deny)\\s*\\(([^)]+)\\)\\s*([^;]*);\\s*\\)$",
       Pattern.CASE_INSENSITIVE | Pattern.DOTALL
   );
 
