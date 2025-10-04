@@ -3,6 +3,7 @@ package com.ldapweb.ldapbrowser.ui.components;
 import com.ldapweb.ldapbrowser.model.LdapEntry;
 import com.ldapweb.ldapbrowser.model.LdapServerConfig;
 import com.ldapweb.ldapbrowser.service.LdapService;
+import com.ldapweb.ldapbrowser.util.AciParser;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -10,6 +11,7 @@ import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.H4;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
@@ -17,9 +19,10 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
+import com.vaadin.flow.component.splitlayout.SplitLayout;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.UI;
-import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.Modification;
 import com.unboundid.ldap.sdk.ModificationType;
@@ -42,6 +45,8 @@ public class EntryAccessControlTab extends VerticalLayout {
   private boolean dataLoaded = false;
   private TextField searchField;
   private List<EntryAciInfo> allAciInfo = new ArrayList<>();
+  private Div aciDetailsPanel;
+  private EntryAciInfo selectedAci;
 
   /**
    * Constructs a new EntryAccessControlTab.
@@ -55,10 +60,34 @@ public class EntryAccessControlTab extends VerticalLayout {
 
   private void initUI() {
     setSizeFull();
-    setPadding(true);
-    setSpacing(true);
+    setPadding(false);
+    setSpacing(false);
 
-    // Header with title and buttons
+    // Create loading indicator (for both panes)
+    progressBar = new ProgressBar();
+    progressBar.setIndeterminate(true);
+    progressBar.setVisible(false);
+    
+    loadingContainer = new Div();
+    loadingContainer.add(progressBar, new Div("Loading entry access control information..."));
+    loadingContainer.getStyle().set("text-align", "center");
+    loadingContainer.getStyle().set("padding", "20px");
+    loadingContainer.setVisible(false);
+    add(loadingContainer);
+
+    // Main split layout - two vertical panes
+    SplitLayout mainLayout = new SplitLayout();
+    mainLayout.setSizeFull();
+    mainLayout.setOrientation(SplitLayout.Orientation.HORIZONTAL);
+    mainLayout.setSplitterPosition(60); // 60% for left pane, 40% for right pane
+
+    // LEFT PANE: Control panel with title, buttons, description, search, and grid
+    VerticalLayout leftPane = new VerticalLayout();
+    leftPane.setSizeFull();
+    leftPane.setPadding(true);
+    leftPane.setSpacing(true);
+
+    // Header with title and buttons on the same row
     HorizontalLayout header = new HorizontalLayout();
     header.setWidthFull();
     header.setJustifyContentMode(JustifyContentMode.BETWEEN);
@@ -82,13 +111,14 @@ public class EntryAccessControlTab extends VerticalLayout {
     buttonGroup.add(refreshButton, addAciButton);
     
     header.add(title, buttonGroup);
-    add(header);
+    leftPane.add(header);
 
+    // Description
     Div description = new Div();
     description.setText("Entries with Access Control Instructions (ACIs) defined at the entry level.");
     description.getStyle().set("color", "var(--lumo-secondary-text-color)")
         .set("margin-bottom", "var(--lumo-space-m)");
-    add(description);
+    leftPane.add(description);
 
     // Search field for filtering ACI rules
     searchField = new TextField();
@@ -97,59 +127,212 @@ public class EntryAccessControlTab extends VerticalLayout {
     searchField.setWidthFull();
     searchField.getStyle().set("margin-bottom", "var(--lumo-space-m)");
     searchField.addValueChangeListener(event -> filterAciGrid());
-    add(searchField);
+    leftPane.add(searchField);
 
-    // Create loading indicator
-    progressBar = new ProgressBar();
-    progressBar.setIndeterminate(true);
-    progressBar.setVisible(false);
-    
-    loadingContainer = new Div();
-    loadingContainer.add(progressBar, new Div("Loading entry access control information..."));
-    loadingContainer.getStyle().set("text-align", "center");
-    loadingContainer.getStyle().set("padding", "20px");
-    loadingContainer.setVisible(false);
-    add(loadingContainer);
-
-    // Grid for displaying entry DN and ACI values
+    // Grid for displaying ACI entries
     aciGrid = new Grid<>(EntryAciInfo.class, false);
+    aciGrid.setSelectionMode(Grid.SelectionMode.SINGLE);
+    aciGrid.setAllRowsVisible(false);
+    aciGrid.setPageSize(50);
+    aciGrid.getStyle()
+        .set("border", "1px solid var(--lumo-contrast-20pct)")
+        .set("border-radius", "var(--lumo-border-radius-m)");
+    setupGridColumns();
+    aciGrid.setSizeFull();
+    aciGrid.addSelectionListener(event -> {
+      selectedAci = event.getFirstSelectedItem().orElse(null);
+      updateDetailsPanel();
+    });
+
+    leftPane.add(aciGrid);
+    leftPane.setFlexGrow(1, aciGrid); // Grid takes remaining space
+
+    // RIGHT PANE: ACI details
+    aciDetailsPanel = new Div();
+    aciDetailsPanel.setHeightFull();
+    aciDetailsPanel.getStyle()
+        .set("padding", "var(--lumo-space-m)")
+        .set("overflow-y", "auto")
+        .set("min-width", "300px") // Ensure minimum width for readability
+        .set("background", "white"); // Match schema browser style
     
-    // Add action columns first (leftmost position)
-    aciGrid.addColumn(new ComponentRenderer<>(aciInfo -> {
-      HorizontalLayout actions = new HorizontalLayout();
-      actions.setSpacing(false);
-      actions.setPadding(false);
-      
-      Button editButton = new Button(new Icon(VaadinIcon.EDIT));
-      editButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-      editButton.setTooltipText("Edit ACI");
-      editButton.addClickListener(event -> openEditAciDialog(aciInfo));
-      
-      Button deleteButton = new Button(new Icon(VaadinIcon.TRASH));
-      deleteButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
-      deleteButton.setTooltipText("Delete ACI");
-      deleteButton.addClickListener(event -> deleteAci(aciInfo));
-      
-      actions.add(editButton, deleteButton);
-      return actions;
-    }))
-        .setHeader("Actions")
+    createDetailsPanel();
+
+    mainLayout.addToPrimary(leftPane);
+    mainLayout.addToSecondary(aciDetailsPanel);
+
+    add(mainLayout);
+    setFlexGrow(1, mainLayout);
+  }
+
+  /**
+   * Sets up the grid columns with the new ACI structure.
+   */
+  private void setupGridColumns() {
+    // Name column (first and leftmost)
+    aciGrid.addColumn(EntryAciInfo::getName)
+        .setHeader("Name")
         .setAutoWidth(true)
-        .setFlexGrow(0);
-    
+        .setFlexGrow(1)
+        .setSortable(true)
+        .setResizable(true);
+
+    // Entry DN column
     aciGrid.addColumn(EntryAciInfo::getDn)
         .setHeader("Entry DN")
         .setAutoWidth(true)
-        .setFlexGrow(1);
-    
-    aciGrid.addColumn(EntryAciInfo::getAciValue)
-        .setHeader("Access Control Instruction (ACI)")
-        .setAutoWidth(true)
-        .setFlexGrow(2);
+        .setFlexGrow(2)
+        .setSortable(true)
+        .setResizable(true);
 
-    aciGrid.setSizeFull();
-    add(aciGrid);
-    setFlexGrow(1, aciGrid);
+    // Resources column
+    aciGrid.addColumn(EntryAciInfo::getResources)
+        .setHeader("Resources")
+        .setAutoWidth(true)
+        .setFlexGrow(2)
+        .setSortable(false)
+        .setResizable(true);
+
+    // Rights column
+    aciGrid.addColumn(EntryAciInfo::getRights)
+        .setHeader("Rights")
+        .setAutoWidth(true)
+        .setFlexGrow(1)
+        .setSortable(false)
+        .setResizable(true);
+
+    // Clients column
+    aciGrid.addColumn(EntryAciInfo::getClients)
+        .setHeader("Clients")
+        .setAutoWidth(true)
+        .setFlexGrow(2)
+        .setSortable(false)
+        .setResizable(true);
+  }
+
+  /**
+   * Creates the initial details panel layout.
+   */
+  private void createDetailsPanel() {
+    updateDetailsPanel();
+  }
+
+  /**
+   * Updates the details panel with the selected ACI information.
+   */
+  private void updateDetailsPanel() {
+    aciDetailsPanel.removeAll();
+
+    if (selectedAci == null) {
+      Span placeholder = new Span("Select an ACI to view details");
+      placeholder.getStyle()
+          .set("color", "var(--lumo-secondary-text-color)")
+          .set("font-style", "italic");
+      aciDetailsPanel.add(placeholder);
+      return;
+    }
+
+    AciParser.ParsedAci parsedAci = selectedAci.getParsedAci();
+
+    // Header with title and action buttons
+    HorizontalLayout detailsHeader = new HorizontalLayout();
+    detailsHeader.setWidthFull();
+    detailsHeader.setJustifyContentMode(JustifyContentMode.BETWEEN);
+    detailsHeader.setAlignItems(Alignment.CENTER);
+    detailsHeader.getStyle().set("margin-bottom", "var(--lumo-space-m)");
+
+    H4 aciTitle = new H4(parsedAci.getName());
+    aciTitle.getStyle().set("margin", "0");
+
+    // Action buttons (Edit and Delete)
+    HorizontalLayout actionButtons = new HorizontalLayout();
+    actionButtons.setSpacing(false);
+
+    Button editButton = new Button(new Icon(VaadinIcon.EDIT));
+    editButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+    editButton.setTooltipText("Edit ACI");
+    editButton.addClickListener(event -> openEditAciDialog(selectedAci));
+
+    Button deleteButton = new Button(new Icon(VaadinIcon.TRASH));
+    deleteButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
+    deleteButton.setTooltipText("Delete ACI");
+    deleteButton.addClickListener(event -> deleteAci(selectedAci));
+
+    actionButtons.add(editButton, deleteButton);
+
+    detailsHeader.add(aciTitle, actionButtons);
+    aciDetailsPanel.add(detailsHeader);
+
+    // Entry DN section
+    addDetailRow("Entry DN", selectedAci.getDn());
+
+    // Resources section
+    if (!parsedAci.getTargets().isEmpty()) {
+      addDetailRow("Resources", String.join(", ", parsedAci.getTargets()));
+    } else {
+      addDetailRow("Resources", "All resources");
+    }
+
+    // Rights section
+    String rightsValue = parsedAci.getAllowOrDeny().toUpperCase();
+    if (!parsedAci.getPermissions().isEmpty()) {
+      rightsValue += " (" + String.join(", ", parsedAci.getPermissions()) + ")";
+    }
+    addDetailRow("Rights", rightsValue);
+
+    // Clients section
+    if (!parsedAci.getBindRules().isEmpty()) {
+      addDetailRow("Clients", String.join(", ", parsedAci.getBindRules()));
+    } else {
+      addDetailRow("Clients", "Any client");
+    }
+
+    // Raw Definition section
+    HorizontalLayout rawSection = new HorizontalLayout();
+    rawSection.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.START);
+    rawSection.setSpacing(true);
+    rawSection.setWidthFull();
+    rawSection.getStyle().set("margin-top", "var(--lumo-space-l)");
+    
+    Span rawLabel = new Span("Raw Definition:");
+    rawLabel.getStyle().set("font-weight", "bold").set("min-width", "150px");
+    
+    TextArea rawTextArea = new TextArea();
+    rawTextArea.setValue(parsedAci.getRawAci());
+    rawTextArea.setReadOnly(true);
+    rawTextArea.setWidthFull();
+    rawTextArea.setMinHeight("100px");
+    rawTextArea.getStyle()
+        .set("font-family", "monospace")
+        .set("font-size", "var(--lumo-font-size-s)");
+    
+    rawSection.add(rawLabel, rawTextArea);
+    rawSection.setFlexGrow(1, rawTextArea);
+    
+    aciDetailsPanel.add(rawSection);
+  }
+
+  /**
+   * Adds a detail row with label and value, matching schema browser styling.
+   */
+  private void addDetailRow(String label, String value) {
+    if (value != null && !value.trim().isEmpty()) {
+      HorizontalLayout row = new HorizontalLayout();
+      row.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.START);
+      row.setSpacing(true);
+      row.getStyle().set("margin-bottom", "var(--lumo-space-s)");
+
+      Span labelSpan = new Span(label + ":");
+      labelSpan.getStyle().set("font-weight", "bold").set("min-width", "150px");
+
+      Span valueSpan = new Span(value);
+      valueSpan.getStyle().set("word-wrap", "break-word");
+
+      row.add(labelSpan, valueSpan);
+      row.setFlexGrow(1, valueSpan);
+
+      aciDetailsPanel.add(row);
+    }
   }
 
   /**
@@ -705,10 +888,12 @@ public class EntryAccessControlTab extends VerticalLayout {
   public static class EntryAciInfo {
     private final String dn;
     private final String aciValue;
+    private final AciParser.ParsedAci parsedAci;
 
     public EntryAciInfo(String dn, String aciValue) {
       this.dn = dn;
       this.aciValue = aciValue;
+      this.parsedAci = AciParser.parseAci(aciValue);
     }
 
     public String getDn() {
@@ -717,6 +902,26 @@ public class EntryAccessControlTab extends VerticalLayout {
 
     public String getAciValue() {
       return aciValue;
+    }
+
+    public AciParser.ParsedAci getParsedAci() {
+      return parsedAci;
+    }
+
+    public String getName() {
+      return parsedAci.getName();
+    }
+
+    public String getResources() {
+      return parsedAci.getResourcesString();
+    }
+
+    public String getRights() {
+      return parsedAci.getRightsString();
+    }
+
+    public String getClients() {
+      return parsedAci.getClientsString();
     }
   }
 }
