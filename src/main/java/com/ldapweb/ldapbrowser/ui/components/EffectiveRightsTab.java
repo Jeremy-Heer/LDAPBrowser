@@ -53,7 +53,7 @@ public class EffectiveRightsTab extends VerticalLayout {
   private ComboBox<SearchScope> scopeComboBox;
   private TextField searchFilterField;
   private TextField attributesField;
-  private TextField effectiveRightsForField;
+  private DnSelectorField effectiveRightsForField;
   private TextField searchSizeLimitField;
   private Button searchButton;
   
@@ -127,12 +127,10 @@ public class EffectiveRightsTab extends VerticalLayout {
     attributesField.setWidthFull();
 
     // Effective Rights For
-    effectiveRightsForField = new TextField("Effective Rights For");
+    effectiveRightsForField = new DnSelectorField("Effective Rights For", ldapService);
     effectiveRightsForField.setPlaceholder("Target user/entity DN (e.g., uid=admin,dc=example,dc=com)");
     effectiveRightsForField.setWidthFull();
-    effectiveRightsForField.setRequired(true);
-    effectiveRightsForField.setHelperText("The 'dn: ' prefix will be automatically added");
-    effectiveRightsForField.setClearButtonVisible(true);
+    effectiveRightsForField.setRequiredIndicatorVisible(true);
 
     // Search Size Limit
     searchSizeLimitField = new TextField("Search Size Limit");
@@ -222,8 +220,9 @@ public class EffectiveRightsTab extends VerticalLayout {
   public void setServerConfig(LdapServerConfig config) {
     this.serverConfig = config;
     
-    // Set server config for DN selector
+    // Set server config for DN selectors
     searchBaseField.setServerConfig(config);
+    effectiveRightsForField.setServerConfig(config);
     
     // Set default search base from server config
     if (config != null && config.getBaseDn() != null && !config.getBaseDn().isEmpty()) {

@@ -259,7 +259,7 @@ public class InternalServersTab extends VerticalLayout {
   }
 
   private void openServerDialog(LdapServerConfig config) {
-    MultiGroupInMemoryServerConfigDialog dialog = new MultiGroupInMemoryServerConfigDialog(config, configurationService, inMemoryLdapService);
+    MultiGroupInMemoryServerConfigDialog dialog = new MultiGroupInMemoryServerConfigDialog(config, configurationService, inMemoryLdapService, ldapService);
     dialog.addSaveListener(savedConfig -> {
       inMemoryLdapService.saveInMemoryServer(savedConfig);
       refreshServerList();

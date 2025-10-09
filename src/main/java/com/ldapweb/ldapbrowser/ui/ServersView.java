@@ -8,7 +8,7 @@ import com.ldapweb.ldapbrowser.service.LoggingService;
 import com.ldapweb.ldapbrowser.service.ServerSelectionService;
 import com.ldapweb.ldapbrowser.ui.components.AccessControlsTab;
 import com.ldapweb.ldapbrowser.ui.components.BulkOperationsTab;
-import com.ldapweb.ldapbrowser.ui.components.DashboardTab;
+import com.ldapweb.ldapbrowser.ui.components.LDAPBrowser;
 import com.ldapweb.ldapbrowser.ui.components.DirectorySearchTab;
 import com.ldapweb.ldapbrowser.ui.components.ExportTab;
 import com.ldapweb.ldapbrowser.ui.components.SchemaBrowser;
@@ -41,7 +41,7 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
 
   private TabSheet tabSheet;
   private DirectorySearchTab directorySearchTab;
-  private DashboardTab dashboardTab;
+  private LDAPBrowser ldapBrowser;
   private SchemaBrowser schemaBrowser;
   private AccessControlsTab accessControlsTab;
   private ExportTab reportsTab;
@@ -90,7 +90,7 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
       if (selectedTab != null) {
         String tabLabel = selectedTab.getLabel();
         if ("LDAP Browser".equals(tabLabel)) {
-          dashboardTab.loadRootDSEWithNamingContexts();
+          ldapBrowser.loadRootDSEWithNamingContexts();
         } else if ("Access".equals(tabLabel)) {
           accessControlsTab.loadData();
         } else if ("Schema".equals(tabLabel)) {
@@ -105,9 +105,9 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
     tabSheet.add(directorySearchTabComponent, directorySearchTab);
 
     Tab dashboardTabComponent = new Tab("LDAP Browser");
-    dashboardTab = new DashboardTab(ldapService, configurationService, inMemoryLdapService,
+    ldapBrowser = new LDAPBrowser(ldapService, configurationService, inMemoryLdapService,
         selectionService);
-    tabSheet.add(dashboardTabComponent, dashboardTab);
+    tabSheet.add(dashboardTabComponent, ldapBrowser);
 
     Tab schemaTabComponent = new Tab("Schema");
     schemaBrowser = new SchemaBrowser(ldapService, configurationService, inMemoryLdapService,
@@ -176,7 +176,7 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
 
     // Update tabs that need the server config explicitly 
     // but don't trigger immediate data loading
-    dashboardTab.setServerConfig(config);
+    ldapBrowser.setServerConfig(config);
     schemaBrowser.setServerConfig(config);
     accessControlsTab.setServerConfig(config);
     reportsTab.setServerConfig(config);
@@ -188,7 +188,7 @@ public class ServersView extends VerticalLayout implements BeforeEnterObserver {
     if (selectedTab != null) {
       String tabLabel = selectedTab.getLabel();
       if ("LDAP Browser".equals(tabLabel)) {
-        dashboardTab.loadRootDSEWithNamingContexts();
+        ldapBrowser.loadRootDSEWithNamingContexts();
       } else if ("Access".equals(tabLabel)) {
         accessControlsTab.loadData();
       } else if ("Schema".equals(tabLabel)) {

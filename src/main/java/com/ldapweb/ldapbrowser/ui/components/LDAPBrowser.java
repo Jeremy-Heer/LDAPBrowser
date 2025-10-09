@@ -21,10 +21,10 @@ import com.vaadin.flow.theme.lumo.LumoUtility;
 import java.util.List;
 
 /**
- * Dashboard tab containing the LDAP browser, attribute editor, and search
+ * LDAP Browser component containing the LDAP browser, attribute editor, and search
  * functionality
  */
-public class DashboardTab extends VerticalLayout {
+public class LDAPBrowser extends VerticalLayout {
 
   private final LdapService ldapService;
   private final ConfigurationService configurationService;
@@ -45,7 +45,7 @@ public class DashboardTab extends VerticalLayout {
   private Tab entryDetailsTab;
   private NewEntryTab newEntryTab;
 
-  public DashboardTab(LdapService ldapService, ConfigurationService configurationService,
+  public LDAPBrowser(LdapService ldapService, ConfigurationService configurationService,
       InMemoryLdapService inMemoryLdapService, ServerSelectionService selectionService) {
     this.ldapService = ldapService;
     this.configurationService = configurationService;

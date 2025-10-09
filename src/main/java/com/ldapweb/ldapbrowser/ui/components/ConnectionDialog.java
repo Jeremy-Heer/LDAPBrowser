@@ -3,6 +3,7 @@ package com.ldapweb.ldapbrowser.ui.components;
 import com.ldapweb.ldapbrowser.model.LdapServerConfig;
 import com.ldapweb.ldapbrowser.service.ConfigurationService;
 import com.ldapweb.ldapbrowser.service.InMemoryLdapService;
+import com.ldapweb.ldapbrowser.service.LdapService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
@@ -27,6 +28,7 @@ public class ConnectionDialog extends Dialog {
 
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
+  private final LdapService ldapService;
 
   private Grid<LdapServerConfig> serverGrid;
   private Button addButton;
@@ -37,9 +39,11 @@ public class ConnectionDialog extends Dialog {
   private final List<Consumer<LdapServerConfig>> saveListeners = new ArrayList<>();
 
   public ConnectionDialog(ConfigurationService configurationService, 
-                         InMemoryLdapService inMemoryLdapService) {
+                         InMemoryLdapService inMemoryLdapService, 
+                         LdapService ldapService) {
     this.configurationService = configurationService;
     this.inMemoryLdapService = inMemoryLdapService;
+    this.ldapService = ldapService;
 
     initializeComponents();
     setupLayout();
@@ -153,7 +157,7 @@ public class ConnectionDialog extends Dialog {
 
   private void openServerDialog(LdapServerConfig config) {
     MultiGroupServerConfigDialog dialog = new MultiGroupServerConfigDialog(
-        config, configurationService, inMemoryLdapService);
+        config, configurationService, inMemoryLdapService, ldapService);
     dialog.addSaveListener(savedConfig -> {
       configurationService.saveConfiguration(savedConfig);
       refreshGrid();

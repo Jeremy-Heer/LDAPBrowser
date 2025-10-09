@@ -30,7 +30,7 @@ import java.util.Map;
 public class NewEntryTab extends VerticalLayout {
 
   private final LdapService ldapService;
-  private final DashboardTab dashboardTab;
+  private final LDAPBrowser ldapBrowser;
   private LdapServerConfig serverConfig;
 
   // UI Components
@@ -45,9 +45,9 @@ public class NewEntryTab extends VerticalLayout {
   // Data
   private List<AttributeRow> attributeRows;
 
-  public NewEntryTab(LdapService ldapService, DashboardTab dashboardTab) {
+  public NewEntryTab(LdapService ldapService, LDAPBrowser ldapBrowser) {
     this.ldapService = ldapService;
-    this.dashboardTab = dashboardTab;
+    this.ldapBrowser = ldapBrowser;
     this.attributeRows = new ArrayList<>();
 
     initializeComponents();
@@ -344,7 +344,7 @@ public class NewEntryTab extends VerticalLayout {
     linkLayout.getStyle().set("cursor", "pointer");
     linkLayout.addClickListener(e -> {
       // Navigate to the created entry in the Entry Details tab
-      dashboardTab.showEntryDetails(dn);
+      ldapBrowser.showEntryDetails(dn);
     });
 
     linkLayout.add(linkIcon, linkText);

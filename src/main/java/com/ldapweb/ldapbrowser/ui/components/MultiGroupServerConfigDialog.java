@@ -3,6 +3,7 @@ package com.ldapweb.ldapbrowser.ui.components;
 import com.ldapweb.ldapbrowser.model.LdapServerConfig;
 import com.ldapweb.ldapbrowser.service.ConfigurationService;
 import com.ldapweb.ldapbrowser.service.InMemoryLdapService;
+import com.ldapweb.ldapbrowser.service.LdapService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
@@ -37,6 +38,7 @@ public class MultiGroupServerConfigDialog extends Dialog {
   private final boolean isNew;
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
+  private final LdapService ldapService;
 
   // Basic server configuration fields
   private TextField nameField;
@@ -47,7 +49,7 @@ public class MultiGroupServerConfigDialog extends Dialog {
   private Checkbox promptForPasswordCheckbox;
   private Checkbox useSslCheckbox;
   private Checkbox useStartTlsCheckbox;
-  private TextField baseDnField;
+  private DnSelectorField baseDnField;
 
   // Group management components
   private MultiSelectListBox<String> groupListBox;
@@ -62,14 +64,17 @@ public class MultiGroupServerConfigDialog extends Dialog {
    * @param config the server configuration to edit, or null to create a new one
    * @param configurationService the configuration service for external servers
    * @param inMemoryLdapService the service for internal servers
+   * @param ldapService the LDAP service for DN operations
    */
   public MultiGroupServerConfigDialog(LdapServerConfig config, 
                                     ConfigurationService configurationService,
-                                    InMemoryLdapService inMemoryLdapService) {
+                                    InMemoryLdapService inMemoryLdapService,
+                                    LdapService ldapService) {
     this.config = config != null ? config : new LdapServerConfig();
     this.isNew = config == null;
     this.configurationService = configurationService;
     this.inMemoryLdapService = inMemoryLdapService;
+    this.ldapService = ldapService;
 
     if (isNew && this.config.getId() == null) {
       this.config.setId(UUID.randomUUID().toString());
@@ -138,9 +143,10 @@ public class MultiGroupServerConfigDialog extends Dialog {
       }
     });
 
-    baseDnField = new TextField("Base DN");
+    baseDnField = new DnSelectorField("Base DN", ldapService);
     baseDnField.setWidthFull();
     baseDnField.setPlaceholder("e.g., dc=example,dc=com");
+    baseDnField.setShowConnectButton(true); // Enable connect button for server configuration
 
     // Group management components
     groupListBox = new MultiSelectListBox<>();
@@ -301,8 +307,58 @@ public class MultiGroupServerConfigDialog extends Dialog {
       useStartTlsCheckbox.setValue(config.isUseStartTLS());
       baseDnField.setValue(config.getBaseDn() != null ? config.getBaseDn() : "");
       
+      // Set server config for DN selector when editing existing server
+      baseDnField.setServerConfig(config);
+      
       // Select the groups this server belongs to
       config.getGroups().forEach(groupListBox::select);
+    } else {
+      // For new servers, we need to create a temporary config when browsing
+      setupDynamicServerConfig();
+    }
+  }
+
+  private void setupDynamicServerConfig() {
+    // Add listeners to form fields to update server config dynamically for new servers
+    hostField.addValueChangeListener(event -> updateTempServerConfig());
+    portField.addValueChangeListener(event -> updateTempServerConfig());
+    bindDnField.addValueChangeListener(event -> updateTempServerConfig());
+    passwordField.addValueChangeListener(event -> updateTempServerConfig());
+    useSslCheckbox.addValueChangeListener(event -> updateTempServerConfig());
+    useStartTlsCheckbox.addValueChangeListener(event -> updateTempServerConfig());
+    promptForPasswordCheckbox.addValueChangeListener(event -> updateTempServerConfig());
+  }
+
+  private void updateTempServerConfig() {
+    // Create a temporary server config from current form values for DN browsing
+    if (isNew) {
+      String host = hostField.getValue();
+      Integer port = portField.getValue();
+      String bindDn = bindDnField.getValue();
+      String password = passwordField.getValue();
+      boolean useSSL = useSslCheckbox.getValue();
+      boolean useStartTLS = useStartTlsCheckbox.getValue();
+      boolean promptForPassword = promptForPasswordCheckbox.getValue();
+      
+      // Only create temp config if we have minimum required fields
+      if (host != null && !host.trim().isEmpty() && port != null && port > 0) {
+        LdapServerConfig tempConfig = new LdapServerConfig();
+        tempConfig.setId("temp-" + System.currentTimeMillis()); // Temporary ID
+        tempConfig.setName("temp");
+        tempConfig.setHost(host.trim());
+        tempConfig.setPort(port);
+        tempConfig.setBindDn(bindDn != null ? bindDn.trim() : "");
+        tempConfig.setPassword(password != null ? password : "");
+        tempConfig.setUseSSL(useSSL);
+        tempConfig.setUseStartTLS(useStartTLS);
+        tempConfig.setPromptForPassword(promptForPassword);
+        
+        // Set the temporary config on the DN selector
+        baseDnField.setServerConfig(tempConfig);
+      } else {
+        // Clear server config if required fields are missing
+        baseDnField.setServerConfig(null);
+      }
     }
   }
 

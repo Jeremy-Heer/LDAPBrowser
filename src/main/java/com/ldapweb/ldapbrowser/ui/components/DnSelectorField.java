@@ -23,8 +23,11 @@ public class DnSelectorField extends CustomField<String> {
     private final LdapService ldapService;
     private TextField textField;
     private Button browseButton;
+    private Button connectButton;
     private LdapServerConfig serverConfig;
     private boolean allowManualEntry = true;
+    private boolean isConnected = false;
+    private boolean showConnectButton = false; // Only show in configuration dialogs
     private LdapTreeBrowser.FilterType filterType = LdapTreeBrowser.FilterType.ALL;
 
     /**
@@ -48,6 +51,17 @@ public class DnSelectorField extends CustomField<String> {
         initializeComponents();
         setupLayout();
         setupEventHandlers();
+        
+        // Add cleanup when component is detached
+        addDetachListener(event -> {
+            if (serverConfig != null && isConnected) {
+                try {
+                    ldapService.disconnect(serverConfig.getId());
+                } catch (Exception e) {
+                    // Ignore disconnect errors during cleanup
+                }
+            }
+        });
     }
 
     private void initializeComponents() {
@@ -56,25 +70,42 @@ public class DnSelectorField extends CustomField<String> {
         textField.setPlaceholder("e.g., ou=users,dc=example,dc=com");
         textField.setWidthFull();
 
+        // Create connect button
+        connectButton = new Button(new Icon(VaadinIcon.CONNECT));
+        connectButton.addThemeVariants(ButtonVariant.LUMO_ICON);
+        connectButton.setTooltipText("Connect to server");
+        connectButton.getStyle().set("color", "#28a745");
+        connectButton.setEnabled(false);
+
         // Create browse button
         browseButton = new Button(new Icon(VaadinIcon.FOLDER_OPEN));
         browseButton.addThemeVariants(ButtonVariant.LUMO_ICON);
         browseButton.setTooltipText("Browse for DN");
         browseButton.getStyle().set("color", "#4a90e2");
+        browseButton.setEnabled(false); // Initially disabled until connected
     }
 
     private void setupLayout() {
-        // Create horizontal layout with text field and browse button
+        // Create horizontal layout with text field, and browse button (connect button only if needed)
         HorizontalLayout layout = new HorizontalLayout();
         layout.setWidthFull();
         layout.setSpacing(false);
         layout.setAlignItems(FlexComponent.Alignment.END);
         
-        layout.add(textField, browseButton);
-        layout.setFlexGrow(1, textField);
+        // Add text field first
+        layout.add(textField);
         
-        // Add some spacing between text field and button
+        // Conditionally add connect button for configuration dialogs
+        if (showConnectButton) {
+            layout.add(connectButton);
+            connectButton.getStyle().set("margin-left", "var(--lumo-space-xs)");
+        }
+        
+        // Always add browse button
+        layout.add(browseButton);
         browseButton.getStyle().set("margin-left", "var(--lumo-space-xs)");
+        
+        layout.setFlexGrow(1, textField);
         
         add(layout);
     }
@@ -83,6 +114,11 @@ public class DnSelectorField extends CustomField<String> {
         // Text field value change handler
         textField.addValueChangeListener(event -> {
             updateValue();
+        });
+
+        // Connect button click handler
+        connectButton.addClickListener(event -> {
+            connectToServer();
         });
 
         // Browse button click handler
@@ -94,8 +130,72 @@ public class DnSelectorField extends CustomField<String> {
         textField.setEnabled(allowManualEntry);
     }
 
+    private void connectToServer() {
+        if (serverConfig == null) {
+            return;
+        }
+
+        connectButton.setEnabled(false);
+        connectButton.setText("Connecting...");
+        connectButton.setIcon(new Icon(VaadinIcon.SPINNER));
+
+        // Test the connection and establish a persistent connection
+        try {
+            // First test the connection to validate credentials
+            boolean connected = ldapService.testConnection(serverConfig);
+            if (connected) {
+                // Now establish a persistent connection for the tree browser to use
+                ldapService.connect(serverConfig);
+                isConnected = true;
+                updateConnectionState();
+            } else {
+                showConnectionError("Failed to connect to the server. Please check your connection settings.");
+            }
+        } catch (Exception e) {
+            showConnectionError("Connection failed: " + e.getMessage());
+        }
+    }
+
+    private void updateConnectionState() {
+        if (showConnectButton) {
+            if (isConnected) {
+                connectButton.setText("Connected");
+                connectButton.setIcon(new Icon(VaadinIcon.CHECK));
+                connectButton.getStyle().set("color", "#28a745");
+                connectButton.setEnabled(false);
+                browseButton.setEnabled(true);
+            } else {
+                connectButton.setText("");
+                connectButton.setIcon(new Icon(VaadinIcon.CONNECT));
+                connectButton.getStyle().set("color", "#dc3545");
+                connectButton.setEnabled(serverConfig != null);
+                browseButton.setEnabled(false);
+            }
+        } else {
+            // When no connect button is shown, assume existing connection context
+            // Browse button is always enabled when server config is set
+            browseButton.setEnabled(serverConfig != null);
+        }
+    }
+
+    private void showConnectionError(String message) {
+        isConnected = false;
+        updateConnectionState();
+        // You could show a notification here if needed
+        connectButton.setTooltipText(message);
+    }
+
     private void openBrowserDialog() {
         if (serverConfig == null) {
+            return;
+        }
+        
+        // If connect button is not shown, assume we're in a context with existing connection
+        if (!showConnectButton) {
+            isConnected = true;
+        }
+        
+        if (!isConnected) {
             return;
         }
 
@@ -161,14 +261,44 @@ public class DnSelectorField extends CustomField<String> {
     }
 
     /**
+     * Set whether to show the connect button (for configuration dialogs)
+     *
+     * @param showConnectButton True to show connect button for server configuration
+     */
+    public void setShowConnectButton(boolean showConnectButton) {
+        this.showConnectButton = showConnectButton;
+        // Re-setup layout to reflect the change
+        getChildren().forEach(this::remove);
+        setupLayout();
+    }
+
+    /**
+     * Get whether the connect button is shown
+     *
+     * @return True if connect button is shown
+     */
+    public boolean isShowConnectButton() {
+        return showConnectButton;
+    }
+
+    /**
      * Set the server configuration for LDAP operations
      *
      * @param serverConfig The server configuration
      */
     public void setServerConfig(LdapServerConfig serverConfig) {
+        // Disconnect from previous server if connected
+        if (this.serverConfig != null && isConnected) {
+            try {
+                ldapService.disconnect(this.serverConfig.getId());
+            } catch (Exception e) {
+                // Ignore disconnect errors
+            }
+        }
+        
         this.serverConfig = serverConfig;
-        // Enable/disable browse button based on server config
-        browseButton.setEnabled(serverConfig != null);
+        this.isConnected = false; // Reset connection state
+        updateConnectionState();
     }
 
     /**
@@ -229,6 +359,9 @@ public class DnSelectorField extends CustomField<String> {
     @Override
     public void setReadOnly(boolean readOnly) {
         textField.setReadOnly(readOnly);
-        browseButton.setEnabled(!readOnly && serverConfig != null);
+        if (showConnectButton) {
+            connectButton.setEnabled(!readOnly && serverConfig != null && !isConnected);
+        }
+        browseButton.setEnabled(!readOnly && (isConnected || !showConnectButton) && serverConfig != null);
     }
 }

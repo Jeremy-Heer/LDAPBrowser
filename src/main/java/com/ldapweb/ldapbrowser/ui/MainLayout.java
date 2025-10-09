@@ -6,6 +6,7 @@ import com.ldapweb.ldapbrowser.service.InMemoryLdapService;
 import com.ldapweb.ldapbrowser.service.LdapService;
 import com.ldapweb.ldapbrowser.service.ServerSelectionService;
 import com.ldapweb.ldapbrowser.service.UIPasswordPromptService;
+import com.ldapweb.ldapbrowser.ui.HelpView;
 import com.ldapweb.ldapbrowser.ui.SettingsView;
 import com.ldapweb.ldapbrowser.ui.WelcomeView;
 import com.vaadin.flow.component.AttachEvent;
@@ -173,6 +174,11 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     SideNavItem settingsItem = new SideNavItem("Settings", SettingsView.class);
     settingsItem.setPrefixComponent(new Icon(VaadinIcon.COG));
     nav.addItem(settingsItem);
+
+    // Help link
+    SideNavItem helpItem = new SideNavItem("Help", HelpView.class);
+    helpItem.setPrefixComponent(new Icon(VaadinIcon.QUESTION_CIRCLE));
+    nav.addItem(helpItem);
 
     // Add combo boxes to drawer
     drawerContent.add(nav, serversComboBox, groupsComboBox);

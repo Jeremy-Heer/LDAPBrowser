@@ -226,7 +226,7 @@ public class ConnectionsTab extends VerticalLayout {
 
   private void openServerDialog(LdapServerConfig config) {
     MultiGroupServerConfigDialog dialog = new MultiGroupServerConfigDialog(
-        config, configurationService, inMemoryLdapService);
+        config, configurationService, inMemoryLdapService, ldapService);
     dialog.addSaveListener(savedConfig -> {
       configurationService.saveConfiguration(savedConfig);
       refreshServerList();

@@ -3,6 +3,7 @@ package com.ldapweb.ldapbrowser.ui;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -39,48 +40,66 @@ public class WelcomeView extends VerticalLayout {
     // Introduction paragraph
     Paragraph intro = new Paragraph(
         "LDAP Browser is a comprehensive web application for browsing, searching, "
-        + "and managing LDAP directories. Navigate through your directory structure, "
-        + "search for entries, and manage your LDAP data all from one central interface.");
-    intro.getStyle().set("max-width", "800px");
+        + "and managing LDAP directories. Connect to your LDAP servers, navigate through "
+        + "directory structures, search for entries, and manage your LDAP data all from "
+        + "one intuitive interface.");
+    intro.getStyle().set("max-width", "800px").set("font-size", "var(--lumo-font-size-l)");
+
+    // Quick Start section
+    H2 quickStartHeader = new H2("Quick Start");
+    quickStartHeader.getStyle().set("color", "var(--lumo-primary-color)");
+    
+    VerticalLayout quickStartSteps = new VerticalLayout();
+    quickStartSteps.setSpacing(true);
+    quickStartSteps.setPadding(false);
+    quickStartSteps.add(
+        createQuickStartStep("1", "Configure Server", 
+            "Go to Settings to add your LDAP server configuration"),
+        createQuickStartStep("2", "Connect", 
+            "Select your server from the sidebar to connect"),
+        createQuickStartStep("3", "Browse", 
+            "Navigate the directory tree and explore your data"));
 
     // Feature cards section
+    H2 featuresHeader = new H2("Key Features");
+    featuresHeader.getStyle().set("color", "var(--lumo-primary-color)");
+    
     HorizontalLayout featureCards = new HorizontalLayout();
     featureCards.setWidthFull();
     featureCards.setJustifyContentMode(JustifyContentMode.CENTER);
     featureCards.add(
         createFeatureCard(
             VaadinIcon.CONNECT,
-            "Connect to a Server",
-            "Select a server from the sidebar to connect and start browsing the directory."),
+            "LDAP Browser",
+            "Navigate directory trees, view and edit entry attributes with an intuitive interface."),
         createFeatureCard(
             VaadinIcon.SEARCH,
-            "Search Directory",
-            "Use the search tab to find entries based on various criteria."),
+            "Advanced Search",
+            "Powerful search capabilities with filters, scopes, and result sorting."),
         createFeatureCard(
             VaadinIcon.FILE_TREE,
-            "Browse Schema",
-            "Explore object classes, attributes, and other schema elements."));
+            "Schema Explorer",
+            "Browse object classes, attributes, syntaxes, and matching rules."));
 
+    H2 tipsHeader = new H2("Quick Tips");
+    tipsHeader.getStyle().set("color", "var(--lumo-primary-color)");
+    
     VerticalLayout tipsList = new VerticalLayout();
     tipsList.setSpacing(false);
     tipsList.setPadding(false);
     tipsList.add(
-        createTipItem("Use the dashboard tab to browse the directory tree."),
-        createTipItem("The schema browser allows you to explore LDAP schema components."),
-        createTipItem("Select a group from the sidebar to focus on servers in that group."),
-        createTipItem("Click on an entry in the tree to view and edit its attributes."));
-
-    // Getting started section (moved closer to usage)
-    H2 gettingStarted = new H2("Getting Started");
-
-    // Tips section (moved closer to usage)
-    H2 tipsHeader = new H2("Quick Tips");
+        createTipItem("Use server groups to organize multiple LDAP servers"),
+        createTipItem("Right-click entries in the tree for context menu options"),
+        createTipItem("Click Help in the sidebar for detailed usage instructions"),
+        createTipItem("Test your setup with internal servers before connecting to production"));
 
     // Add all components
     add(
         header,
         intro,
-        gettingStarted,
+        quickStartHeader,
+        quickStartSteps,
+        featuresHeader,
         featureCards,
         tipsHeader,
         tipsList);
@@ -148,5 +167,54 @@ public class WelcomeView extends VerticalLayout {
 
     tipItem.add(bulletIcon, text);
     return tipItem;
+  }
+
+  /**
+   * Creates a quick start step with a number, title, and description.
+   *
+   * @param stepNumber The step number
+   * @param title The step title
+   * @param description The step description
+   * @return A horizontal layout representing the step
+   */
+  private HorizontalLayout createQuickStartStep(String stepNumber, String title, String description) {
+    HorizontalLayout stepItem = new HorizontalLayout();
+    stepItem.setSpacing(true);
+    stepItem.setPadding(false);
+    stepItem.setAlignItems(Alignment.CENTER);
+    stepItem.getStyle().set("margin-bottom", "var(--lumo-space-s)");
+
+    // Step number circle
+    Div numberCircle = new Div();
+    numberCircle.setText(stepNumber);
+    numberCircle.getStyle()
+        .set("background-color", "var(--lumo-primary-color)")
+        .set("color", "var(--lumo-primary-contrast-color)")
+        .set("border-radius", "50%")
+        .set("width", "32px")
+        .set("height", "32px")
+        .set("display", "flex")
+        .set("align-items", "center")
+        .set("justify-content", "center")
+        .set("font-weight", "bold")
+        .set("font-size", "var(--lumo-font-size-s)")
+        .set("flex-shrink", "0");
+
+    // Step content
+    VerticalLayout stepContent = new VerticalLayout();
+    stepContent.setSpacing(false);
+    stepContent.setPadding(false);
+    stepContent.getStyle().set("margin", "0");
+
+    H3 stepTitle = new H3(title);
+    stepTitle.getStyle().set("margin", "0").set("font-size", "var(--lumo-font-size-m)");
+
+    Paragraph stepDescription = new Paragraph(description);
+    stepDescription.getStyle().set("margin", "0").set("color", "var(--lumo-secondary-text-color)");
+
+    stepContent.add(stepTitle, stepDescription);
+    stepItem.add(numberCircle, stepContent);
+    
+    return stepItem;
   }
 }

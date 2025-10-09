@@ -3,6 +3,7 @@ package com.ldapweb.ldapbrowser.ui.components;
 import com.ldapweb.ldapbrowser.model.LdapServerConfig;
 import com.ldapweb.ldapbrowser.service.ConfigurationService;
 import com.ldapweb.ldapbrowser.service.InMemoryLdapService;
+import com.ldapweb.ldapbrowser.service.LdapService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
@@ -39,11 +40,12 @@ public class MultiGroupInMemoryServerConfigDialog extends Dialog {
   private final boolean isNew;
   private final ConfigurationService configurationService;
   private final InMemoryLdapService inMemoryLdapService;
+  private final LdapService ldapService;
 
   // Form fields
   private TextField nameField;
   private IntegerField portField;
-  private TextField baseDnField;
+  private DnSelectorField baseDnField;
   private TextField bindDnField;
   private PasswordField passwordField;
   private Checkbox promptForPasswordCheckbox;
@@ -59,11 +61,13 @@ public class MultiGroupInMemoryServerConfigDialog extends Dialog {
 
   public MultiGroupInMemoryServerConfigDialog(LdapServerConfig config,
                                             ConfigurationService configurationService,
-                                            InMemoryLdapService inMemoryLdapService) {
+                                            InMemoryLdapService inMemoryLdapService,
+                                            LdapService ldapService) {
     this.config = config != null ? config : new LdapServerConfig();
     this.isNew = config == null;
     this.configurationService = configurationService;
     this.inMemoryLdapService = inMemoryLdapService;
+    this.ldapService = ldapService;
 
     if (isNew && this.config.getId() == null) {
       this.config.setId(UUID.randomUUID().toString());
@@ -97,11 +101,11 @@ public class MultiGroupInMemoryServerConfigDialog extends Dialog {
     portField.setWidthFull();
     portField.setHelperText("Port for the in-memory LDAP server");
 
-    baseDnField = new TextField("Base DN");
+    baseDnField = new DnSelectorField("Base DN", ldapService);
     baseDnField.setRequiredIndicatorVisible(true);
     baseDnField.setWidthFull();
     baseDnField.setPlaceholder("e.g., dc=example,dc=com");
-    baseDnField.setHelperText("Root DN for the directory tree");
+    baseDnField.setShowConnectButton(true); // Enable connect button for server configuration
 
     bindDnField = new TextField("Admin DN");
     bindDnField.setRequiredIndicatorVisible(true);
@@ -290,6 +294,9 @@ public class MultiGroupInMemoryServerConfigDialog extends Dialog {
       promptForPasswordCheckbox.setValue(config.isPromptForPassword());
       useSSLCheckbox.setValue(config.isUseSSL());
       
+      // Set server config for DN selector when editing existing server
+      baseDnField.setServerConfig(config);
+      
       // Select the groups this server belongs to
       config.getGroups().forEach(groupListBox::select);
     } else {
@@ -297,6 +304,51 @@ public class MultiGroupInMemoryServerConfigDialog extends Dialog {
       baseDnField.setValue("dc=example,dc=com");
       bindDnField.setValue("cn=admin,dc=example,dc=com");
       passwordField.setValue("admin");
+      
+      // For new servers, we need to create a temporary config when browsing
+      setupDynamicServerConfig();
+    }
+  }
+
+  private void setupDynamicServerConfig() {
+    // Add listeners to form fields to update server config dynamically for new servers
+    nameField.addValueChangeListener(event -> updateTempServerConfig());
+    portField.addValueChangeListener(event -> updateTempServerConfig());
+    bindDnField.addValueChangeListener(event -> updateTempServerConfig());
+    passwordField.addValueChangeListener(event -> updateTempServerConfig());
+    promptForPasswordCheckbox.addValueChangeListener(event -> updateTempServerConfig());
+    useSSLCheckbox.addValueChangeListener(event -> updateTempServerConfig());
+  }
+
+  private void updateTempServerConfig() {
+    // Create a temporary server config from current form values for DN browsing
+    if (isNew) {
+      String name = nameField.getValue();
+      Integer port = portField.getValue();
+      String bindDn = bindDnField.getValue();
+      String password = passwordField.getValue();
+      boolean promptForPassword = promptForPasswordCheckbox.getValue();
+      boolean useSSL = useSSLCheckbox.getValue();
+      
+      // Only create temp config if we have minimum required fields
+      if (name != null && !name.trim().isEmpty() && port != null && port > 0) {
+        LdapServerConfig tempConfig = new LdapServerConfig();
+        tempConfig.setId("temp-inmemory-" + System.currentTimeMillis()); // Temporary ID
+        tempConfig.setName(name.trim());
+        tempConfig.setHost("localhost"); // In-memory servers are always localhost
+        tempConfig.setPort(port);
+        tempConfig.setBindDn(bindDn != null ? bindDn.trim() : "");
+        tempConfig.setPassword(password != null ? password : "");
+        tempConfig.setUseSSL(useSSL);
+        tempConfig.setUseStartTLS(false); // In-memory servers typically don't use StartTLS
+        tempConfig.setPromptForPassword(promptForPassword);
+        
+        // Set the temporary config on the DN selector
+        baseDnField.setServerConfig(tempConfig);
+      } else {
+        // Clear server config if required fields are missing
+        baseDnField.setServerConfig(null);
+      }
     }
   }
 
